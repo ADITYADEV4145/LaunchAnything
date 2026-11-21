@@ -19,6 +19,7 @@ export async function guard(page: Page, selectors: string[]) {
         const element = await frame.frameElement();
         try {
           const isCovered = await element.evaluate((el, selectors) => {
+            if (!(el instanceof Element)) throw new Error('Frame element unavailable');
             let current: Element | null = el;
             while (current) {
               if (selectors.some(s => current!.matches(s))) return true;
@@ -37,12 +38,18 @@ export async function guard(page: Page, selectors: string[]) {
           }
           const style = getComputedStyle(el);
           if (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(el.tagName) || style.display === 'none') return;
-          if (el.getClientRects().length && style.visibility === 'visible') {
+          const visible = el.getClientRects().length > 0 && style.visibility === 'visible';
+          if (visible) {
             attributes.push(...['title', 'alt', 'placeholder'].map(a => el.getAttribute(a) ?? ''), 'value' in el ? String(el.value) : '');
-            for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE) nodes.push(node.textContent ?? '');
           }
-          for (const child of el.children) visit(child);
-          if (el.shadowRoot) for (const child of el.shadowRoot.children) visit(child);
+          const visitChildren = (root: Element | ShadowRoot) => {
+            for (const node of root.childNodes) {
+              if (node.nodeType === Node.TEXT_NODE && visible) nodes.push(node.textContent ?? '');
+              else if (node instanceof Element) visit(node);
+            }
+          };
+          visitChildren(el);
+          if (el.shadowRoot) visitChildren(el.shadowRoot);
         };
         visit(document.documentElement);
         return { text: [...nodes, ...attributes].join('\n'), textContent: nodes.join(''), redactedCount };

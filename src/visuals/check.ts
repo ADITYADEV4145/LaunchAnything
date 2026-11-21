@@ -12,9 +12,14 @@ export function pngSize(data: Buffer) {
   if (data.length < 24 || data.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a' || data.toString('ascii', 12, 16) !== 'IHDR') throw new Error('Invalid PNG header');
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
 }
-export function contrast(a: number[], b: number[]) {
+export function compositeColor(foreground: number[], background: number[]): number[] {
+  const alpha = foreground[3] ?? 1;
+  return foreground.slice(0, 3).map((channel, i) => channel * alpha + background[i] * (1 - alpha));
+}
+export function contrast(a: number[], b: number[], base = [255, 255, 255]) {
   const luminance = (rgb: number[]) => rgb.map(v => v / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((n, v, i) => n + v * [0.2126, 0.7152, 0.0722][i], 0);
-  const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  const background = compositeColor(b, base);
+  const x = luminance(compositeColor(a, background)), y = luminance(background); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 export function safeArea(box: { x: number; y: number; width: number; height: number }, width: number, height: number, youtube = false) {
   return box.width > 0 && box.height > 0 && box.x >= width * .05 && box.y >= height * .05 && box.x + box.width <= width * .95 && box.y + box.height <= height * .95 && !(youtube && box.x + box.width > width * .8 && box.y + box.height > height * .85);

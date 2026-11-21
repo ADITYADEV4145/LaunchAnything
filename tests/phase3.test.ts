@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scanSecrets, maskSecrets, assertPrivate } from '../src/visuals/privacy.js';
-import { contrast, pngSize, safeArea } from '../src/visuals/check.js';
+import { contrast, compositeColor, pngSize, safeArea } from '../src/visuals/check.js';
 import { validateFile } from '../src/core/schema.js';
 import { checks } from '../src/selftest/phase3.js';
 import { PNG } from 'pngjs';
@@ -26,6 +26,8 @@ it('detects secrets split across inline text nodes without scanning redacted tex
   try {
     await page.setContent('<span>a</span><span>@b.com</span>');
     await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    await page.setContent('<p><span>a</span>@b.com</p>');
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
     await page.setContent('<div class="private"><span>a</span><span>@b.com</span></div><p>Safe text</p>');
     expect(await guard(page, ['.private'])).toBe(1);
     await page.setContent('<span>ordinary</span><span> text</span>');
@@ -42,6 +44,9 @@ it('scans and redacts open shadow roots and nested frames, failing closed on unr
     await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
     expect(await guard(page, ['.private'])).toBe(1);
     expect(await page.locator('#host').locator('.private').evaluate(el => getComputedStyle(el).filter)).toBe('blur(18px)');
+    await page.locator('#host').evaluate(el => { el.shadowRoot!.innerHTML = 'person@example.test'; });
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    expect(await guard(page, ['#host'])).toBe(1);
     await page.setContent('<iframe srcdoc="<iframe srcdoc=\'person@example.test\'></iframe>"></iframe>');
     await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
     expect(await guard(page, ['iframe'])).toBe(1);
@@ -62,6 +67,26 @@ it('contrast and safe areas', () => {
   expect(safeArea({ x: 850, y: 550, width: 250, height: 40 }, 1200, 630, true)).toBe(false);
   expect(safeArea({ x: 60, y: 40, width: 0, height: 0 }, 1200, 630)).toBe(false);
 });
+it('composites translucent text and background colors before checking contrast', () => {
+  expect(compositeColor([255, 255, 255, 0], [16, 24, 39])).toEqual([16, 24, 39]);
+  expect(compositeColor([255, 255, 255, .5], [0, 0, 0])).toEqual([127.5, 127.5, 127.5]);
+  expect(contrast([255, 255, 255, 32 / 255], [16, 24, 39])).toBeLessThan(4.5);
+  expect(contrast([0, 0, 0], [255, 255, 255, .5], [0, 0, 0])).toBeCloseTo(contrast([0, 0, 0], [127.5, 127.5, 127.5]));
+});
+it('rejects translucent headlines after compositing nested template backgrounds', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'phase3-alpha-'));
+  try {
+    await mkdir(join(cwd, '.launch/media/images/custom'), { recursive: true });
+    await writeFile(join(cwd, '.launch/product.json'), JSON.stringify({ name: 'Demo', oneLiner: 'Local demo' }));
+    const custom = join(cwd, '.launch/media/images/custom/index.html');
+    await writeFile(custom, '<html style="background:#101827"><body style="margin:0;background:#ffffff10;padding:70px"><h1 data-headline style="color:#ffffff20;background:#10182780">Local demo</h1></body></html>');
+    await expect(makeImages(cwd, { size: 'og' })).rejects.toThrow('Image checks failed');
+    const report = JSON.parse(await readFile(join(cwd, '.launch/media/images/report.json'), 'utf8'));
+    expect(report[0].checks.contrast).toBe(false); expect(report[0].contrastRatio).toBeLessThan(4.5);
+    await writeFile(custom, '<body style="margin:0;background:#101827;padding:70px"><h1 data-headline style="color:#ffffff">Local demo</h1></body>');
+    expect((await makeImages(cwd, { size: 'og' }))[0].ok).toBe(true);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+}, 30000);
 it('reads PNG dimensions and rejects invalid data', () => { expect(pngSize(PNG.sync.write(new PNG({ width: 12, height: 34 })))).toEqual({ width: 12, height: 34 }); expect(() => pngSize(Buffer.alloc(0))).toThrow(); expect(() => pngSize(Buffer.alloc(24))).toThrow(); });
 it('supports backwards compatible shots and terminal additions', () => {
   const viewport = { width: 800, height: 600 };

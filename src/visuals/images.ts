@@ -3,7 +3,7 @@ import { join, extname, resolve } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { packageRoot } from '../core/package-root.js';
 import { browser, escapeHtml } from './runtime.js';
-import { platforms, checkImage, type Size } from './check.js';
+import { platforms, checkImage, compositeColor, type Size } from './check.js';
 import { assertPrivate } from './privacy.js';
 import { ocrCheck } from './capture.js';
 async function optionalJson(path: string) { try { return JSON.parse(await readFile(path, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {}; throw e; } }
@@ -47,13 +47,14 @@ export async function makeImages(cwd: string, options: { template?: string; size
         await page.setContent(html); await page.evaluate(() => document.fonts.ready);
         const metrics = await page.locator('[data-headline]').evaluate(el => {
           const box = el.getBoundingClientRect(); const style = getComputedStyle(el);
-          let parent: Element | null = el; let background = 'rgba(0, 0, 0, 0)';
-          while (parent && background === 'rgba(0, 0, 0, 0)') { background = getComputedStyle(parent).backgroundColor; parent = parent.parentElement; }
-          const rgb = (v: string) => (v.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
-          return { box: { x: box.x, y: box.y, width: box.width, height: box.height }, foreground: rgb(style.color), background: rgb(background) };
+          const rgba = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
+          let parent: Element | null = el; const backgrounds: number[][] = [];
+          while (parent) { backgrounds.unshift(rgba(getComputedStyle(parent).backgroundColor)); parent = parent.parentElement; }
+          return { box: { x: box.x, y: box.y, width: box.width, height: box.height }, foreground: rgba(style.color), backgrounds };
         });
         const png = await page.screenshot(); await ocrCheck(png); const file = join(dir, `${id}.png`); await writeFile(file, png);
-        report.push(await checkImage(file, id, metrics));
+        const background = metrics.backgrounds.reduce((base, layer) => compositeColor(layer, base), [255, 255, 255]);
+        report.push(await checkImage(file, id, { ...metrics, background }));
       } finally { await page.close(); }
     }
     await writeFile(join(dir, 'report.json'), JSON.stringify(report, null, 2));

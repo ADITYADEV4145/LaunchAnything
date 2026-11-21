@@ -10,6 +10,12 @@ interface Pain { name: string; description: string; mentionCount: number; dateRa
 interface Product { name: string; oneLiner: string; audience: string; problem: string; proofPoints: string[]; features: { name: string; description: string; sources: { ref: string }[] }[] }
 const rules = parse(readFileSync(join(packageRoot(), 'rules/brief.yaml'), 'utf8')) as { version: number; faqMin: number; faqMax: number; sections: { title: string; words: number }[] };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const excerpt = (s: string, limit: number) => s.trim().split(/\s+/).slice(0, Math.max(0, limit)).join(' ');
+function budgetEntries(entries: { prefix: string; text: string; suffix: string }[], limit: number) {
+  const required = entries.reduce((sum, entry) => sum + words(entry.prefix) + words(entry.suffix), 0);
+  const allowance = Math.max(0, Math.floor((limit - required) / Math.max(1, entries.length)));
+  return entries.map(entry => [entry.prefix, excerpt(entry.text, allowance), entry.suffix].filter(Boolean).join(' ')).join('\n');
+}
 const url = (s: string) => { try { return ['http:', 'https:'].includes(new URL(s).protocol); } catch { return false; } };
 function inputs(cwd: string) {
   const root = launchDir(cwd).root;
@@ -37,17 +43,17 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
   const { product: p, pains, plan, hash } = ctx;
   const top = pains.map((pain, index) => ({ pain, index })).sort((a, b) => b.pain.mentionCount - a.pain.mentionCount).slice(0, 3);
   const contents = [
-    `${p.name}: ${p.oneLiner} For ${p.audience}. Problem: ${p.problem} [product.json](product.json)`,
-    `Audience: ${p.audience} [product.json](product.json)\n\n` + (top.length ? top.map(({ pain, index }) => `- ${pain.name}: ${pain.description} [pain:${index}](research/pains.json#/pains/${index})\n` + pain.quotes.map(q => `  - “${q.text}” [quote](${q.url})`).join('\n')).join('\n') : 'Pain research unavailable; no validated pains supplied.'),
+    `${excerpt(p.name, 10)}: ${p.oneLiner} For ${excerpt(p.audience, 25)}. Problem: ${excerpt(p.problem, 40)} [product.json](product.json)`,
+    `Audience: ${excerpt(p.audience, 25)} [product.json](product.json)\n\n` + (top.length ? top.map(({ pain, index }) => `- ${pain.name}: ${excerpt(pain.description, 15)} [pain:${index}](research/pains.json#/pains/${index})\n` + pain.quotes.map(q => `  - “${q.text}” [quote](${q.url})`).join('\n')).join('\n') : 'Pain research unavailable; no validated pains supplied.'),
     `One-liner: ${p.oneLiner} [product.json](product.json)\n\n` + [1, 2, 3].map(n => `- Tagline ${n}: Pending agent wording grounded in product.json.`).join('\n'),
-    [p.oneLiner, `For ${p.audience}.`, p.problem].map(s => `- ${s} [product.json](product.json)`).join('\n'),
-    p.proofPoints.map((s, i) => `- ${s} [product.json](product.json#/proofPoints/${i})`).join('\n'),
-    p.features.map((f, i) => `- ${f.name}: ${f.description} [feature:${i}](product.json#/features/${i}) — Pain mapping pending agent verification; do not imply a match.`).join('\n'),
+    [p.oneLiner, `For ${excerpt(p.audience, 25)}.`, excerpt(p.problem, 40)].map(s => `- ${s} [product.json](product.json)`).join('\n'),
+    budgetEntries(p.proofPoints.map((s, i) => ({ prefix: '-', text: s, suffix: `[product.json](product.json#/proofPoints/${i})` })), rules.sections[4].words - 20),
+    budgetEntries(p.features.map((f, i) => ({ prefix: `- ${f.name}:`, text: f.description, suffix: `[feature:${i}](product.json#/features/${i}) — Pain mapping unverified.` })), rules.sections[5].words - 20),
     'No verified competitor claims available.',
     '- Is this suitable for our workflow? Review the sourced features; suitability requires human evaluation.',
-    ['Who is this for?', 'What problem does it address?', 'What does it do?', 'Where is the evidence?', 'What does it cost?', 'Is there a free tier?', 'How do I get started?', 'What remains unverified?'].map((q, i) => `### ${i + 1}. ${q}\n${i === 0 ? p.audience : i === 1 ? p.problem : 'Pending agent answer from verified sources; do not invent details.'} [product.json](product.json)`).join('\n\n'),
+    ['Who is this for?', 'What problem does it address?', 'What does it do?', 'Where is the evidence?', 'What does it cost?', 'Is there a free tier?', 'How do I get started?', 'What remains unverified?'].map((q, i) => `### ${i + 1}. ${q}\n${i === 0 ? excerpt(p.audience, 25) : i === 1 ? excerpt(p.problem, 40) : 'Pending agent answer from verified sources; do not invent details.'} [product.json](product.json)`).join('\n\n'),
     'Pricing and free-tier details unverified. Agent must inspect authoritative pricing sources before making promises.',
-    plan.replace(/^#{1,6} /gm, ''),
+    words(plan) <= rules.sections[10].words - 20 ? plan.replace(/^#{1,6} /gm, '') : `Plan excerpt (review full dates and checklist in plan.md):\n\n${excerpt(plan.replace(/^#{1,6} /gm, ''), rules.sections[10].words - 40)}\n\n[Full launch plan](plan.md)`,
     ['08:00 — Verify assets and approvals.', '09:00 — Review scheduled channel times in plan.md.', '10:00 — Human launches approved channels at their planned times.', '11:00 — Monitor feedback.', '12:00 — Review questions.', '13:00 — Record issues.', '14:00 — Review replies with human.', '15:00 — Check links.', '16:00 — Capture initial metrics.', '17:00 — Record follow-ups.'].join('\n\n'),
     'Targets pending human agreement. Track visits, activation and qualified feedback; no baseline or outcome is assumed.',
     'Unverified pricing, competitor research and feature-to-pain mapping require agent and human review. This deterministic scaffold is not approved launch copy.'

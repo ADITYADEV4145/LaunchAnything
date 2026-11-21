@@ -21,6 +21,25 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('budgets verbose feature descriptions, proof points, audience, problem and plan', () => {
+    setup();
+    const path = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(path, 'utf8'));
+    product.features = Array.from({ length: 8 }, (_, i) => ({ ...product.features[0], name: `Capability-${i}`, description: 'Detailed supported behavior. '.repeat(400) }));
+    product.proofPoints = Array.from({ length: 5 }, () => 'Evidence from the repository. '.repeat(400));
+    product.audience = 'Developers seeking simple workflows. '.repeat(400);
+    product.problem = 'Difficult setup and scattered guidance. '.repeat(400);
+    writeFileSync(path, JSON.stringify(product));
+    writeFileSync(join(cwd, '.launch/plan.md'), '2026-02-10 09:00 UTC — Review approved launch channels. '.repeat(400));
+    const result = brief(cwd);
+    expect(validateBrief(cwd).valid).toBe(true);
+    const markdown = readFileSync(result.path, 'utf8');
+    product.features.forEach((feature: { name: string }, i: number) => {
+      expect(markdown).toContain(feature.name);
+      expect(markdown).toContain(`[feature:${i}](product.json#/features/${i})`);
+    });
+    expect(markdown).toContain('[Full launch plan](plan.md)');
+  });
   it('allows feature and pain names in fixed headings without heading citations', () => {
     setup();
     const path = join(cwd, '.launch/product.json');

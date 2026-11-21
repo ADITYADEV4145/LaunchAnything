@@ -81,7 +81,7 @@ export function destination(channel: string) {
   return destinations[channel];
 }
 
-async function readReceipts(cwd?: string) {
+export async function readReceipts(cwd?: string) {
   return validate<{ posts: PublishReceipt[] }>('published',
     JSON.parse(await readOptional(launchDir(cwd).published) ?? '{"posts":[]}'));
 }

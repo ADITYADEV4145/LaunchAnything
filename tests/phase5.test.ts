@@ -142,6 +142,37 @@ it('resolves local receipt adapters for phase 6 and makes cancellation visible t
   await expect(adapter.status(record.channel, record.id, cwd)).resolves.toEqual({ status: 'cancelled' });
 });
 
+it('retains skipped and previous-version receipts across confirmed publishes without duplicating an ID', async () => {
+  const { cwd, paths, markdown } = await project();
+  async function approve() {
+    const { posts: [{ channel, hash }] } = await buildReview(cwd);
+    await writeFile(paths.approvals, JSON.stringify({ approvals: [
+      { channel, hash, name: 'Reviewer', time: '2026-07-13T09:00:00Z' },
+    ] }));
+    return { channel, hash };
+  }
+  const { channel, hash } = await approve();
+  const first = await publish(cwd, true);
+  if (first.mode !== 'offline-staging') throw new Error('Expected offline staging');
+  const [original] = first.posts;
+  const adapter = getAdapter(channel, original.id);
+
+  await writeFile(join(paths.review, 'skipped.json'), JSON.stringify({ [channel]: hash }));
+  expect((await publish(cwd, true)).posts).toEqual([]);
+  await expect(adapter.status(channel, original.id, cwd)).resolves.toEqual({ status: 'manual' });
+  await expect(adapter.cancel(channel, original.id, cwd)).resolves.toEqual({ status: 'cancelled' });
+
+  await writeFile(join(paths.posts, channel + '.md'), markdown.replace('local launch', 'new launch'));
+  await approve();
+  const edited = await publish(cwd, true);
+  if (edited.mode !== 'offline-staging') throw new Error('Expected offline staging');
+  expect(edited.posts[0].id).not.toBe(original.id);
+  await publish(cwd, true);
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toEqual([
+    { ...original, status: 'cancelled' }, ...edited.posts,
+  ]);
+});
+
 it('runs all phase 5 checks for every fixture', async () => {
   const { results } = await selftest(5);
   const checks = results.filter(result => result.phase === 5);

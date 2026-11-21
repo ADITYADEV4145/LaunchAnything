@@ -2,15 +2,16 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
+import { plan } from '../planning/plan.js';
 import { collect } from '../results/collect.js';
 import { readJson, writeJson } from '../results/files.js';
-import { learn, loadPlanLessons } from '../results/history.js';
+import { learn } from '../results/history.js';
 import { manualObservations, postKey, type PublishedPost } from '../results/metrics.js';
 import { receipt } from '../results/receipt.js';
 import type { Check } from './types.js';
 
 export const checks: Check[] = [{
-  name: 'recorded metrics produce a report, local replies, receipt and a scheduling observation',
+  name: 'recorded metrics produce a report, local replies, receipt and a changed second plan',
   async run({ cwd }) {
     const fixtures = join(cwd, '.liftoff-fixture');
     const workspace = join(fixtures, 'phase6-work');
@@ -24,6 +25,8 @@ export const checks: Check[] = [{
       launchType: 'new-product', timezone: 'America/Chicago', launchDate, profileConfirmed: true,
     });
     const historyPath = join(workspace, 'history.json');
+    const first = await plan(workspace, { historyPath });
+    assert.equal(first.channels.find(channel => channel.id === 'x')?.time, '09:00');
     const posts: PublishedPost[] = [{ channel: 'x', id: 'fixture-x', status: 'published', scheduledAt: '2026-01-06T22:00:00Z' }];
     await writeJson(paths.published, { posts });
     const recordings = manualObservations(await readJson(join(fixtures, 'phase6-metrics.json')), posts);
@@ -44,8 +47,9 @@ export const checks: Check[] = [{
     const learned = await learn(workspace, historyPath);
     assert.ok(learned.observations.some(observation => observation.channel === 'x' && observation.bestHour === 16));
     assert.ok(await readJson(historyPath));
-    const lessons = await loadPlanLessons(profile, historyPath);
-    assert.equal(lessons.find(lesson => lesson.channel === 'x')?.time, '16:00');
+    const second = await plan(workspace, { historyPath });
+    assert.equal(second.channels.find(channel => channel.id === 'x')?.time, '16:00');
+    assert.match(second.markdown, /recorded \d+ views/);
     const image = await receipt(workspace, false);
     assert.doesNotMatch(await readFile(image.path, 'utf8'), /launched with Liftoff/);
   },

@@ -174,6 +174,23 @@ it('returns one structured CLI result and exits nonzero on bad input', async () 
   expect(await readFile(JSON.parse(image.stdout).data.path, 'utf8')).not.toContain('launched with Liftoff');
 });
 
+it('loads learned history from home on the next CLI plan', async () => {
+  const { cwd, paths } = await workspace();
+  const plan = () => {
+    const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', 'plan', '--cwd', cwd, '--json'],
+      { cwd: packageRoot(), encoding: 'utf8', env: { ...process.env, HOME: cwd, USERPROFILE: cwd } });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    return JSON.parse(result.stdout).data;
+  };
+  expect(plan().channels).toContainEqual(expect.objectContaining({ id: 'x', time: '09:00' }));
+  await writeJson(join(paths.root, 'metrics.json'), { posts: [{ channel: 'x', id: 'one', metrics: { views: 8 } }] });
+  await collect(cwd, { now });
+  await learn(cwd, join(cwd, '.liftoff', 'history.json'));
+  const next = plan();
+  expect(next.channels).toContainEqual(expect.objectContaining({ id: 'x', time: '18:00' }));
+  expect(next.markdown).toContain('recorded 8 views');
+});
+
 it.each(['cli-tool', 'saas-next', 'mobile-expo'])('passes Phase 6 checks independently for %s', async fixture => {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-phase6-'));
   dirs.push(cwd);

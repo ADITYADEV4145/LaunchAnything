@@ -21,6 +21,23 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('budgets citations added to flattened plan headings at the section limit', () => {
+    setup();
+    const productPath = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(productPath, 'utf8'));
+    product.features = ['FeatureA', 'FeatureB', 'FeatureC'].map(name => ({ ...product.features[0], name }));
+    writeFileSync(productPath, JSON.stringify(product));
+    const plan = '## FeatureA FeatureB FeatureC\n'.repeat(20) + 'schedule '.repeat(720);
+    expect(plan.trim().split(/\s+/)).toHaveLength(800);
+    writeFileSync(join(cwd, '.launch/plan.md'), plan);
+    const result = brief(cwd);
+    expect(validateBrief(cwd).valid).toBe(true);
+    const section = readFileSync(result.path, 'utf8').split('## Channel plan with dates\n')[1].split('\n## ')[0];
+    expect(section.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
+    expect(section).toContain('[Full launch plan](plan.md)');
+    expect(section).toContain('…');
+    for (let i = 0; i < 3; i++) expect(section).toContain(`[feature:${i}](product.json#/features/${i})`);
+  });
   it('normalizes multiline free text in every inline scaffold insertion', () => {
     setup();
     const productPath = join(cwd, '.launch/product.json');

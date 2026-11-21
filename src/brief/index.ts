@@ -64,6 +64,7 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
     return line;
   }).join('\n');
   const fit = (index: number, texts: string[], render: (values: string[]) => string) => budgetText(texts, rules.sections[index].words, values => cite(render(values)));
+  const flatPlan = plan.replace(/^#{1,6} /gm, '');
   const contents = [
     fit(0, [p.name, p.audience, p.problem], ([name, audience, problem]) => `${name}: ${p.oneLiner} For ${audience}. Problem: ${problem} [product.json](product.json)`),
     fit(1, [p.audience, ...top.map(({ pain }) => pain.description)], ([audience, ...descriptions]) => `Audience: ${audience} [product.json](product.json)\n\n` + (top.length ? top.map(({ pain, index }, i) => `- ${pain.name}: ${descriptions[i]} [pain:${index}](research/pains.json#/pains/${index})\n` + pain.quotes.map(q => `  - “${q.text}” [quote](${q.url})`).join('\n')).join('\n') : 'Pain research unavailable; no validated pains supplied.')),
@@ -78,7 +79,7 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
       return `### ${i + 1}. ${q}\n${answer} [${answer.endsWith('…') ? 'Full text in product.json' : 'product.json'}](product.json)`;
     }).join('\n\n')),
     'Pricing and free-tier details unverified. Agent must inspect authoritative pricing sources before making promises.',
-    words(cite(plan)) <= rules.sections[10].words ? plan.replace(/^#{1,6} /gm, '') : fit(10, [plan.replace(/^#{1,6} /gm, '')], ([text]) => `Plan excerpt (review full dates and checklist in plan.md):\n\n${text}\n\n[Full launch plan](plan.md)`),
+    words(cite(flatPlan)) <= rules.sections[10].words ? flatPlan : fit(10, [flatPlan], ([text]) => `Plan excerpt (review full dates and checklist in plan.md):\n\n${text}\n\n[Full launch plan](plan.md)`),
     ['08:00 — Verify assets and approvals.', '09:00 — Review scheduled channel times in plan.md.', '10:00 — Human launches approved channels at their planned times.', '11:00 — Monitor feedback.', '12:00 — Review questions.', '13:00 — Record issues.', '14:00 — Review replies with human.', '15:00 — Check links.', '16:00 — Capture initial metrics.', '17:00 — Record follow-ups.'].join('\n\n'),
     'Targets pending human agreement. Track visits, activation and qualified feedback; no baseline or outcome is assumed.',
     'Unverified pricing, competitor research and feature-to-pain mapping require agent and human review. This deterministic scaffold is not approved launch copy.'

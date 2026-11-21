@@ -21,6 +21,17 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('renders the full plan and safe local citations without enabling unsafe links', () => {
+    setup();
+    writeFileSync(join(cwd, '.launch/plan.md'), 'Review launch dates. '.repeat(400));
+    const result = brief(cwd);
+    edit(s => s.replace('Targets pending', '[notes](research/notes.md) [unsafe](javascript:alert) [outside](../secret.md) [absolute](/etc/passwd) [protocol](//evil.example) [encoded](%2e%2e/secret.md) [other](data:text/plain,hello) Targets pending'));
+    brief(cwd);
+    const html = readFileSync(result.html, 'utf8');
+    expect(html).toContain('<a href="plan.md">Full launch plan</a>');
+    expect(html).toContain('<a href="research/notes.md">notes</a>');
+    for (const unsafe of ['javascript:', '../secret.md', '/etc/passwd', '//evil.example', '%2e%2e', 'data:']) expect(html).not.toContain(`href="${unsafe}`);
+  });
   it('requires citations in FAQ questions and adds them to generated questions', () => {
     setup();
     const productPath = join(cwd, '.launch/product.json');

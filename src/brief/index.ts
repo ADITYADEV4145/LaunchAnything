@@ -108,6 +108,7 @@ function validateText(ctx: ReturnType<typeof inputs>, path: string, text: string
   return { kind: 'brief', path, valid: !errors.length, errors: [...new Set(errors)], warnings };
 }
 const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const safeLink = (href: string) => url(href) || /^(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-][a-zA-Z0-9_.-]*(?:#[a-zA-Z0-9_/-]+)?$/.test(href);
 export function brief(cwd: string, force = false) {
   const ctx = inputs(cwd);
   const path = join(ctx.root, 'brief.md');
@@ -120,7 +121,7 @@ export function brief(cwd: string, force = false) {
   const html = join(ctx.root, 'brief.html');
   const body = markdown.split('\n').filter(l => !l.startsWith('<!--')).map(l => {
     const heading = /^(#{1,3}) (.*)/.exec(l);
-    const content = escape(heading ? heading[2] : l).replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => /^(https?:|product\.json|research\/pains\.json)/.test(href) ? `<a href="${href}">${label}</a>` : label);
+    const content = escape(heading ? heading[2] : l).replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => safeLink(href) ? `<a href="${href}">${label}</a>` : label);
     return heading ? `<h${heading[1].length}>${content}</h${heading[1].length}>` : `<p>${content}</p>`;
   }).join('\n');
   writeFileSync(html, `<!doctype html><html lang="en"><meta charset="utf-8"><title>Launch Brief</title><style>body{max-width:900px;margin:3rem auto;font:16px/1.5 system-ui;padding:1rem;color:#182030}h2{border-bottom:1px solid #ccc}p{white-space:pre-wrap}a{color:#164a98}@media print{body{margin:0;max-width:none;font-size:11pt}h2,h3{break-after:avoid}a{color:inherit}p{orphans:3;widows:3}}</style><body>${body}</body></html>`);

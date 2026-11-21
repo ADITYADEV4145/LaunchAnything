@@ -18,8 +18,10 @@ export async function guard(page: Page, selectors: string[]) {
       if (frame.parentFrame()) {
         const element = await frame.frameElement();
         try {
-          const isCovered = await element.evaluate((el, selectors) => {
+          const shouldSkip = await element.evaluate((el, selectors) => {
             if (!(el instanceof Element)) throw new Error('Frame element unavailable');
+            const box = el.getBoundingClientRect();
+            if (!el.checkVisibility({ visibilityProperty: true, opacityProperty: true }) || box.width <= 0 || box.height <= 0 || el.clientWidth <= 0 || el.clientHeight <= 0) return true;
             let current: Element | null = el;
             while (current) {
               if (selectors.some(s => current!.matches(s))) return true;
@@ -27,7 +29,7 @@ export async function guard(page: Page, selectors: string[]) {
             }
             return false;
           }, selectors);
-          if (isCovered) { covered.add(frame); continue; }
+          if (shouldSkip) { covered.add(frame); continue; }
         } finally { await element.dispose(); }
       }
       result = await frame.evaluate((selectors) => {

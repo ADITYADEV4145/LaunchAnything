@@ -77,6 +77,27 @@ it('scans and redacts open shadow roots and nested frames, failing closed on unr
     evaluation.mockRestore();
   } finally { await app.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
+it('skips invisible iframe subtrees without inspecting their documents', async () => {
+  const app = await browser(); const page = await app.newPage();
+  const secretFrame = '<iframe srcdoc="person@example.test"></iframe>';
+  try {
+    const cases = [
+      ...['visibility:hidden', 'display:none', 'opacity:0', 'width:0', 'height:0', 'transform:scale(0)'].map(style => `<iframe style="${style}" srcdoc="person@example.test"></iframe>`),
+      ...['visibility:hidden', 'display:none', 'opacity:0'].map(style => `<div style="${style}">${secretFrame}</div>`),
+      '<iframe style="display:none" srcdoc="<iframe srcdoc=\'person@example.test\'></iframe>"></iframe>',
+    ];
+    for (const html of cases) {
+      await page.setContent(html);
+      const evaluations = page.frames().filter(frame => frame !== page.mainFrame()).map(frame => vi.spyOn(frame, 'evaluate').mockRejectedValue(new Error('must not inspect hidden frame')));
+      try {
+        expect(await guard(page, [])).toBe(0);
+        for (const evaluation of evaluations) expect(evaluation).not.toHaveBeenCalled();
+      } finally { for (const evaluation of evaluations) evaluation.mockRestore(); }
+    }
+    await page.setContent(secretFrame);
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+  } finally { await app.close(); }
+});
 it('contrast and safe areas', () => {
   expect(contrast([0, 0, 0], [255, 255, 255])).toBeCloseTo(21); expect(contrast([42, 42, 42], [42, 42, 42])).toBe(1);
   expect(safeArea({ x: 60, y: 40, width: 500, height: 50 }, 1200, 630)).toBe(true);

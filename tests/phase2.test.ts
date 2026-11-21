@@ -82,6 +82,13 @@ it('checks citations across soft wraps but ignores list numbering', () => {
   expect(rules({ body: 'Task editor works.\n\n[claim:edit]', claims: ['edit'] })).toContain('claims.uncited');
   expect(rules({ body: 'Task editor works. Another sentence [claim:edit].', claims: ['edit'] })).toContain('claims.uncited');
 });
+it('keeps citations within their thread post and paragraph', () => {
+  for (const boundary of ['\n---\n', '\r\n---\r\n', '\n\n']) {
+    expect(rules({ body: 'Task editor [claim:edit]' + boundary + 'Only 2 steps', claims: ['edit'] })).toContain('claims.uncited');
+    expect(rules({ body: 'Task editor' + boundary + 'Only 2 steps [claim:edit]', claims: ['edit'] })).toContain('claims.uncited');
+    expect(rules({ body: 'Task editor [claim:edit]' + boundary + 'Only 2 steps [claim:edit]', claims: ['edit'] })).not.toContain('claims.uncited');
+  }
+});
 it('checks titles, hooks, links and threads', () => {
   expect(rules({ title: 'Demo' }, 'show-hn')).toEqual(expect.arrayContaining(['title.prefix','links.required']));
   expect(rules({ title: 'Show HN: revolutionary demo', link: 'https://example.test' }, 'show-hn')).toContain('words.banned');

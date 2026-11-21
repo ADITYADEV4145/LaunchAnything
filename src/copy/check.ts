@@ -110,7 +110,7 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   if (cited.some(id => !post.claims.includes(id))) add('claims.undeclared', 'Citation missing from front matter', 'Declare cited IDs in claims');
   const paragraphs = [post.title, ...post.body
     .replace(/^[ \t]*(?:\d+[.)]|[-+*])[ \t]+/gm, '\n\n')
-    .split(/\r?\n[ \t]*\r?\n/)];
+    .split(/\r?\n---\r?\n|\r?\n[ \t]*\r?\n/)];
   const sentences = paragraphs.flatMap(paragraph => paragraph
     .replace(/\r?\n/g, ' ')
     .replace(/([.!?])\s+((?:\[claim:[^\]]+\]\s*)+)/g, ' $2$1 ')

@@ -81,7 +81,8 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
       if (entry.selfPromotion === 'forbidden' && post.selfPromotion !== false) add('reddit.self-promotion', 'Self-promotion forbidden under local policy', 'Choose another community; selfPromotion defaults to true for launch posts');
     }
   }
-  if (body.length < rules.body.minLength || body.length > rules.body.maxLength) add('body.length', 'Body outside platform length budget', 'Use ' + rules.body.minLength + '–' + rules.body.maxLength + ' characters');
+  const bodyLength = rules.postMax ? body.split(/\r?\n---\r?\n/).reduce((sum, part) => sum + part.trim().length, 0) : body.length;
+  if (bodyLength < rules.body.minLength || bodyLength > rules.body.maxLength) add('body.length', 'Body outside platform length budget', 'Use ' + rules.body.minLength + '–' + rules.body.maxLength + ' characters');
   if (rules.postMax) {
     const posts = body.split(/\r?\n---\r?\n/);
     if (posts.some(p => p.trim().length > rules.postMax!)) add('thread.post-length', 'Thread post too long', 'Keep each post within ' + rules.postMax + ' characters');

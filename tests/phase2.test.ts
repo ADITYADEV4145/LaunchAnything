@@ -81,6 +81,12 @@ it('checks titles, hooks, links and threads', () => {
   expect(rules({ body: Array(11).fill('hello').join('\n---\n') })).toContain('thread.length');
   expect(rules({ body: 'https://a.test https://b.test https://c.test https://d.test' })).toContain('links.count');
 });
+it('excludes thread separators from the X total budget', () => {
+  expect(rules({ body: Array(10).fill('a'.repeat(280)).join('\n---\n') })).toEqual([]);
+  expect(rules({ body: Array(10).fill('a'.repeat(280)).join('\r\n---\r\n') })).toEqual([]);
+  expect(rules({ body: 'a'.repeat(281) })).toContain('thread.post-length');
+  expect(rules({ body: Array(11).fill('hello').join('\n---\n') })).toContain('thread.length');
+});
 it('uses shingle similarity and handles empty text', () => {
   expect(similarity('', '')).toBe(0);
   expect(similarity('one two three four', 'one two three four')).toBe(1);

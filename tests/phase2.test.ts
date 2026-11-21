@@ -3,6 +3,7 @@ import { cpSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, m
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { checks } from '../src/selftest/phase2.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { channels, loadPlatform } from '../src/copy/platforms.js';
@@ -12,7 +13,7 @@ import { assertSafePath } from '../src/copy/safe-path.js';
 
 const root = packageRoot();
 it('refuses symlinked output directories and files without touching external targets', () => {
-  for (const target of ['.launch', '.launch/posts', '.launch/posts/briefs', '.launch/posts/briefs/x.md', '.launch/posts/check-state.json', '.launch/posts/fix-list.md']) {
+  for (const target of ['.launch', '.launch/posts', '.launch/posts/briefs', '.launch/posts/briefs/x.md', '.launch/posts/check-state.json', '.launch/posts/fix-list.md', '.launch/posts/check-results.json']) {
     isolated(cwd => {
       checks[0].run({ cwd, fixture: 'cli-tool' });
       const outside = mkdtempSync(join(tmpdir(), 'liftoff-outside-'));
@@ -25,7 +26,7 @@ it('refuses symlinked output directories and files without touching external tar
         else writeFileSync(destination, 'unchanged');
         symlinkSync(destination, path);
         const before = directory ? readFileSync(join(outside, 'original', target === '.launch' ? 'config.json' : target.endsWith('briefs') ? 'x.md' : 'briefs/x.md'), 'utf8') : 'unchanged';
-        if (!target.includes('check-state') && !target.includes('fix-list')) expect(() => writeBriefs(cwd, ['x'])).toThrow('Unsafe');
+        if (!target.includes('check-state') && !target.includes('fix-list') && !target.includes('check-results')) expect(() => writeBriefs(cwd, ['x'])).toThrow('Unsafe');
         if (!target.includes('briefs')) expect(() => checkPosts(cwd, ['x'])).toThrow('Unsafe');
         if (!directory) expect(readFileSync(destination, 'utf8')).toBe(before);
       } finally { rmSync(outside, { recursive: true, force: true }); }
@@ -198,6 +199,65 @@ it('tracks failures, missing/schema/duplicate posts and removes stale fixes', ()
   expect(checkPosts(cwd, ['x','reddit']).issues.some(i => i.rule === 'text.duplicate')).toBe(true);
   expect(checkPosts(cwd, ['x'])).toMatchObject({ passed: true, attempts: 0, askUser: false });
   expect(existsSync(join(posts, 'fix-list.md'))).toBe(false);
+}));
+it('records missing, invalid and passing source hashes while preserving unchecked results', () => isolated(cwd => {
+  checks[0].run({ cwd, fixture: 'cli-tool' });
+  const posts = join(cwd, '.launch/posts');
+  const reportPath = join(posts, 'check-results.json');
+  const read = () => JSON.parse(readFileSync(reportPath, 'utf8')).posts as {channel: string; sourceHash: string | null; issues: {rule: string; message: string}[]}[];
+  checkPosts(cwd);
+  const missing = read();
+  expect(missing).toHaveLength(5);
+  for (const entry of missing) {
+    expect(entry.sourceHash).toBeNull();
+    expect(entry.issues).toEqual([{ rule: 'post.missing', message: 'Missing planned post' }]);
+  }
+  const xPath = join(posts, 'x.md');
+  const invalid = Buffer.from([0xff, 0x0d, 0x0a]);
+  writeFileSync(xPath, invalid);
+  checkPosts(cwd, ['x']);
+  expect(read().find(entry => entry.channel === 'x')).toMatchObject({
+    sourceHash: createHash('sha256').update(invalid).digest('hex'),
+    issues: [{ rule: 'post.schema', message: expect.any(String) }]
+  });
+  const good = readFileSync(join(cwd, '.liftoff-fixture/phase2/good/x.md'), 'utf8').replace(/\n/g, '\r\n') + '\r\n';
+  writeFileSync(xPath, good);
+  expect(checkPosts(cwd, ['x']).passed).toBe(true);
+  const pass = read().find(entry => entry.channel === 'x')!;
+  expect(pass).toEqual({ channel: 'x', sourceHash: createHash('sha256').update(Buffer.from(good)).digest('hex'), issues: [] });
+  expect(read().filter(entry => entry.channel !== 'x')).toEqual(missing.filter(entry => entry.channel !== 'x'));
+  writeFileSync(xPath, good + ' ');
+  checkPosts(cwd, ['reddit']);
+  expect(read().find(entry => entry.channel === 'x')).toEqual(pass);
+  checkPosts(cwd, ['x']);
+  expect(read().find(entry => entry.channel === 'x')!.sourceHash).not.toBe(pass.sourceHash);
+}));
+it('records cross-channel issues for each affected channel and clears them on recheck', () => isolated(cwd => {
+  checks[0].run({ cwd, fixture: 'cli-tool' });
+  const posts = join(cwd, '.launch/posts');
+  const good = readFileSync(join(cwd, '.liftoff-fixture/phase2/good/x.md'), 'utf8');
+  writeFileSync(join(posts, 'x.md'), good);
+  writeFileSync(join(posts, 'reddit.md'), good.replace('channel: x', 'channel: reddit\nsubreddit: r/SideProject'));
+  expect(checkPosts(cwd, ['x','reddit']).passed).toBe(false);
+  const report = JSON.parse(readFileSync(join(posts, 'check-results.json'), 'utf8'));
+  expect(report.posts).toHaveLength(2);
+  for (const entry of report.posts) {
+    expect(entry.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(entry.issues).toEqual([{ rule: 'text.duplicate', message: 'Over 60% similarity with another channel' }]);
+  }
+  checkPosts(cwd, ['x']);
+  const updated = JSON.parse(readFileSync(join(posts, 'check-results.json'), 'utf8'));
+  expect(updated.posts.find((entry: {channel: string}) => entry.channel === 'x').issues).toEqual([]);
+  expect(updated.posts.find((entry: {channel: string}) => entry.channel === 'reddit')).toEqual(report.posts[0]);
+}));
+it('refuses malformed prior check results without overwriting them', () => isolated(cwd => {
+  checks[0].run({ cwd, fixture: 'cli-tool' });
+  const path = join(cwd, '.launch/posts/check-results.json');
+  for (const invalid of ['{', '{"posts":{}}', '{"posts":[{"channel":"x","sourceHash":"bad","issues":[]}]}']) {
+    writeFileSync(path, invalid);
+    expect(() => checkPosts(cwd, ['x'])).toThrow();
+    expect(readFileSync(path, 'utf8')).toBe(invalid);
+  }
 }));
 it('loads brand voice, detects local copywriting and rejects invalid inputs', () => isolated(cwd => {
   expect(() => writeBriefs(cwd)).toThrow();

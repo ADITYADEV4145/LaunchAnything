@@ -1,10 +1,11 @@
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { validateFile } from '../core/schema.js';
 import { context, type Product } from './context.js';
-import { loadPlatform } from './platforms.js';
+import { channels, loadPlatform } from './platforms.js';
 import { assertSafePath } from './safe-path.js';
 
 export interface Post {
@@ -22,6 +23,18 @@ const extensionValidator = new Ajv2020({ allErrors: true }).compile({
   }
 });
 export interface Issue { channel: string; rule: string; message: string; fix: string }
+interface CheckResult { channel: string; sourceHash: string | null; issues: { rule: string; message: string }[] }
+const resultsValidator = new Ajv2020({ allErrors: true }).compile({
+  type: 'object', additionalProperties: false, required: ['posts'], properties: {
+    posts: { type: 'array', items: { type: 'object', additionalProperties: false,
+      required: ['channel','sourceHash','issues'], properties: {
+        channel: { enum: channels },
+        sourceHash: { anyOf: [{ type: 'null' }, { type: 'string', pattern: '^[a-f0-9]{64}$' }] },
+        issues: { type: 'array', items: { type: 'object', additionalProperties: false,
+          required: ['rule','message'], properties: { rule: { type: 'string' }, message: { type: 'string' } } } }
+      } } }
+  }
+});
 export const stripCitations = (text: string) => text.replace(/\[claim:[^\]]+\]/g, '').trim();
 export function parsePost(text: string): Post {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);
@@ -134,11 +147,19 @@ export function checkPosts(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected), issues: Issue[] = [], posts: Post[] = [];
   assertSafePath(cwd, join(ctx.paths.posts, 'check-state.json'));
   assertSafePath(cwd, join(ctx.paths.posts, 'fix-list.md'));
+  const resultsPath = join(ctx.paths.posts, 'check-results.json');
+  assertSafePath(cwd, resultsPath);
+  const previous: unknown = existsSync(resultsPath) ? JSON.parse(readFileSync(resultsPath, 'utf8')) : { posts: [] };
+  if (!resultsValidator(previous)) throw new Error('Invalid check-results.json: ' + JSON.stringify(resultsValidator.errors));
+  const results = new Map((previous as { posts: CheckResult[] }).posts.map(entry => [entry.channel, entry]));
+  const hashes = new Map<string, string | null>(ctx.channels.map(channel => [channel, null]));
   for (const channel of ctx.channels) {
     const path = join(ctx.paths.posts, channel + '.md');
     if (!existsSync(path)) { issues.push({ channel, rule: 'post.missing', message: 'Missing planned post', fix: 'Write ' + path }); continue; }
     try {
-      const post = parsePost(readFileSync(path, 'utf8'));
+      const source = readFileSync(path);
+      hashes.set(channel, createHash('sha256').update(source).digest('hex'));
+      const post = parsePost(source.toString('utf8'));
       issues.push(...inspectPost(post, channel, ctx.product));
       posts.push({ ...post, channel });
     } catch (error) { issues.push({ channel, rule: 'post.schema', message: String(error), fix: 'Follow the brief front matter format' }); }
@@ -149,6 +170,12 @@ export function checkPosts(cwd: string, selected?: string[]) {
     }
   }
   mkdirSync(ctx.paths.posts, { recursive: true });
+  for (const channel of ctx.channels) results.set(channel, {
+    channel, sourceHash: hashes.get(channel) ?? null,
+    issues: issues.filter(issue => issue.channel === channel).map(({ rule, message }) => ({ rule, message }))
+  });
+  writeFileSync(resultsPath, JSON.stringify({ posts: [...results.values()].sort((a, b) =>
+    a.channel < b.channel ? -1 : a.channel > b.channel ? 1 : 0) }, null, 2) + '\n');
   const statePath = join(ctx.paths.posts, 'check-state.json');
   let attempts = 0;
   if (existsSync(statePath)) {

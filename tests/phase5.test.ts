@@ -60,10 +60,7 @@ it('builds a review page and defaults the CLI to an approval-gated dry run', asy
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
-it('records named approvals, skips, and edits through the page script', async () => {
-  const { cwd, paths, markdown } = await project(true);
-  const { path, posts } = await buildReview(cwd);
-  const html = await readFile(path, 'utf8');
+function reviewTab(cwd: string, html: string, reviewer: string, openWriter = localWriter) {
   const snapshot = html.match(/<script id="snapshot" type="application\/json">([^<]+)<\/script>/)![1];
   const script = html.match(/<script>([\s\S]+)<\/script><\/html>/)![1];
   const feedback = { textContent: '' };
@@ -80,18 +77,21 @@ it('records named approvals, skips, and edits through the page script', async ()
     querySelector: (selector: string) => ({ '.feedback': feedback, '.state': state, '.edit': editor })[selector],
     querySelectorAll: () => buttons,
   };
-  const selector = { value: '0' };
+  const selector = { value: reviewer };
   function directory(dir: string) {
     return {
       async getDirectoryHandle(name: string) { return directory(join(dir, name)); },
-      async getFileHandle(name: string) {
+      async getFileHandle(name: string, options?: { create: boolean }) {
         const filename = join(dir, name);
+        if (options?.create) await writeFile(filename, '', { flag: 'wx' }).catch(error => {
+          if (error.code !== 'EEXIST') throw error;
+        });
         return {
           async getFile() { return { text: () => readFile(filename, 'utf8').catch(error => {
             if (error.code === 'ENOENT') error.name = 'NotFoundError';
             throw error;
           }) }; },
-          async createWritable() { return { write: (content: string) => writeFile(filename, content), async close() {} }; },
+          createWritable: (options?: { mode: string }) => openWriter(filename, options),
         };
       },
     };
@@ -102,7 +102,20 @@ it('records named approvals, skips, and edits through the page script', async ()
       querySelectorAll: () => [article],
     },
     window: { showDirectoryPicker: async () => directory(cwd) },
+    setTimeout,
   });
+  return { actions, feedback, input, selector, state };
+}
+
+async function localWriter(filename: string, _options?: { mode: string }) {
+  return { write: (content: string) => writeFile(filename, content), async close() {}, async abort() {} };
+}
+
+it('records named approvals, skips, and edits through the page script', async () => {
+  const { cwd, paths, markdown } = await project(true);
+  const { path, posts } = await buildReview(cwd);
+  const html = await readFile(path, 'utf8');
+  const { actions, feedback, input, selector, state } = reviewTab(cwd, html, '0');
   await actions.approve();
   expect(feedback.textContent).toContain('Still needed: Counsel');
   await expect(publish(cwd, true)).rejects.toThrow('Counsel (legal-review)');
@@ -123,6 +136,45 @@ it('records named approvals, skips, and edits through the page script', async ()
   expect(await readFile(join(paths.posts, 'show-hn.md'), 'utf8')).toBe(input.value);
   expect(state.textContent).toBe('Edited');
   await expect(publish(cwd, true)).rejects.toThrow('exact post and media hash not approved');
+});
+
+it('merges approvals when two tabs overlap before the first write commits', async () => {
+  const { cwd, paths } = await project(true);
+  const { path, posts } = await buildReview(cwd);
+  const html = await readFile(path, 'utf8');
+  await writeFile(paths.approvals, '{"approvals":[]}');
+  const firstWriting = Promise.withResolvers<void>();
+  const secondOpening = Promise.withResolvers<void>();
+  let attempts = 0;
+  let locked = false;
+  async function openWriter(filename: string, options?: { mode: string }) {
+    const attempt = ++attempts;
+    if (attempt === 2) secondOpening.resolve();
+    const exclusive = options?.mode === 'exclusive';
+    if (exclusive && locked) throw new DOMException('Writer already open', 'NoModificationAllowedError');
+    if (exclusive) locked = true;
+    const writer = await localWriter(filename);
+    return {
+      async write(content: string) {
+        if (attempt === 1) {
+          firstWriting.resolve();
+          await secondOpening.promise;
+        }
+        await writer.write(content);
+      },
+      async close() { if (exclusive) locked = false; },
+      async abort() { if (exclusive) locked = false; },
+    };
+  }
+  const owner = reviewTab(cwd, html, '0', openWriter);
+  const counsel = reviewTab(cwd, html, '1', openWriter);
+  const ownerApproval = owner.actions.approve();
+  await firstWriting.promise;
+  await Promise.all([ownerApproval, counsel.actions.approve()]);
+  expect(JSON.parse(await readFile(paths.approvals, 'utf8')).approvals).toMatchObject([
+    { name: 'Owner', hash: posts[0].hash }, { name: 'Counsel', role: 'legal-review', hash: posts[0].hash },
+  ]);
+  expect(counsel.state.textContent).toBe('Approved');
 });
 
 it('resolves local receipt adapters for phase 6 and makes cancellation visible to status', async () => {

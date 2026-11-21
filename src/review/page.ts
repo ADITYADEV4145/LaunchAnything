@@ -66,6 +66,32 @@ async function write(dir, name, value) {
   await writer.write(value);
   await writer.close();
 }
+async function mergeApproval(dir, approval) {
+  const file = await dir.getFileHandle('approvals.json', { create: true });
+  let writer;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      writer = await file.createWritable({ mode: 'exclusive' });
+      break;
+    } catch (error) {
+      if (error.name !== 'NoModificationAllowedError' || attempt >= 40) throw error;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+  try {
+    const current = await (await file.getFile()).text();
+    const records = current ? JSON.parse(current) : { approvals: [] };
+    records.approvals = records.approvals.filter(item =>
+      item.channel !== approval.channel || item.name !== approval.name);
+    records.approvals.push(approval);
+    await writer.write(JSON.stringify(records, null, 2) + '\n');
+    await writer.close();
+    return records;
+  } catch (error) {
+    await writer.abort().catch(() => {});
+    throw error;
+  }
+}
 for (const article of document.querySelectorAll('article')) {
   const channel = article.dataset.channel;
   const post = snapshot.posts[channel];
@@ -111,11 +137,7 @@ for (const article of document.querySelectorAll('article')) {
         feedback.textContent = 'This version will be excluded from publish.';
         return;
       }
-      const records = await read(launch, 'approvals.json', { approvals: [] });
-      records.approvals = records.approvals.filter(item =>
-        item.channel !== channel || item.name !== person.name);
-      records.approvals.push({ channel, ...person, time: new Date().toISOString(), hash: post.hash });
-      await write(launch, 'approvals.json', JSON.stringify(records, null, 2) + '\n');
+      const records = await mergeApproval(launch, { channel, ...person, time: new Date().toISOString(), hash: post.hash });
       if (Object.hasOwn(skipped, channel)) {
         delete skipped[channel];
         await write(review, 'skipped.json', JSON.stringify(skipped, null, 2) + '\n');

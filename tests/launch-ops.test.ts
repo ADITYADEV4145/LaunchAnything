@@ -7,7 +7,7 @@ import { packageRoot } from '../src/core/package-root.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import { friends, checkFriendDraft } from '../src/launch-ops/friends.js';
 import { followup } from '../src/launch-ops/followup.js';
-import { release } from '../src/launch-ops/release.js';
+import { release, releaseSince } from '../src/launch-ops/release.js';
 import { warroom } from '../src/launch-ops/warroom.js';
 import { collect } from '../src/results/collect.js';
 import { readJson, writeJson, writeLocal } from '../src/results/files.js';
@@ -111,6 +111,12 @@ it('release reads tags and cadence without mutating git and handles empty/error 
   await expect(release(cwd, { type: 'bad' })).rejects.toThrow('--type');
   expect(git(cwd, 'tag')).toBe('v0.1.0');
   git(cwd, 'tag', '-d', 'v0.1.0'); await expect(release(cwd)).rejects.toThrow('Unable to read git');
+});
+it('monthly release cadence clamps month ends and preserves the UTC time', () => {
+  expect(releaseSince(new Date('2026-03-31T12:34:56Z'), 'monthly').toISOString()).toBe('2026-02-28T12:34:56.000Z');
+  expect(releaseSince(new Date('2024-03-31T12:34:56Z'), 'monthly').toISOString()).toBe('2024-02-29T12:34:56.000Z');
+  expect(releaseSince(new Date('2026-03-15T12:34:56Z'), 'monthly').toISOString()).toBe('2026-02-15T12:34:56.000Z');
+  expect(releaseSince(new Date('2026-03-31T12:34:56Z'), 'weekly').toISOString()).toBe('2026-03-24T12:34:56.000Z');
 });
 it('release uses the exact target tag rather than the requested ref label', async () => {
   const { cwd } = await workspace(); await repository(cwd);

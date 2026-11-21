@@ -5,6 +5,19 @@ import type { Config } from '../product/init.js';
 import { checked, readJson, writeLocal } from '../results/files.js';
 import { commitNotes, commits, git, root, slug } from './common.js';
 
+export function releaseSince(now: Date, cadence: string) {
+  const since = new Date(now);
+  if (cadence === 'weekly') since.setUTCDate(since.getUTCDate() - 7);
+  else {
+    const day = since.getUTCDate();
+    since.setUTCDate(1);
+    since.setUTCMonth(since.getUTCMonth() - 1);
+    const lastDay = new Date(Date.UTC(since.getUTCFullYear(), since.getUTCMonth() + 1, 0)).getUTCDate();
+    since.setUTCDate(Math.min(day, lastDay));
+  }
+  return since;
+}
+
 export async function release(cwd: string, options: { from?: string; to?: string; type?: string; cadence?: string; now?: Date } = {}) {
   const type = options.type ?? 'changelog';
   if (!['feature', 'changelog'].includes(type)) throw new Error('--type must be feature or changelog');
@@ -16,9 +29,7 @@ export async function release(cwd: string, options: { from?: string; to?: string
   if (!from && !options.cadence) from = git(cwd, 'describe', '--tags', '--abbrev=0', target);
   const base = from ? git(cwd, 'rev-parse', '--verify', '--end-of-options', `${from}^{commit}`) : undefined;
   const now = options.now ?? new Date();
-  const since = new Date(now);
-  if (options.cadence === 'weekly') since.setUTCDate(since.getUTCDate() - 7);
-  else since.setUTCMonth(since.getUTCMonth() - 1);
+  const since = releaseSince(now, options.cadence ?? 'monthly');
   const rows = commits(cwd, base ? [`${base}..${target}`] : [target, `--since=${since.toISOString()}`, `--until=${now.toISOString()}`]);
   if (!rows.length) throw new Error('No commits in release range');
   const config = checked<Config>('config', await readJson(launchDir(cwd).config));

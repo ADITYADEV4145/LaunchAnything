@@ -113,8 +113,9 @@ function offlineAdapter(name: AdapterName): PublishAdapter {
       await mkdir(folder, { recursive: true });
       const file = join(folder, 'post.txt');
       const copy = [name === 'email' ? `Subject: ${post.title}` : post.title, post.body,
-        post.link && !post.body.includes(post.link) ? post.link : undefined].filter(Boolean);
+        !post.linkFirstComment && post.link && !post.body.includes(post.link) ? post.link : undefined].filter(Boolean);
       await writeFile(file, copy.join('\n\n') + '\n');
+      if (post.linkFirstComment && post.link) await writeFile(join(folder, 'first-comment.txt'), post.link + '\n');
       for (const [index, media] of post.media.entries()) {
         await writeFile(join(folder, `attachment-${index + 1}${extname(media.path)}`), media.bytes);
       }

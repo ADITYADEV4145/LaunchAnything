@@ -6,6 +6,10 @@ import { totalDuration, validateScript, srt } from '../src/video/script.js';
 import { check, checkProbe } from '../src/video/check.js';
 import { parseFormats, remotionCli, render, run } from '../src/video/render.js';
 import { record } from '../src/video/record.js';
+import { frameLayout, wrapText } from '../src/video/design.js';
+import { prepareFixtureVideo } from '../src/selftest/phase4.js';
+import { cp, readFile } from 'node:fs/promises';
+import { packageRoot } from '../src/core/package-root.js';
 
 const dirs: string[] = [];
 async function setup() {
@@ -19,6 +23,28 @@ async function setup() {
 }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d,{recursive:true,force:true}))); });
 describe('phase 4',() => {
+  it('fits complete footage and wraps even long unbroken captions',() => {
+    for(const [width,height] of [[1280,720],[720,1280],[720,720]]) {
+      const frame=frameLayout(width,height,1280,800);
+      expect(frame.width/frame.height).toBeCloseTo(1.6,1);
+      expect(frame.x).toBeGreaterThan(0);
+      expect(frame.x+frame.width).toBeLessThan(width);
+      expect(frame.y+frame.height).toBeLessThan(height*.73);
+    }
+    expect(frameLayout(1280,720,390,844).kind).toBe('phone');
+    expect(wrapText('',15)).toEqual([]);
+    expect(wrapText('UnbrokenExtraordinaryProductName',10).every(l=>l.length<=10)).toBe(true);
+  });
+  it('uses real bundled fixture captures and source copy, including SaaS navigation',async () => {
+    const cwd=await mkdtemp(join(tmpdir(),'phase4-real-'));dirs.push(cwd);
+    await cp(join(packageRoot(),'fixtures/saas-next'),cwd,{recursive:true});
+    const script=await prepareFixtureVideo(cwd,'saas-next');
+    expect(script.scenes.some(s=>s.shot.endsWith('.webm'))).toBe(true);
+    expect(new Set(script.scenes.map(s=>s.shot)).size).toBeGreaterThan(1);
+    expect(script.scenes.every(s=>s.text.split(/\s+/).length<=8 && !/phase four|placeholder/i.test(s.text))).toBe(true);
+    expect(JSON.parse(await readFile(join(cwd,'.launch/media/manifest.json'),'utf8')).capturedAt).toBeTruthy();
+    await expect(validateScript(cwd,script)).resolves.toEqual(script);
+  });
   it('validates schema, duration, real files, shot IDs and containment',async () => {
     const {cwd,script} = await setup();
     await expect(validateScript(cwd,script)).resolves.toEqual(script);

@@ -1,0 +1,19 @@
+{
+  "fixture": "mobile-expo",
+  "capturedAt": "2026-11-21T21:24:27.934Z",
+  "author": "Aditya",
+  "files": [
+    {
+      "file": "journal.png",
+      "command": "Chrome via Playwright: open fixtures/mobile-expo/assets/screenshot.svg as file URL, viewport 390x844, deviceScaleFactor 2; screenshot. Unmodified real SVG asset."
+    }
+  ],
+  "sceneFiles": [
+    "journal.png",
+    "journal.png",
+    "journal.png",
+    "journal.png",
+    "journal.png",
+    "journal.png"
+  ]
+}

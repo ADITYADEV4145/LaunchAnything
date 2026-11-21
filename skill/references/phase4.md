@@ -30,19 +30,26 @@ the target. Credit only **Aditya** in metadata.
 
 `liftoff video render --renderer auto --format 16x9,9x16,1x1 --json` exports the
 demo, vertical short and square video plus captions.srt. Auto uses a local or
-doctor-detected Remotion CLI if available, otherwise ffmpeg. Explicit
+PATH/local Remotion CLI if available, otherwise ffmpeg. Explicit
 `--renderer ffmpeg` works without Remotion installed. Requires ffmpeg/ffprobe
-with libx264 and drawtext. Captions are burned in. Both renderers append a dedicated
-3-second dark end card with the product name and optional `.launch/media/logo.*`
-(PNG/JPG/JPEG/WebP/SVG), with no screenshot. SRT covers only the footage scenes.
+with libx264 and librsvg (SVG rasterization). Both renderers use the same generated
+gradient plates, browser/phone frames, shadows, large wrapped captions and safe
+areas. Captions fade in/out; a small centre-top zoom keeps the full capture visible.
+Portrait captures in a landscape/square video include a magnified detail alongside
+the complete phone, rather than throwing away the rest of the screen. A captured
+terminal can opt out of browser chrome via `.launch/media/manifest.json` with
+`{"frame":"terminal"}`. Both renderers append a dedicated 3-second gradient end
+card with the product name, description/oneLiner, homepage URL (product metadata
+or package.json), and optional `.launch/media/logo.*` (PNG/JPG/JPEG/WebP/SVG), or
+a generated monogram. SRT covers only the footage scenes.
 
 The independent project is bundled at `templates/video/remotion/`. Install its
 dependencies in your working repository to use it (Remotion is not a CLI runtime
 dependency). If Remotion skills are installed (see doctor), read them before
-customizing scenes/camera moves. Default motion is a gentle zoom and pan because
-the shared scene schema does not carry click coordinates. Keep real footage as
-the background. A logo may be supplied to the template as the `logo` prop; put it
-in public/. No generated product imagery.
+customizing scenes/camera moves. The CLI prepares shared layout/caption/end-card
+PNGs and supplies them as composition props. Default motion is a gentle zoom
+because the shared scene schema does not carry click coordinates. Keep real
+footage in the frame. No generated product imagery.
 
 `liftoff video check --json` verifies dimensions, duration (Shorts ≤60s, X ≤140s,
 Product Hunt ≤180s), render caption receipt plus matching SRT, and audio loudness
@@ -53,3 +60,10 @@ non-zero for validation/tool failures.
 
 Checks report duration compliance for every platform, but enforce only the mapped
 targets: 9x16 → YouTube Shorts, 1x1 → X, 16x9 → X and Product Hunt.
+
+Selftest uses the small real captures bundled under `templates/video/footage/`
+only when phase-3 captures are absent. Each fixture's manifest records the capture
+date and routes/commands. SaaS includes a real pricing-link navigation recording;
+mobile uses its real SVG asset rasterized in Chrome; CLI images contain actual
+Tasklight command stdout, not fabricated output. Captions come from fixture product
+copy. No source fixture is modified by captures or selftest.

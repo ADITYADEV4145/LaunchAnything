@@ -63,6 +63,21 @@ it('renders ranked pains, competitor complaints and product matches without user
   expect(result.markdown).not.toContain('fixture_person');
   expect((await checkResearch(cwd)).valid).toBe(true);
 });
+it('escapes Markdown quote punctuation without changing the displayed evidence', async () => {
+  const text = 'Use <draft> | > and &lt; safely';
+  const raw = structuredClone(fixture.hn);
+  raw.hits[0].comment_text = 'Use &lt;draft&gt; | &gt; and &amp;lt; safely';
+  await fetchResearch(cwd, ['punctuation'], { fetch: async () => new Response(JSON.stringify(raw)), adapters: [adapters({})[0]] });
+  const data = structuredClone(fixture.pains); data.pains[0].quotes[0].text = text;
+  await writeFile(researchPaths(cwd).pains, JSON.stringify(data));
+  const { markdown } = await renderReport(cwd);
+  const quote = markdown.split('\n').find(line => line.startsWith('> Use '))!.slice(2).split(' — [source]')[0];
+  expect(quote).toContain('&lt;draft&gt; \\| &gt;');
+  const entities: Record<string, string> = { amp: '&', lt: '<', gt: '>' };
+  const displayed = quote.replace(/\\([\\|\[\]`*_])/g, '$1').replace(/&(amp|lt|gt);/g, (_, name: string) => entities[name]);
+  expect(displayed).toBe(text);
+  expect((await checkResearch(cwd)).valid).toBe(true);
+});
 it('handles empty normalized results', () => {
   for (const source of ['hn', 'reddit', 'github', 'stackoverflow', 'product-hunt', 'x', 'app-store']) expect(normalize(source, {})).toEqual([]);
 });

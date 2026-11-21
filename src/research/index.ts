@@ -63,7 +63,7 @@ export async function checkResearch(cwd: string, report?: string) {
   }
   return { valid: !errors.length, errors };
 }
-const cell = (s: string) => s.replace(/[|\n\r]/g, ' ').replace(/[<>]/g, '').replace(/[\[\]`*_]/g, '\\$&');
+const cell = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\n\r]/g, ' ').replace(/[\\|\[\]`*_]/g, '\\$&');
 export async function renderReport(cwd: string) {
   const checked = await checkResearch(cwd, ''); if (!checked.valid) throw new Error(checked.errors.join('; '));
   const data = await loadPains(cwd);

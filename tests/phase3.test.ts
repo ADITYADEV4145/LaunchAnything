@@ -75,6 +75,23 @@ it('sanitizes terminal environments and handles empty, failed and timed-out comm
   await expect(runTerminal('node -e "process.exit(1)"', process.cwd())).rejects.toThrow('output withheld');
   await expect(runTerminal('node -e "setTimeout(() => {}, 10000)"', process.cwd(), 100)).rejects.toThrow('timed out');
 });
+it('accepts a non-2xx base response or the first working shot route for readiness', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'phase3-ready-')); let baseStatus = 404;
+  const server = createServer((req, res) => { res.statusCode = req.url === '/home' ? 200 : baseStatus; res.end('<h1>Ready</h1>'); });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    await mkdir(join(cwd, '.launch'));
+    const baseUrl = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    const spec = { baseUrl, readyTimeoutMs: 1000, shots: [{ id: 'ready', route: '/home', viewport: { width: 400, height: 300 } }] };
+    await writeFile(join(cwd, '.launch/shots.yaml'), JSON.stringify(spec));
+    expect(await takeShots(cwd)).toHaveLength(1);
+    baseStatus = 503;
+    expect(await takeShots(cwd)).toHaveLength(1);
+    spec.shots[0].route = '/unavailable'; spec.readyTimeoutMs = 50;
+    await writeFile(join(cwd, '.launch/shots.yaml'), JSON.stringify(spec));
+    await expect(takeShots(cwd)).rejects.toThrow('App readiness timeout');
+  } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(cwd, { recursive: true, force: true }); }
+}, 30000);
 it('rejects missing input, empty shot lists and invalid image options', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'phase3-errors-'));
   try {

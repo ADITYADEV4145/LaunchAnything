@@ -28,7 +28,16 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
         url = 'http://127.0.0.1:3000'; stop = start(command, cwd);
       }
       const deadline = Date.now() + (spec.readyTimeoutMs ?? 30000);
-      while (true) { try { if ((await fetch(url, { signal: AbortSignal.timeout(1000) })).ok) break; } catch { /* not ready */ } if (Date.now() >= deadline) throw new Error('App readiness timeout'); await new Promise(r => setTimeout(r, 150)); }
+      const readyUrls = [...new Set([url, new URL(selected.find(s => !s.commands)!.route!, url).href])];
+      while (true) {
+        let ready = false;
+        for (const candidate of readyUrls) {
+          try { const response = await fetch(candidate, { signal: AbortSignal.timeout(1000) }); await response.body?.cancel(); if (response.status < 500) { ready = true; break; } } catch { /* not ready */ }
+        }
+        if (ready) break;
+        if (Date.now() >= deadline) throw new Error('App readiness timeout');
+        await new Promise(r => setTimeout(r, 150));
+      }
     }
     for (const shot of selected) {
       const pngPath = join(dir, `${shot.id}.png`); const gifPath = join(dir, `${shot.id}.gif`);

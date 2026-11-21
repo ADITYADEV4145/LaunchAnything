@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { packageRoot } from '../core/package-root.js';
 import type { Phase } from './types.js';
+import { checks as phase0 } from './phase0.js';
 import { checks as phase1 } from './phase1.js';
 import { checks as phase2 } from './phase2.js';
 import { checks as phase3 } from './phase3.js';
@@ -12,8 +13,7 @@ import { checks as phase5 } from './phase5.js';
 import { checks as phase6 } from './phase6.js';
 import { checks as phase2b } from './phase2b.js';
 
-export const phases: Phase[] = [{ phase: 1, checks: phase1 }, { phase: 2, checks: phase2 }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: 6, checks: phase6 }];
-phases.splice(2, 0, { phase: '2b', checks: phase2b });
+export const phases: Phase[] = [{ phase: 0, checks: phase0 }, { phase: 1, checks: phase1 }, { phase: 2, checks: phase2 }, { phase: '2b', checks: phase2b }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: 6, checks: phase6 }];
 export async function selftest(through: number | string) {
   const order = phases.map(p => String(p.phase));
   const last = order.indexOf(String(through));

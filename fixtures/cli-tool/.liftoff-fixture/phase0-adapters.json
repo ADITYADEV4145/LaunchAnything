@@ -1,0 +1,142 @@
+{
+  "reddit": {
+    "data": {
+      "children": [
+        {
+          "data": {
+            "permalink": "/r/test/comments/123",
+            "author": "reddit_person",
+            "created_utc": 1767225600,
+            "title": "Drafts disappear",
+            "selftext": "I lost my launch draft",
+            "score": 3,
+            "num_comments": 2
+          }
+        }
+      ]
+    }
+  },
+  "github": {
+    "items": [
+      {
+        "html_url": "https://github.com/example/app/issues/1",
+        "user": {
+          "login": "issue_person"
+        },
+        "created_at": "2026-01-01T00:00:00Z",
+        "title": "Drafts disappear",
+        "body": "I lost my launch draft",
+        "reactions": {
+          "total_count": 3
+        },
+        "comments": 2
+      }
+    ]
+  },
+  "stackoverflow": {
+    "items": [
+      {
+        "link": "https://stackoverflow.com/questions/1",
+        "owner": {
+          "display_name": "so_person"
+        },
+        "creation_date": 1767225600,
+        "title": "Drafts disappear",
+        "body": "<p>I lost my launch draft</p>",
+        "score": 3,
+        "answer_count": 2
+      }
+    ]
+  },
+  "x": {
+    "data": [
+      {
+        "id": "123",
+        "author_id": "x_person",
+        "created_at": "2026-01-01T00:00:00Z",
+        "text": "I lost my launch draft",
+        "public_metrics": {
+          "like_count": 3,
+          "reply_count": 2
+        }
+      }
+    ]
+  },
+  "app-store": {
+    "feed": {
+      "entry": [
+        {
+          "link": {
+            "attributes": {
+              "href": "https://apps.apple.com/app/id123?see-all=reviews"
+            }
+          },
+          "author": {
+            "name": {
+              "label": "apple_person"
+            }
+          },
+          "updated": {
+            "label": "2026-01-01T00:00:00Z"
+          },
+          "title": {
+            "label": "Drafts disappear"
+          },
+          "content": {
+            "label": "I lost my launch draft"
+          },
+          "im:rating": {
+            "label": "1"
+          }
+        }
+      ]
+    }
+  },
+  "play-store": {
+    "packageName": "com.example.app",
+    "reviews": [
+      {
+        "reviewId": "123",
+        "authorName": "play_person",
+        "comments": [
+          {
+            "userComment": {
+              "text": "I lost my launch draft",
+              "starRating": 1,
+              "lastModified": {
+                "seconds": "1767225600"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "product-hunt": {
+    "data": {
+      "posts": {
+        "edges": [
+          {
+            "node": {
+              "comments": {
+                "edges": [
+                  {
+                    "node": {
+                      "url": "https://www.producthunt.com/posts/app#comment-123",
+                      "user": {
+                        "username": "ph_person"
+                      },
+                      "createdAt": "2026-01-01T00:00:00Z",
+                      "body": "I lost my launch draft",
+                      "votesCount": 3
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

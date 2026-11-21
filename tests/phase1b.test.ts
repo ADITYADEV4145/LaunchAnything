@@ -21,6 +21,32 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('normalizes multiline free text in every inline scaffold insertion', () => {
+    setup();
+    const productPath = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(productPath, 'utf8'));
+    product.name = '- Tasklight\n+ Portable';
+    product.oneLiner = '- Local tasks\n* Simple workflow';
+    product.audience = '- Developers\n- Small teams';
+    product.problem = '1. Complex setup\n2. Scattered guidance';
+    product.proofPoints[0] = '* Repository evidence\n+ Working interface';
+    product.features[0].name = '- Local\n- tasks';
+    product.features[0].description = '- Add tasks\n- Track progress';
+    writeFileSync(productPath, JSON.stringify(product));
+    const pains = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
+    pains.pains[0].name = '- Setup\n- friction';
+    pains.pains[0].description = '- Too many steps\n- Poor guidance';
+    pains.pains[0].quotes[0].text = '- Setup is slow\n- Guidance is unclear';
+    writeFileSync(join(cwd, '.launch/research/pains.json'), JSON.stringify(pains));
+    const result = brief(cwd);
+    const markdown = readFileSync(result.path, 'utf8');
+    expect(validateBrief(cwd).valid).toBe(true);
+    for (const text of ['Tasklight Portable', 'Local tasks Simple workflow', 'Developers Small teams', 'Complex setup Scattered guidance', 'Repository evidence Working interface', 'Local tasks: Add tasks Track progress', 'Setup friction: Too many steps Poor guidance', 'Setup is slow Guidance is unclear']) expect(markdown).toContain(text);
+    const messages = markdown.split('## Key messages\n')[1].split('\n## ')[0];
+    expect(messages.match(/^- /gm)).toHaveLength(3);
+    edit(s => s.replace('## Open risks', '## Open risks\nLocal tasks are available.'));
+    expect(validateBrief(cwd).errors.join()).toContain('requires an indexed feature citation');
+  });
   it('keeps full input wording when sections fit and marks omissions when they do not', () => {
     setup();
     const productPath = join(cwd, '.launch/product.json');

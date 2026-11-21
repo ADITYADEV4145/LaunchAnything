@@ -100,3 +100,11 @@ See [phase6.md](references/phase6.md) for data gaps and observation guidelines.
 Every claim must cite a source in product.json. Never auto-post to Hacker News or
 Reddit. Never auto-reply. No fabricated screenshots, no approval bypasses and no
 secrets in captured media. Platform rules belong in versioned YAML, not prompts.
+
+## Launch day, after and ongoing
+
+Use `warroom` on launch day for local metrics and reply approvals, and `friends`
+only for people who explicitly asked to hear about the launch. Run `friends --check`
+after editing drafts. After collecting phase-6 results, use `followup` and `retro`.
+Use `release` for smaller tag-based feature/changelog announcements. These commands
+never send anything. See [launch-ops.md](references/launch-ops.md) for flags and files.

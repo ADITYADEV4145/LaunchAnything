@@ -15,10 +15,16 @@ import { register as results } from './results.js';
 import { register as learn } from './learn.js';
 import { register as receipt } from './receipt.js';
 import { register as prelaunch } from './prelaunch.js';
+import { register as warroom } from './warroom.js';
+import { register as friends } from './friends.js';
+import { register as followup } from './followup.js';
+import { register as retro } from './retro.js';
+import { register as release } from './release.js';
 import type { Command } from 'commander';
 import { register as voice } from './voice.js';
 import { register as research } from './research.js';
 export function registerCommands(program: Command) {
   voice(program);
   for (const register of [research, init, scan, validate, plan, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
+  for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

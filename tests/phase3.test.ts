@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { mkdtemp, cp, rm } from 'node:fs/promises';
+import { mkdtemp, cp, rm, readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scanSecrets, maskSecrets, assertPrivate } from '../src/visuals/privacy.js';
@@ -9,7 +11,7 @@ import { contrast, pngSize, safeArea } from '../src/visuals/check.js';
 import { validateFile } from '../src/core/schema.js';
 import { checks } from '../src/selftest/phase3.js';
 import { PNG } from 'pngjs';
-import { browser, runTerminal, sanitizedEnv } from '../src/visuals/runtime.js';
+import { browser, runTerminal, sanitizedEnv, start } from '../src/visuals/runtime.js';
 import { guard } from '../src/visuals/capture.js';
 import { takeShots } from '../src/visuals/shots.js';
 import { makeImages } from '../src/visuals/images.js';
@@ -75,6 +77,35 @@ it('sanitizes terminal environments and handles empty, failed and timed-out comm
   await expect(runTerminal('node -e "process.exit(1)"', process.cwd())).rejects.toThrow('output withheld');
   await expect(runTerminal('node -e "setTimeout(() => {}, 10000)"', process.cwd(), 100)).rejects.toThrow('timed out');
 });
+it('removes server lifecycle handlers after explicit cleanup', () => {
+  const events = ['SIGINT', 'SIGTERM', 'exit'] as const;
+  const before = events.map(event => process.listenerCount(event));
+  const stop = start('node -e "setInterval(() => {}, 1000)"', process.cwd());
+  expect(events.map(event => process.listenerCount(event))).toEqual(before.map(n => n + 1));
+  stop(); stop();
+  expect(events.map(event => process.listenerCount(event))).toEqual(before);
+});
+for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const) it(`kills detached dev servers on ${signal}`, async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'phase3-signal-'));
+  const pidFile = join(cwd, 'phase3-server.pid');
+  const server = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000);`;
+  const runtime = pathToFileURL(join(process.cwd(), 'src/visuals/runtime.ts')).href;
+  const script = `import { start } from ${JSON.stringify(runtime)}; start(${JSON.stringify(`node -e '${server.replaceAll("'", "'\\''")}'`)}, ${JSON.stringify(cwd)});`;
+  const parent = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { cwd: process.cwd(), stdio: 'ignore' });
+  try {
+    let pid = 0;
+    for (let i = 0; i < 100; i++) { try { pid = Number(await readFile(pidFile, 'utf8')); break; } catch { await new Promise(r => setTimeout(r, 25)); } }
+    expect(pid).toBeGreaterThan(0);
+    const exited = once(parent, 'exit'); parent.kill(signal);
+    expect((await exited)[0]).toBe(code);
+    let running = true;
+    for (let i = 0; i < 100; i++) {
+      try { const stat = await readFile(`/proc/${pid}/stat`, 'utf8'); running = !stat.slice(stat.lastIndexOf(')') + 2).startsWith('Z'); } catch { running = false; }
+      if (!running) break; await new Promise(r => setTimeout(r, 25));
+    }
+    expect(running).toBe(false);
+  } finally { parent.kill('SIGTERM'); await rm(cwd, { recursive: true, force: true }); }
+}, 15000);
 it('accepts a non-2xx base response or the first working shot route for readiness', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'phase3-ready-')); let baseStatus = 404;
   const server = createServer((req, res) => { res.statusCode = req.url === '/home' ? 200 : baseStatus; res.end('<h1>Ready</h1>'); });

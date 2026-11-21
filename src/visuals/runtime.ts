@@ -17,7 +17,14 @@ export function sanitizedEnv() {
 export function start(command: string, cwd: string) {
   const child = spawn(command, { cwd, shell: true, detached: process.platform !== 'win32', env: sanitizedEnv(), stdio: 'ignore' });
   child.on('error', () => {});
-  return () => { if (child.pid) { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL'); } catch { /* already exited */ } } };
+  const cleanup = () => {
+    process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', terminate); process.removeListener('exit', cleanup);
+    if (child.pid) { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL'); } catch { /* already exited */ } }
+  };
+  const interrupt = () => { cleanup(); process.exit(130); };
+  const terminate = () => { cleanup(); process.exit(143); };
+  process.once('SIGINT', interrupt); process.once('SIGTERM', terminate); process.once('exit', cleanup);
+  return cleanup;
 }
 export function runTerminal(command: string, cwd: string, timeout = 15000): Promise<string> {
   return new Promise((resolve, reject) => {

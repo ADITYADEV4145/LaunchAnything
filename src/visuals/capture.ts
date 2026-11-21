@@ -40,9 +40,10 @@ export async function guard(page: Page, selectors: string[]) {
           }
           const style = getComputedStyle(el);
           if (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(el.tagName) || style.display === 'none') return;
-          const boundary = el.tagName === 'BR' || !['inline', 'contents'].includes(style.display);
+          const boundary = el.tagName === 'BR' || (!style.display.startsWith('inline') &&
+            (style.display.startsWith('table') || style.display.split(' ').some(display => ['block', 'flex', 'grid', 'list-item', 'flow-root'].includes(display))));
           if (boundary) nodes.push('\n');
-          const visible = el.getClientRects().length > 0 && style.visibility === 'visible';
+          const visible = (el.getClientRects().length > 0 || style.display === 'contents') && style.visibility === 'visible';
           if (visible) {
             attributes.push(...['title', 'alt', 'placeholder'].map(a => el.getAttribute(a) ?? ''), 'value' in el ? String(el.value) : '');
           }

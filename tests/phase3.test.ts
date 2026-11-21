@@ -37,7 +37,7 @@ it('detects secrets split across inline text nodes without scanning redacted tex
 it('does not join unrelated text across rendered layout boundaries', async () => {
   const app = await browser(); const page = await app.newPage();
   try {
-    for (const display of ['block', 'flex', 'grid', 'table-cell']) {
+    for (const display of ['block', 'flex', 'grid', 'list-item', 'flow-root', 'table', 'table-row', 'table-cell']) {
       await page.setContent(`<span style="display:${display}">token: short</span><span style="display:${display}">DashboardSettings</span>`);
       expect(await guard(page, [])).toBe(0);
     }
@@ -49,6 +49,15 @@ it('does not join unrelated text across rendered layout boundaries', async () =>
     expect(await guard(page, [])).toBe(0);
     await page.setContent('<span>token: short</span><span>DashboardSettings</span>');
     await expect(guard(page, [])).rejects.toThrow('Privacy guard: assignment');
+  } finally { await app.close(); }
+});
+it('detects secrets split across inline-level boxes', async () => {
+  const app = await browser(); const page = await app.newPage();
+  try {
+    for (const display of ['inline', 'inline-block', 'inline-flex', 'inline-grid', 'inline-table', 'contents']) {
+      await page.setContent(`<span style="display:${display}">a</span><span style="display:${display}">@b.com</span>`);
+      await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    }
   } finally { await app.close(); }
 });
 it('scans and redacts open shadow roots and nested frames, failing closed on unreadable frames', async () => {

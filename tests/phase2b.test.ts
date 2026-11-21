@@ -8,6 +8,20 @@ import { aiTells } from '../src/voice/ai-tells.js';
 import { honesty } from '../src/voice/honesty.js';
 import { checks } from '../src/selftest/phase2b.js';
 import { packageRoot } from '../src/core/package-root.js';
+import { inspectPost } from '../src/copy/check.js';
+
+it('keeps title praise separate from body citations when checking a post', () => {
+  const product = { name: 'Tool', features: [], claims: [
+    { id: 'count', text: '100 users', sources: [{ type: 'file', ref: 'metrics.csv' }] },
+    { id: 'praise', text: 'Users love Tool', sources: [{ type: 'file', ref: 'feedback.txt' }] }
+  ] };
+  const post = { channel: 'x', title: 'Users love Tool', body: '100 users [claim:count]', claims: ['count', 'praise'], media: [] };
+  const issues = inspectPost(post, 'x', product);
+  expect(issues.some(i => i.rule === 'honesty.testimonial')).toBe(true);
+  expect(issues.some(i => i.rule === 'honesty.unsupported-count')).toBe(false);
+  expect(inspectPost({ ...post, title: 'Users love Tool [claim:praise]' }, 'x', product).some(i => i.rule === 'honesty.testimonial')).toBe(false);
+  expect(inspectPost({ ...post, title: '' }, 'x', product).some(i => i.rule.startsWith('honesty.'))).toBe(false);
+});
 
 it('associates soft-wrapped citations with their factual sentence, not other paragraphs', () => {
   const product = { name: 'Tool', features: [], claims: [

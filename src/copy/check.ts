@@ -116,7 +116,7 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   if (rules.hookMax && body.split(/\n\s*\n/)[0].length > rules.hookMax) add('hook.length', 'Opening hook too long', 'Keep first paragraph within ' + rules.hookMax + ' characters');
   const text = title + '\n' + body;
   for (const issue of aiTells(text, channel)) add(issue.rule, issue.message, 'Rewrite concretely in your own voice; preserve citations.');
-  for (const issue of honesty(post.title + '\n' + post.body, product, !!rules.requiresAffiliationDisclosure))
+  for (const issue of honesty(post.title + '\n\n' + post.body, product, !!rules.requiresAffiliationDisclosure))
     add(issue.rule, issue.message, 'Use sourced claims and disclose ownership honestly.');
   for (const word of rules.bannedWords) {
     if (text.toLowerCase().includes(word.toLowerCase())) add('words.banned', 'Banned phrase: ' + word, 'Replace hype with concrete evidence');

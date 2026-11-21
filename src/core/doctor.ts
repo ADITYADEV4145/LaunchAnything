@@ -1,9 +1,10 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
 export async function doctor(cwd: string, home = homedir()) {
+  if (!(await stat(cwd)).isDirectory()) throw new Error(`Not a directory: ${cwd}`);
   const warnings: string[] = [];
   const skillPaths = [...new Set([join(cwd, '.claude/skills'), join(home, '.claude/skills'),
     join(cwd, '.agents/skills'), join(home, '.agents/skills')])];

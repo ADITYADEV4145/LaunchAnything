@@ -81,7 +81,8 @@ it('friends respects explicit opt-in and checks human edited files', async () =>
   expect(await readFile(result.paths![0], 'utf8')).toContain('https://example.test/live');
   await writeLocal(result.paths![0], 'Please upvote us');
   await expect(friends(cwd, { check: true })).rejects.toThrow('vote/ranking');
-  for (const text of ['vote for us', 'help our ranking', 'up-vote this']) expect(() => checkFriendDraft(text)).toThrow();
+  for (const text of ['vote for us', 'help our ranking', 'up-vote this', 'Please help by upvoting our HN post', 'Help improve our rankings', 'upvoted', 'downvoting', 'voting', 'ranked', 'ranks']) expect(() => checkFriendDraft(text)).toThrow();
+  for (const text of ['frank', 'crankshaft']) expect(() => checkFriendDraft(text)).not.toThrow();
   await writeJson(join(paths.root, 'friends.json'), { people: [] }); expect((await friends(cwd)).paths).toEqual([]);
   await writeJson(join(paths.root, 'friends.json'), { people: [{}] }); await expect(friends(cwd)).rejects.toThrow('requires people');
 });

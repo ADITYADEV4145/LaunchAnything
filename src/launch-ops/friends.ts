@@ -4,7 +4,7 @@ import { readJson, writeLocal } from '../results/files.js';
 import { liveUrls, product, published, root, slug } from './common.js';
 
 export function checkFriendDraft(text: string) {
-  if (/\b(up[ -]?votes?|down[ -]?votes?|votes?|voting|rank(?:ing)?|boost us)\b/i.test(text))
+  if (/\b(up[ -]?vot\w*|down[ -]?vot\w*|vote\w*|voting|rank(?:s|ed|ing|ings)?|boost us)\b/i.test(text))
     throw new Error('Friend draft contains vote/ranking language; remove it before sharing');
 }
 export async function friends(cwd: string, options: { check?: boolean } = {}) {

@@ -2,10 +2,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { context } from './context.js';
 import { loadPlatform } from './platforms.js';
+import { assertSafePath } from './safe-path.js';
 
 export function writeBriefs(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected);
   const directory = join(ctx.paths.posts, 'briefs');
+  assertSafePath(cwd, directory);
+  for (const channel of ctx.channels) assertSafePath(cwd, join(directory, channel + '.md'));
   mkdirSync(directory, { recursive: true });
   const briefs = ctx.channels.map(channel => {
     const path = join(directory, channel + '.md');

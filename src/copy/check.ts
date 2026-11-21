@@ -5,6 +5,7 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import { validateFile } from '../core/schema.js';
 import { context, type Product } from './context.js';
 import { loadPlatform } from './platforms.js';
+import { assertSafePath } from './safe-path.js';
 
 export interface Post {
   channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
@@ -108,6 +109,8 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
 }
 export function checkPosts(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected), issues: Issue[] = [], posts: Post[] = [];
+  assertSafePath(cwd, join(ctx.paths.posts, 'check-state.json'));
+  assertSafePath(cwd, join(ctx.paths.posts, 'fix-list.md'));
   for (const channel of ctx.channels) {
     const path = join(ctx.paths.posts, channel + '.md');
     if (!existsSync(path)) { issues.push({ channel, rule: 'post.missing', message: 'Missing planned post', fix: 'Write ' + path }); continue; }

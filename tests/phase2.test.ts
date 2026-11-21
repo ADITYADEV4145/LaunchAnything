@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cpSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, symlinkSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -8,8 +8,35 @@ import { packageRoot } from '../src/core/package-root.js';
 import { channels, loadPlatform } from '../src/copy/platforms.js';
 import { parsePost, inspectPost, similarity, checkPosts, type Post } from '../src/copy/check.js';
 import { writeBriefs } from '../src/copy/write.js';
+import { assertSafePath } from '../src/copy/safe-path.js';
 
 const root = packageRoot();
+it('refuses symlinked output directories and files without touching external targets', () => {
+  for (const target of ['.launch', '.launch/posts', '.launch/posts/briefs', '.launch/posts/briefs/x.md', '.launch/posts/check-state.json', '.launch/posts/fix-list.md']) {
+    isolated(cwd => {
+      checks[0].run({ cwd, fixture: 'cli-tool' });
+      const outside = mkdtempSync(join(tmpdir(), 'liftoff-outside-'));
+      try {
+        const path = join(cwd, target);
+        if (existsSync(path)) renameSync(path, join(outside, 'original'));
+        const directory = !target.endsWith('.md') && !target.endsWith('.json');
+        const destination = join(outside, directory ? 'directory' : 'sentinel');
+        if (directory) cpSync(join(outside, 'original'), destination, { recursive: true });
+        else writeFileSync(destination, 'unchanged');
+        symlinkSync(destination, path);
+        const before = directory ? readFileSync(join(outside, 'original', target === '.launch' ? 'config.json' : target.endsWith('briefs') ? 'x.md' : 'briefs/x.md'), 'utf8') : 'unchanged';
+        if (!target.includes('check-state') && !target.includes('fix-list')) expect(() => writeBriefs(cwd, ['x'])).toThrow('Unsafe');
+        if (!target.includes('briefs')) expect(() => checkPosts(cwd, ['x'])).toThrow('Unsafe');
+        if (!directory) expect(readFileSync(destination, 'utf8')).toBe(before);
+      } finally { rmSync(outside, { recursive: true, force: true }); }
+    });
+  }
+  isolated(cwd => {
+    expect(() => assertSafePath(cwd, join(cwd, '..', 'escaped'))).toThrow('outside repository');
+    symlinkSync(join(cwd, 'missing'), join(cwd, '.launch'));
+    expect(() => assertSafePath(cwd, join(cwd, '.launch/posts/x.md'))).toThrow('Unsafe');
+  });
+});
 const product = { name: 'Demo', features: [{ name: 'Task editor', description: 'Edits tasks' }], claims: [{ id: 'edit', text: 'Edits tasks' }] };
 const post: Post = { channel: 'x', title: 'Demo', body: 'Try this small project.', media: [], claims: [] };
 function rules(p: Partial<Post>, channel = 'x') { return inspectPost({ ...post, channel, ...p }, channel, product).map(i => i.rule); }

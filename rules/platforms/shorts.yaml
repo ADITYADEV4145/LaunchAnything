@@ -1,0 +1,1 @@
+{"kind":"platform","id":"shorts","name":"shorts","version":1,"lastVerified":"2026-09-25","sources":["https://support.google.com/youtube/answer/57407"],"title":{"required":true,"maxLength":100},"body":{"minLength":1,"maxLength":5000},"maxLinks":3,"requiredLink":false,"bannedWords":[],"guidance":["Title up to 100 characters; description up to 5000."]}

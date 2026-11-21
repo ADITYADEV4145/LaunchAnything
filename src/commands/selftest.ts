@@ -3,7 +3,7 @@ import { selftest } from '../selftest/index.js';
 import { commandOptions, output } from '../core/output.js';
 export function register(program: Command) {
   program.command('selftest').description('Run phase checks against isolated fixture repositories')
-    .option('--through <phase>', 'Last phase to run (0-6)', '1')
+    .option('--through <phase>', 'Last phase to run (0, 1, 1b, 2, 2b, 3-6)', '1')
     .action(async (options: { through: string }) => {
       const report = await selftest(options.through);
       const failed = report.results.some(r => !r.ok);

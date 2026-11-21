@@ -8,6 +8,7 @@ Coordinate changes to those with the lead rather than editing them concurrently.
 | --- | --- | --- |
 | 0 | research | src/research/, schemas/pains.schema.json, src/selftest/phase0.ts, tests/phase0.test.ts |
 | 1 | init, scan, validate, plan | src/product/, src/planning/, src/selftest/phase1.ts, tests/phase1.test.ts |
+| 1b | brief | src/brief/, rules/brief.yaml, src/selftest/phase1b.ts, tests/phase1b.test.ts, skill/references/phase1b.md |
 | 2 | write, check | src/copy/, rules/platforms/, src/selftest/phase2.ts, tests/phase2.test.ts |
 | 3 | shots, images | src/visuals/, templates/images/, src/selftest/phase3.ts, tests/phase3.test.ts |
 | 4 | video | src/video/, templates/video/, src/selftest/phase4.ts, tests/phase4.test.ts |

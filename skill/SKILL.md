@@ -18,7 +18,7 @@ The agent is the model; the CLI never calls an LLM API. All commands support
 
 ## Run order
 
-doctor → init → confirm profile → scan → agent writes product.json → validate → plan.
+doctor → research → init → confirm profile → scan → agent writes product.json → validate → plan → brief.
 Phase 1 product understanding and planning and phase 5 review/local staging are
 implemented. Phases 2–4 and 6 remain stubs; never claim they created assets.
 
@@ -63,7 +63,15 @@ rules, launch date and timezone. Review `.launch/plan.md` with the user. The pla
 2–4 channels with local posting times and a T-7 to T+3 checklist, under 120 lines.
 See [phase1.md](references/phase1.md) for detection, scheduling and history hooks.
 
-## selftest
+## brief — phase 1b
+
+Run `liftoff brief --json`, edit the deterministic scaffold with verified messaging,
+then `liftoff validate brief --json` and `liftoff brief --json` to export printable
+HTML. Existing edits are preserved; `--force` explicitly replaces them. Missing
+pain research and changed inputs warn. See [phase1b.md](references/phase1b.md).
+Later-phase agents must read brief.md as their single messaging source.
+
+## selftest gates
 
 Run `liftoff selftest --through 1` to exercise all three fixture repositories.
 Phase 5 also has fixture checks. Higher cumulative gates still fail at the

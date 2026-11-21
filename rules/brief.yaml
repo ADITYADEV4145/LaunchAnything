@@ -1,0 +1,18 @@
+version: 1
+faqMin: 8
+faqMax: 12
+sections:
+  - {title: Positioning statement, words: 150}
+  - {title: Target users and top pains, words: 500}
+  - {title: One-liner and alternative taglines, words: 150}
+  - {title: Key messages, words: 200}
+  - {title: Proof points with sources, words: 400}
+  - {title: Feature-to-pain map, words: 600}
+  - {title: Competitor comparison, words: 500}
+  - {title: Likely objections with answers, words: 400}
+  - {title: FAQ, words: 800}
+  - {title: Pricing and free-tier story, words: 250}
+  - {title: Channel plan with dates, words: 800}
+  - {title: Launch-day schedule hour by hour, words: 400}
+  - {title: Success metrics, words: 250}
+  - {title: Open risks, words: 300}

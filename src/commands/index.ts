@@ -1,4 +1,5 @@
 import { register as init } from './init.js';
+import { register as brief } from './brief.js';
 import { register as scan } from './scan.js';
 import { register as validate } from './validate.js';
 import { register as plan } from './plan.js';
@@ -25,6 +26,6 @@ import { register as voice } from './voice.js';
 import { register as research } from './research.js';
 export function registerCommands(program: Command) {
   voice(program);
-  for (const register of [research, init, scan, validate, plan, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
+  for (const register of [research, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

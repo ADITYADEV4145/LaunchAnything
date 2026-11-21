@@ -60,6 +60,36 @@ it('builds a review page and defaults the CLI to an approval-gated dry run', asy
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
+it('shows stale approvals with the previous approver after copy or attachment bytes change', async () => {
+  const { cwd, paths, markdown } = await project();
+  const postFile = join(paths.posts, 'show-hn.md');
+  const mediaFile = join(paths.media, 'example.svg');
+  const source = markdown.replace('media: []', 'media:\n  - slot: screenshot\n    path: media/example.svg');
+  await mkdir(paths.media);
+  await writeFile(mediaFile, '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  await writeFile(postFile, source);
+  const { path, posts: [{ channel, hash }] } = await buildReview(cwd);
+  const state = async () => (await readFile(path, 'utf8')).match(/<span class="state">([^<]+)/)?.[1];
+  expect(await state()).toBe('Awaiting approval');
+  await writeFile(paths.approvals, JSON.stringify({ approvals: [
+    { channel, hash, name: 'Taylor & Co.', time: '2026-07-13T09:00:00Z' },
+  ] }));
+  await buildReview(cwd);
+  expect(await state()).toBe('Approved');
+
+  await writeFile(postFile, source.replace('local launch', 'new launch'));
+  await buildReview(cwd);
+  const stale = 'Approval stale: copy or attachments changed (previously approved by Taylor &amp; Co.)';
+  expect(await state()).toBe(stale);
+  await expect(publish(cwd, true)).rejects.toThrow('exact post and media hash not approved');
+
+  await writeFile(postFile, source);
+  await writeFile(mediaFile, '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
+  await buildReview(cwd);
+  expect(await state()).toBe(stale);
+  await expect(publish(cwd, true)).rejects.toThrow('exact post and media hash not approved');
+});
+
 function reviewTab(cwd: string, html: string, reviewer: string, openWriter = localWriter) {
   const snapshot = html.match(/<script id="snapshot" type="application\/json">([^<]+)<\/script>/)![1];
   const script = html.match(/<script>([\s\S]+)<\/script><\/html>/)![1];

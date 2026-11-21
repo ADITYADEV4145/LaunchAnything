@@ -183,10 +183,16 @@ export async function buildReview(cwd?: string) {
   const snapshots = Object.fromEntries(posts.map(({ channel, filename, hash, source }) =>
     [channel, { filename, hash, source }]));
   const cards = posts.map(post => {
-    const matches = approvals.filter(record => record.channel === post.channel && record.hash === post.hash && record.name.trim());
+    const channelApprovals = approvals.filter(record => record.channel === post.channel && record.name.trim());
+    const matches = channelApprovals.filter(record => record.hash === post.hash);
     const approved = matches.length && approvers.every(person =>
       matches.some(record => record.name === person.name && record.role === person.role));
-    return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : 'Awaiting approval', config.timezone);
+    const previous = [...new Set(channelApprovals.filter(record => record.hash !== post.hash &&
+      !matches.some(match => match.name === record.name)).map(record => record.name))];
+    const pending = previous.length
+      ? `Approval stale: copy or attachments changed (previously approved by ${previous.join(', ')})`
+      : 'Awaiting approval';
+    return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone);
   });
   const scriptHash = createHash('sha256').update(script).digest('base64');
   const html = `<!doctype html>

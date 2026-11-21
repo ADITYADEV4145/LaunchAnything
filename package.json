@@ -16,6 +16,7 @@
     "schemas/",
     "rules/",
     "skill/",
+    "templates/",
     "fixtures/"
   ],
   "scripts": {

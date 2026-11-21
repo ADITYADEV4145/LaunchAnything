@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
+import type { ContentBox } from './crop.js';
 
 export interface Branding { name: string; tagline: string; homepage: string }
 export interface Frame { x:number; y:number; width:number; height:number; radius:number; kind:'browser'|'phone'|'terminal'; detail?:{x:number;y:number;width:number;height:number;fraction:number} }
@@ -31,7 +32,7 @@ function svg(width:number,height:number,body:string) { return `<svg xmlns="http:
 function backdrop(width:number,height:number) {
   return `<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#111b39"/><stop offset=".55" stop-color="#26335d"/><stop offset="1" stop-color="#405a70"/></linearGradient><radialGradient id="glow"><stop stop-color="#7e9bb9" stop-opacity=".27"/><stop offset="1" stop-color="#7e9bb9" stop-opacity="0"/></radialGradient></defs><rect width="${width}" height="${height}" fill="url(#bg)"/><ellipse cx="${width*.85}" cy="${height*.18}" rx="${width*.7}" ry="${height*.8}" fill="url(#glow)"/><path d="M0 ${height*.82} Q ${width*.5} ${height*.6} ${width} ${height*.88}" fill="none" stroke="#d0e0ff" stroke-opacity=".07" stroke-width="1"/>`;
 }
-export function frameLayout(width:number,height:number,sourceWidth:number,sourceHeight:number,terminal=false): Frame {
+export function frameLayout(width:number,height:number,sourceWidth:number,sourceHeight:number,terminal=false,crop?:ContentBox): Frame {
   const vertical = height > width;
   const phone = sourceHeight/sourceWidth > 1.5;
   if (phone && !vertical) {
@@ -42,6 +43,7 @@ export function frameLayout(width:number,height:number,sourceWidth:number,source
   }
   const availableWidth = width * (phone ? .68 : .87);
   const availableHeight = height * (vertical ? .49 : .57);
+  if (crop) { sourceWidth=crop.width; sourceHeight=crop.height; }
   const scale = Math.min(availableWidth/sourceWidth,availableHeight/sourceHeight);
   const w = Math.round(sourceWidth*scale/2)*2;
   const h = Math.round(sourceHeight*scale/2)*2;

@@ -9,6 +9,7 @@ import { launchDir } from '../core/launch-dir.js';
 import { packageRoot } from '../core/package-root.js';
 import { endCardSeconds, loadScript, resolveShot, srt, totalDuration } from './script.js';
 import { branding, endAsset, frameLayout, sceneAssets } from './design.js';
+import { detectContent } from './crop.js';
 
 const exec = promisify(execFile);
 export async function run(binary: string, args: string[], cwd?: string) {
@@ -65,7 +66,16 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     const dimensions = await Promise.all(paths.map(async path => JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','json',path])).stdout).streams[0] as {width:number;height:number}));
     let terminal = false;
     try { terminal = JSON.parse(await readFile(join(launchDir(cwd).media,'manifest.json'),'utf8')).frame === 'terminal'; } catch { /* Ordinary captures use browser or phone framing. */ }
-    const assets: Record<string,{plate:string;caption:string;frame:ReturnType<typeof frameLayout>}[]> = {};
+    const focused=await Promise.all(paths.map(async (path,i)=>{
+      const {width,height}=dimensions[i];
+      if (terminal || height/width>1.5 || selected.every(f=>formats[f].width>formats[f].height)) return;
+      const crop=await detectContent(path,width,height);
+      if (!crop) return;
+      const video=/\.(mp4|webm)$/i.test(path),target=join(work,`focus-${i}.${video?'webm':'png'}`);
+      await run('ffmpeg',['-y','-v','error','-i',path,'-vf',`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}`,...(video?['-an','-c:v','libvpx-vp9','-crf','28','-b:v','0','-cpu-used','8']:['-frames:v','1']),'-threads','1',target]);
+      return {path:target,crop};
+    }));
+    const assets: Record<string,{plate:string;caption:string;source:string;frame:ReturnType<typeof frameLayout>}[]> = {};
     const endCards: Record<string,string> = {};
     const png = async (source:string) => {
       const target = source.replace(/\.svg$/,'.png');
@@ -76,9 +86,10 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
       const {width,height} = formats[format];
       assets[format] = [];
       for (const [i,scene] of script.scenes.entries()) {
-        const frame=frameLayout(width,height,dimensions[i].width,dimensions[i].height,terminal);
+        const focus=width<=height?focused[i]:undefined;
+        const frame=frameLayout(width,height,dimensions[i].width,dimensions[i].height,terminal,focus?.crop);
         const source=await sceneAssets(work,`${format}-${i}`,width,height,frame,brand,scene.text,i,script.scenes.length);
-        assets[format].push({plate:await png(source.platePath),caption:await png(source.captionPath),frame});
+        assets[format].push({plate:await png(source.platePath),caption:await png(source.captionPath),source:focus?.path??paths[i],frame});
       }
       endCards[format] = await png(await endAsset(work,format,width,height,brand,logo));
     }
@@ -96,7 +107,9 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
         for (const format of selected) {
           const asset=assets[format][i];
           for (const file of [asset.plate,asset.caption]) await cp(file,join(work,'public',basename(file)));
-          layouts[`${formats[format].width}x${formats[format].height}`]={...asset,plate:basename(asset.plate),caption:basename(asset.caption)};
+          const src=`${format}-${i}.${asset.source.split('.').pop()}`;
+          await cp(asset.source,join(work,'public',src));
+          layouts[`${formats[format].width}x${formats[format].height}`]={...asset,src,plate:basename(asset.plate),caption:basename(asset.caption)};
         }
         return { ...s, src: `${i}.${ext}`, layouts };
       }));
@@ -122,13 +135,13 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
           const duration = (Math.round(elapsed * 12) - startFrame) / 12;
           const piece = join(work, `${format}-${i}.mp4`);
           const video = /\.(webm|mp4)$/i.test(paths[i]);
-          const {frame,plate,caption}=assets[format][i];
+          const {frame,plate,caption,source}=assets[format][i];
           const innerW=Math.floor(frame.width*.96/2)*2,innerH=Math.floor(frame.height*.96/2)*2;
           const camera=`scale=${innerW}:${innerH}:force_original_aspect_ratio=decrease,pad=${frame.width}:${frame.height}:(ow-iw)/2:(oh-ih)/2:color=${frame.kind==='terminal'?'0x111b30':'white'},zoompan=z='1+0.015*on/${Math.max(1,duration*12)}':x='iw/2-iw/zoom/2':y=0:d=1:s=${frame.width}x${frame.height}:fps=12`;
           const detail=frame.detail;
           const footage=detail?`[1:v]fps=12,split[full][detail];[full]${camera}[shot];[detail]crop=iw:ih*${detail.fraction}:0:0,scale=${detail.width}:${detail.height}[inset];[0:v][inset]overlay=${detail.x}:${detail.y}[plate]`:`[1:v]fps=12,${camera}[shot]`;
           const filter=`${footage};[${detail?'plate':'0:v'}][shot]overlay=${frame.x}:${frame.y}[base];[2:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=${Math.max(0,duration-.25)}:d=0.25:alpha=1[caption];[base][caption]overlay[out]`;
-          await run('ffmpeg',['-y','-v','error','-filter_complex_threads','2','-loop','1','-framerate','12','-i',plate,...(video?['-stream_loop','-1']:['-loop','1','-framerate','12']),'-i',paths[i],'-loop','1','-framerate','12','-i',caption,'-filter_complex',filter,'-map','[out]','-t',String(duration),'-an','-r','12','-c:v','libx264','-preset','ultrafast','-crf','22','-pix_fmt','yuv420p','-threads','2',piece]);
+          await run('ffmpeg',['-y','-v','error','-filter_complex_threads','2','-loop','1','-framerate','12','-i',plate,...(video?['-stream_loop','-1']:['-loop','1','-framerate','12']),'-i',source,'-loop','1','-framerate','12','-i',caption,'-filter_complex',filter,'-map','[out]','-t',String(duration),'-an','-r','12','-c:v','libx264','-preset','ultrafast','-crf','22','-pix_fmt','yuv420p','-threads','2',piece]);
           pieces.push(piece);
         }
         const endCard = join(work,`${format}-end.mp4`);

@@ -10,6 +10,7 @@ import { frameLayout, wrapText } from '../src/video/design.js';
 import { prepareFixtureVideo } from '../src/selftest/phase4.js';
 import { cp, readFile } from 'node:fs/promises';
 import { packageRoot } from '../src/core/package-root.js';
+import { contentBounds, detectContent } from '../src/video/crop.js';
 
 const dirs: string[] = [];
 async function setup() {
@@ -23,6 +24,35 @@ async function setup() {
 }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d,{recursive:true,force:true}))); });
 describe('phase 4',() => {
+  it('trims uniform margins with padding and unions moving content',() => {
+    const pixels=new Uint8Array(60*40*3*2).fill(255);
+    for(let frame=0;frame<2;frame++) for(let y=10;y<30;y++) for(let x=10+frame*10;x<30+frame*10;x++) pixels.fill(0,(frame*60*40+y*60+x)*3,(frame*60*40+y*60+x)*3+3);
+    const box=contentBounds(pixels,60,40)!;
+    expect(box.x).toBeLessThan(10);
+    expect(box.x+box.width).toBeGreaterThan(40);
+    expect(box.y).toBeLessThan(10);
+    expect(box.y+box.height).toBeGreaterThan(30);
+    expect(box.width).toBeLessThan(60);
+    pixels.fill(0,(37*60+1)*3,(37*60+3)*3);
+    expect(contentBounds(pixels,60,40)).toEqual(box);
+    expect(contentBounds(new Uint8Array(60*40*3).fill(255),60,40)).toBeUndefined();
+    expect(contentBounds(new Uint8Array(),60,40)).toBeUndefined();
+    expect(()=>contentBounds(new Uint8Array(7),60,40)).toThrow('Invalid RGB');
+    const complex=new Uint8Array(60*40*3).fill(255);
+    complex.fill(0,0,3);complex.set([0,128,0],59*3);complex.set([128,0,0],39*60*3);
+    expect(contentBounds(complex,60,40)).toBeUndefined();
+  });
+  it('finds actual web content and enlarges it without changing its browser framing',async () => {
+    const home=join(packageRoot(),'templates/video/footage/saas-next/home.png');
+    const crop=await detectContent(home,2560,1600);
+    expect(crop).toBeDefined();
+    expect(crop!.width).toBeLessThan(1000);
+    expect(crop!.height).toBeLessThan(800);
+    const original=frameLayout(720,1280,2560,1600);
+    const focused=frameLayout(720,1280,2560,1600,false,crop);
+    expect(focused.kind).toBe('browser');
+    expect(focused.width/crop!.width).toBeGreaterThan(original.width/2560*2);
+  });
   it('fits complete footage and wraps even long unbroken captions',() => {
     for(const [width,height] of [[1280,720],[720,1280],[720,720]]) {
       const frame=frameLayout(width,height,1280,800);

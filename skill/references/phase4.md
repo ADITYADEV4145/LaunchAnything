@@ -35,6 +35,12 @@ PATH/local Remotion CLI if available, otherwise ffmpeg. Explicit
 with libx264 and librsvg (SVG rasterization). Both renderers use the same generated
 gradient plates, browser/phone frames, shadows, large wrapped captions and safe
 areas. Captions fade in/out; a small centre-top zoom keeps the full capture visible.
+Portrait and square browser shots automatically trim near-uniform background
+margins with padding before fitting the window. Video crops union the content
+bounds across the first four sampled seconds, preserving navigation content.
+Small isolated corner overlays (such as a development-server badge) are ignored.
+Uniform/complex-background captures keep their original bounds. Landscape, phone,
+and terminal shots are unchanged by this content crop.
 Portrait captures in a landscape/square video include a magnified detail alongside
 the complete phone, rather than throwing away the rest of the screen. A captured
 terminal can opt out of browser chrome via `.launch/media/manifest.json` with

@@ -120,6 +120,17 @@ it('extracts adjacent Markdown targets and deduplicates decorated bare links', (
   })).not.toContain('links.count');
   expect(rules({ body: '**https://a.test** [b](https://b.test)[c](https://c.test)' })).toContain('links.count');
 });
+it('stops bare URLs before adjacent Markdown links', () => {
+  for (const markdown of ['[docs](https://b.example)', '![docs](https://b.example)', '[docs](https://b.example "see https://title.example")']) {
+    const text = 'https://a.example-' + markdown;
+    expect(extractLinks(text)).toEqual(['https://a.example-', 'https://b.example']);
+    expect(rules({ body: text })).not.toContain('links.count');
+    expect(rules({ body: text + ' https://c.example' })).toContain('links.count');
+  }
+  expect(extractLinks('https://a.example/?filter[key]=[value]')).toEqual(['https://a.example/?filter[key]=[value]']);
+  expect(extractLinks('https://a.example/path-[broken]')).toEqual(['https://a.example/path-[broken]']);
+});
+
 it('consumes Markdown titles that wrap across lines', () => {
   for (const newline of ['\n', '\r\n']) {
     for (const [open, close] of [['"', '"'], ["'", "'"], ['(', ')']]) {

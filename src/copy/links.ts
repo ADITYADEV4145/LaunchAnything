@@ -76,6 +76,7 @@ export function extractLinks(text: string) {
     let depth = 0;
     for (; cursor < text.length; cursor++) {
       const char = text[cursor];
+      if ((char === '[' || char === '!') && markdownLink(text, cursor)) break;
       const next = text[cursor + 1];
       if (char === "'" && (!next || /\s/u.test(next) || (next.charCodeAt(0) > 127 && /\p{P}/u.test(next)))) break;
       if (/[\s<>"→]/u.test(char) || (char === ')' && depth === 0)) break;

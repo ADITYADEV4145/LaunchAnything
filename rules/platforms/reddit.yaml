@@ -1,0 +1,54 @@
+kind: platform
+id: reddit
+name: Reddit
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Reddiquette fetched but supplies no post length or subreddit-specific limits. All four subreddit
+    rule fetches returned no content. Policies below are unverified conservative local gates, not
+    verified live rules.
+sources:
+  - https://support.reddithelp.com/hc/en-us/articles/205926439
+  - https://www.reddit.com/r/SideProject/about/rules.json
+  - https://www.reddit.com/r/webdev/about/rules.json
+  - https://www.reddit.com/r/programming/about/rules.json
+  - https://www.reddit.com/r/selfhosted/about/rules.json
+title:
+  required: true
+  maxLength: 300
+body:
+  minLength: 1
+  maxLength: 10000
+maxLinks: 2
+requiredLink: false
+bannedWords: []
+guidance:
+  - Subreddit rules override these budgets; self-promotion may be forbidden.
+  - Check pinned rules, required flair and disclosure manually; never auto-submit.
+subreddits:
+  r/SideProject:
+    selfPromotion: allowed
+    flairRequired: false
+    verified: false
+    note: Unverified conservative local policy, not a statement of current subreddit rules. Fetch
+      returned no content on 2026-11-21; manually review before posting.
+  r/webdev:
+    selfPromotion: restricted
+    flairRequired: true
+    verified: false
+    note: Unverified conservative local policy, not a statement of current subreddit rules. Fetch
+      returned no content on 2026-11-21; manually review before posting.
+  r/programming:
+    selfPromotion: forbidden
+    flairRequired: false
+    verified: false
+    note: Unverified conservative local policy, not a statement of current subreddit rules. Fetch
+      returned no content on 2026-11-21; manually review before posting.
+  r/selfhosted:
+    selfPromotion: restricted
+    flairRequired: true
+    verified: false
+    note: Unverified conservative local policy, not a statement of current subreddit rules. Fetch
+      returned no content on 2026-11-21; manually review before posting.

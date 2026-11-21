@@ -37,11 +37,17 @@ export function parsePost(text: string): Post {
   return post as Post;
 }
 export function similarity(a: string, b: string) {
-  const shingles = (text: string) => {
-    const words = stripCitations(text).toLowerCase().match(/[a-z0-9]+/g) ?? [];
-    return new Set(words.slice(0, -2).map((_, i) => words.slice(i, i + 3).join(' ')));
-  };
-  const x = shingles(a), y = shingles(b);
+  const normalize = (text: string) => stripCitations(text).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+  const left = normalize(a), right = normalize(b);
+  if (!left || !right) return 0;
+  if (left === right) return 1;
+  const tokens = (text: string) => text.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const leftWords = tokens(left), rightWords = tokens(right);
+  const size = Math.min(3, leftWords.length, rightWords.length);
+  if (!size) return 0;
+  const shingles = (words: string[]) => new Set(words.slice(0, words.length - size + 1)
+    .map((_, i) => words.slice(i, i + size).join(' ')));
+  const x = shingles(leftWords), y = shingles(rightWords);
   if (!x.size || !y.size) return 0;
   return [...x].filter(s => y.has(s)).length / new Set([...x, ...y]).size;
 }

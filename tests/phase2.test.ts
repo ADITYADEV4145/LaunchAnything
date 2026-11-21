@@ -102,6 +102,17 @@ it('uses shingle similarity and handles empty text', () => {
   expect(similarity('one two three four', 'one two three four')).toBe(1);
   expect(similarity('one two three four', 'other words not alike')).toBe(0);
 });
+it('detects short and non-Latin duplicates with Unicode-aware similarity', () => {
+  expect(similarity('Hello', 'hello')).toBe(1);
+  expect(similarity('Two words [claim:edit]', 'two  words')).toBe(1);
+  expect(similarity('你好世界', '你好世界')).toBe(1);
+  expect(similarity('Привет мир снова', 'привет мир снова!')).toBe(1);
+  expect(similarity('café project', 'cafe\u0301 project')).toBe(1);
+  expect(similarity('🚀', '🚀')).toBe(1);
+  expect(similarity('Hello', 'Goodbye')).toBe(0);
+  expect(similarity('你好', '再见')).toBe(0);
+  expect(similarity('', '')).toBe(0);
+});
 it('enforces structured channel specifics and metadata without changing the shared schema', () => {
   expect(rules({ body: 'A launch without a section.' }, 'product-hunt')).toContain('maker-comment.required');
   expect(rules({ body: '## Maker comment\n\n' }, 'product-hunt')).toContain('maker-comment.required');

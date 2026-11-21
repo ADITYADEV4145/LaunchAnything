@@ -59,6 +59,40 @@ it('uses shingle similarity and handles empty text', () => {
   expect(similarity('one two three four', 'one two three four')).toBe(1);
   expect(similarity('one two three four', 'other words not alike')).toBe(0);
 });
+it('enforces structured channel specifics and metadata without changing the shared schema', () => {
+  expect(rules({ body: 'A launch without a section.' }, 'product-hunt')).toContain('maker-comment.required');
+  expect(rules({ body: '## Maker comment\n\n' }, 'product-hunt')).toContain('maker-comment.required');
+  expect(rules({ body: '## Maker comment\n\nI made this.' }, 'product-hunt')).not.toContain('maker-comment.required');
+  expect(rules({ media: [{slot: 'gallery-1', width: 100, height: 100}] }, 'product-hunt')).toEqual(expect.arrayContaining(['gallery.count','gallery.size']));
+  expect(rules({ body: '## Maker comment\n\nI made this.', media: [
+    {slot: 'gallery-1', width: 1270, height: 760}, {slot: 'gallery-2', width: 1270, height: 760}
+  ] }, 'product-hunt')).toEqual([]);
+  expect(rules({ subreddit: 'r/webdev' }, 'reddit')).toContain('reddit.flair-required');
+  expect(rules({ subreddit: 'r/webdev', flair: 'Showoff' }, 'reddit')).toEqual([]);
+  expect(rules({ subreddit: 'r/programming' }, 'reddit')).toContain('reddit.self-promotion');
+  expect(rules({ subreddit: 'r/programming', selfPromotion: false }, 'reddit')).toEqual([]);
+  expect(rules({ subreddit: 'r/unknown' }, 'reddit')).toContain('reddit.subreddit');
+  expect(rules({ linkFirstComment: true, link: 'https://example.test' }, 'linkedin')).toEqual([]);
+  expect(rules({ linkFirstComment: true }, 'linkedin')).toContain('links.comment-required');
+  expect(rules({ linkFirstComment: true, link: 'https://example.test', body: 'See https://example.test' }, 'linkedin')).toContain('links.first-comment');
+  expect(rules({ linkFirstComment: true }, 'x')).toContain('links.placement');
+  expect(rules({ title: 'a'.repeat(61) }, 'email')).toContain('subject.length');
+  for (const channel of ['tiktok','reels','shorts'])
+    expect(rules({ body: 'a'.repeat(loadPlatform(channel).captionMax! + 1) }, channel)).toContain('caption.length');
+  const text = '---\nchannel: reddit\ntitle: Demo\nmedia: []\nclaims: []\nsubreddit: r/webdev\nflair: Showoff\nselfPromotion: true\n---\nHello';
+  expect(parsePost(text).subreddit).toBe('r/webdev');
+  expect(() => parsePost(text.replace('selfPromotion: true', 'selfPromotion: yes'))).toThrow('Invalid phase 2 metadata');
+  expect(() => parsePost(text.replace('flair: Showoff', 'flair: ""'))).toThrow('Invalid phase 2 metadata');
+  expect(() => parsePost(text.replace('flair: Showoff', 'unknown: value'))).toThrow();
+});
+it('records honest source verification status', () => {
+  for (const channel of channels) {
+    const platform = loadPlatform(channel);
+    expect(readFileSync(join(root, 'rules/platforms', channel + '.yaml'), 'utf8')).toMatch(/^kind: platform\n/);
+    expect(platform.lastVerified).toBe(platform.verifiedFields.length ? '2026-11-21' : null);
+    expect(platform.verificationNotes.length).toBeGreaterThan(0);
+  }
+});
 it('tracks failures, missing/schema/duplicate posts and removes stale fixes', () => isolated(cwd => {
   checks[0].run({ cwd, fixture: 'cli-tool' });
   const posts = join(cwd, '.launch/posts');

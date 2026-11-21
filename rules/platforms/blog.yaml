@@ -1,1 +1,23 @@
-{"kind":"platform","id":"blog","name":"blog","version":1,"lastVerified":"2026-09-25","sources":["https://developers.google.com/search/docs/fundamentals/creating-helpful-content"],"title":{"required":true,"maxLength":120},"body":{"minLength":1,"maxLength":50000},"maxLinks":20,"requiredLink":false,"bannedWords":[],"guidance":["Use a descriptive title, original evidence and source links."]}
+kind: platform
+id: blog
+name: Blog
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source fetched but did not state the numeric copy limits. All numeric budgets are unverified
+    local editorial limits, not platform guarantees.
+sources:
+  - https://developers.google.com/search/docs/fundamentals/creating-helpful-content
+title:
+  required: true
+  maxLength: 120
+body:
+  minLength: 1
+  maxLength: 50000
+maxLinks: 20
+requiredLink: false
+bannedWords: []
+guidance:
+  - Use a descriptive title, original evidence and source links.

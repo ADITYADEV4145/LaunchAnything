@@ -7,3 +7,9 @@ These budgets deliberately prefer short copy; guidance labels editorial limits.
 Sources are reference documentation, not live network checks. Reverify platform
 policies before publishing. Reddit subreddit policies, gallery dimensions, media
 readiness and live link availability require human review.
+
+Source pages were fetched on 2026-11-21. lastVerified is null when no constraint
+value was confirmed; otherwise it dates only verifiedFields. verified: false
+means the whole rule is not verified. verificationNotes distinguish source facts
+from local budgets. Subreddit policies are explicitly unverified local gates;
+blocked rule pages must not be treated as evidence of live moderator policy.

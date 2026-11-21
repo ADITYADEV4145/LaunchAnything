@@ -1,1 +1,27 @@
-{"kind":"platform","id":"email","name":"email","version":1,"lastVerified":"2026-09-25","sources":["https://mailchimp.com/help/best-practices-for-email-subject-lines/"],"title":{"required":true,"maxLength":60},"body":{"minLength":1,"maxLength":10000},"maxLinks":5,"requiredLink":false,"bannedWords":[],"guidance":["Title is the subject; 60 characters is an editorial budget, not a protocol limit.","Include consent-compliant audience and unsubscribe controls in the sending tool."]}
+kind: platform
+id: email
+name: Email
+version: 2
+lastVerified: 2026-11-21
+verified: false
+verifiedFields:
+  - subjectMax
+  - title.maxLength
+verificationNotes:
+  - Mailchimp recommends at most 60 subject characters; this is guidance, not a protocol maximum.
+    Other budgets are local.
+sources:
+  - https://mailchimp.com/help/best-practices-for-email-subject-lines/
+title:
+  required: true
+  maxLength: 60
+body:
+  minLength: 1
+  maxLength: 10000
+maxLinks: 5
+requiredLink: false
+bannedWords: []
+guidance:
+  - Title is the subject; 60 characters is an editorial budget, not a protocol limit.
+  - Include consent-compliant audience and unsubscribe controls in the sending tool.
+subjectMax: 60

@@ -1,1 +1,27 @@
-{"kind":"platform","id":"shorts","name":"shorts","version":1,"lastVerified":"2026-09-25","sources":["https://support.google.com/youtube/answer/57407"],"title":{"required":true,"maxLength":100},"body":{"minLength":1,"maxLength":5000},"maxLinks":3,"requiredLink":false,"bannedWords":[],"guidance":["Title up to 100 characters; description up to 5000."]}
+kind: platform
+id: shorts
+name: YouTube Shorts
+version: 2
+lastVerified: 2026-11-21
+verified: false
+verifiedFields:
+  - title.maxLength
+  - body.maxLength
+  - captionMax
+verificationNotes:
+  - Source explicitly states title 100 characters and description 5000 characters. captionMax models
+    the description; other budgets are local.
+sources:
+  - https://support.google.com/youtube/answer/57407
+title:
+  required: true
+  maxLength: 100
+body:
+  minLength: 1
+  maxLength: 5000
+maxLinks: 3
+requiredLink: false
+bannedWords: []
+guidance:
+  - Title up to 100 characters; description up to 5000.
+captionMax: 5000

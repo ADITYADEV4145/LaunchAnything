@@ -1,1 +1,24 @@
-{"kind":"platform","id":"tiktok","name":"tiktok","version":1,"lastVerified":"2026-09-25","sources":["https://support.tiktok.com/en/using-tiktok/creating-videos"],"title":{"required":true,"maxLength":100},"body":{"minLength":1,"maxLength":2200},"maxLinks":1,"requiredLink":false,"bannedWords":[],"guidance":["Use a short demonstration caption; 2200 is a conservative editorial budget."]}
+kind: platform
+id: tiktok
+name: TikTok
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source returned navigation only, no caption numbers. Caption and other limits remain unverified
+    local budgets.
+sources:
+  - https://support.tiktok.com/en/using-tiktok/creating-videos
+title:
+  required: true
+  maxLength: 100
+body:
+  minLength: 1
+  maxLength: 2200
+maxLinks: 1
+requiredLink: false
+bannedWords: []
+guidance:
+  - Use a short demonstration caption; 2200 is a conservative editorial budget.
+captionMax: 2200

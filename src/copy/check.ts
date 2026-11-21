@@ -1,11 +1,25 @@
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 import { validateFile } from '../core/schema.js';
 import { context, type Product } from './context.js';
 import { loadPlatform } from './platforms.js';
 
-export interface Post { channel: string; title: string; body: string; media: {slot: string; path?: string}[]; claims: string[]; link?: string }
+export interface Post {
+  channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
+  claims: string[]; link?: string; linkFirstComment?: boolean; subreddit?: string; flair?: string; selfPromotion?: boolean;
+}
+const extensionValidator = new Ajv2020({ allErrors: true }).compile({
+  type: 'object', additionalProperties: false, properties: {
+    linkFirstComment: { type: 'boolean' }, subreddit: { type: 'string', pattern: '^r/[A-Za-z0-9_]+$' },
+    flair: { type: 'string', minLength: 1, pattern: '\\S' }, selfPromotion: { type: 'boolean' },
+    media: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['slot'], properties: {
+      slot: { type: 'string', minLength: 1 }, path: { type: 'string', minLength: 1 },
+      width: { type: 'integer', minimum: 1 }, height: { type: 'integer', minimum: 1 }
+    } } }
+  }
+});
 export interface Issue { channel: string; rule: string; message: string; fix: string }
 export const stripCitations = (text: string) => text.replace(/\[claim:[^\]]+\]/g, '').trim();
 export function parsePost(text: string): Post {
@@ -14,7 +28,10 @@ export function parsePost(text: string): Post {
   const metadata: unknown = parse(match[1]);
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new Error('Front matter must be an object');
   const post = { ...metadata, body: match[2].trim() };
-  const result = validateFile('post', post);
+  const { linkFirstComment, subreddit, flair, selfPromotion, media, ...base } = post as Post;
+  const extensions = { linkFirstComment, subreddit, flair, selfPromotion, media };
+  if (!extensionValidator(extensions)) throw new Error('Invalid phase 2 metadata: ' + JSON.stringify(extensionValidator.errors));
+  const result = validateFile('post', { ...base, media: media?.map(({ width, height, ...item }) => item) });
   if (!result.valid) throw new Error(result.errors.join('; '));
   return post as Post;
 }
@@ -35,6 +52,34 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   if (rules.title.required && !title) add('title.required', 'Title is empty', 'Supply a factual title');
   if (title.length > rules.title.maxLength) add('title.length', 'Title exceeds ' + rules.title.maxLength, 'Shorten the title');
   if (rules.title.prefix && !title.startsWith(rules.title.prefix)) add('title.prefix', 'Missing ' + rules.title.prefix, 'Use the required prefix');
+  if (rules.taglineMax && title.length > rules.taglineMax) add('tagline.length', 'Tagline too long', 'Shorten to ' + rules.taglineMax + ' characters');
+  if (rules.subjectMax && title.length > rules.subjectMax) add('subject.length', 'Subject too long', 'Shorten to ' + rules.subjectMax + ' characters');
+  if (rules.captionMax && body.length > rules.captionMax) add('caption.length', 'Caption too long', 'Shorten to ' + rules.captionMax + ' characters');
+  if (rules.makerComment?.required) {
+    const lines = post.body.split(/\r?\n/);
+    const index = lines.findIndex(line => line.trim() === rules.makerComment!.heading);
+    const section = index < 0 ? '' : lines.slice(index + 1).join('\n').split(/^## /m)[0].trim();
+    if (!stripCitations(section)) add('maker-comment.required', 'Missing maker comment section', 'Add ' + rules.makerComment.heading + ' followed by a substantive comment');
+  }
+  if (rules.gallery) {
+    const gallery = post.media.filter(item => item.slot.startsWith('gallery-'));
+    if (gallery.length && gallery.length < rules.gallery.minImages) add('gallery.count', 'Too few supplied gallery images', 'Supply at least ' + rules.gallery.minImages + ' images, or omit unsupplied assets');
+    if (gallery.some(item => item.width !== rules.gallery!.width || item.height !== rules.gallery!.height))
+      add('gallery.size', 'Gallery dimensions missing or outside budget', 'Declare width ' + rules.gallery.width + ' and height ' + rules.gallery.height + ' for each gallery image; manually verify files');
+  }
+  if (post.linkFirstComment && !rules.linkFirstComment) add('links.placement', 'First-comment links unsupported here', 'Remove linkFirstComment for this channel');
+  if (post.linkFirstComment && rules.linkFirstComment) {
+    if (!post.link) add('links.comment-required', 'First-comment link missing', 'Set front matter link to the URL for the first comment');
+    if (/https?:\/\//i.test(body)) add('links.first-comment', 'Link remains in body', 'Move body URLs to front matter link for the first comment');
+  }
+  if (rules.subreddits) {
+    const entry = Object.entries(rules.subreddits).find(([name]) => name.toLowerCase() === post.subreddit?.toLowerCase())?.[1];
+    if (!entry) add('reddit.subreddit', 'Missing or unsupported subreddit', 'Name a configured subreddit in front matter and review its current rules');
+    else {
+      if (entry.flairRequired && !post.flair?.trim()) add('reddit.flair-required', 'Target requires flair under local policy', 'Set a valid flair from the target community');
+      if (entry.selfPromotion === 'forbidden' && post.selfPromotion !== false) add('reddit.self-promotion', 'Self-promotion forbidden under local policy', 'Choose another community; selfPromotion defaults to true for launch posts');
+    }
+  }
   if (body.length < rules.body.minLength || body.length > rules.body.maxLength) add('body.length', 'Body outside platform length budget', 'Use ' + rules.body.minLength + '–' + rules.body.maxLength + ' characters');
   if (rules.postMax) {
     const posts = body.split(/\r?\n---\r?\n/);

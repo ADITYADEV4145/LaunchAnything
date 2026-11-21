@@ -1,5 +1,7 @@
 ---
 channel: reddit
+subreddit: r/SideProject
+selfPromotion: true
 title: "Teamnest: looking for workflow feedback"
 media: []
 claims: [interface]

@@ -13,7 +13,14 @@ a number or product feature name and declare the ID in claims.
 X thread posts are separated by a line containing exactly --- after front matter.
 Citations are stripped before measuring length. Title is Product Hunt's tagline,
 email's subject, or the platform headline; Product Hunt body is the maker comment.
-LinkedIn's first paragraph is the hook. First-comment links stay outside the post.
+LinkedIn's first paragraph is the hook. First-comment links stay outside the body.
+To stage a LinkedIn first-comment link, set linkFirstComment: true and link in front
+matter; keep URLs out of the body. Product Hunt needs a ## Maker comment section.
+Supplied gallery media use gallery-* slots with width and height metadata matching
+the local gallery budget. Reddit requires subreddit metadata and, where configured,
+flair; selfPromotion defaults to true and forbidden targets fail.
+Read verifiedFields and verificationNotes before treating any budget as platform
+policy. Unverified subreddit entries are conservative local gates, not live rules.
 
 Run `liftoff check --json`. Rewrite using .launch/posts/fix-list.md and re-check.
 After at most three failed loops, stop and ask the user; check-state.json tracks

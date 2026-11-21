@@ -28,10 +28,10 @@ export const checks: Check[] = [
     const result = checkPosts(ctx.cwd);
     if (!result.passed) throw new Error(JSON.stringify(result.issues));
   } },
-  ...Object.entries({ 'too-long': 'thread.post-length', uncited: 'claims.uncited', banned: 'words.banned', links: 'links.count' }).map(([seed, rule]): Check => ({
+  ...Object.entries({ 'too-long': 'thread.post-length', uncited: 'claims.uncited', banned: 'words.banned', links: 'links.count', 'reddit-flair': 'reddit.flair-required' }).map(([seed, rule]): Check => ({
     name: 'phase 2 bad ' + seed + ' fails ' + rule, run(ctx) {
       const { base } = setup(ctx);
-      const channel = seed === 'banned' ? 'show-hn' : 'x';
+      const channel = seed === 'banned' ? 'show-hn' : seed === 'reddit-flair' ? 'reddit' : 'x';
       const post = join(ctx.cwd, '.launch/posts', channel + '.md');
       mkdirSync(join(ctx.cwd, '.launch/posts'), { recursive: true });
       const previous = existsSync(post) ? readFileSync(post) : undefined;

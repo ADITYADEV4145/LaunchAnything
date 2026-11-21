@@ -1,1 +1,22 @@
-{"kind":"platform","id":"instagram","name":"instagram","version":1,"lastVerified":"2026-09-25","sources":["https://help.instagram.com/"],"title":{"required":true,"maxLength":100},"body":{"minLength":1,"maxLength":2200},"maxLinks":1,"requiredLink":false,"bannedWords":[],"guidance":["Caption budget 2200; make the opening sentence useful without a link."]}
+kind: platform
+id: instagram
+name: Instagram
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source fetch returned no content. Caption and other limits remain unverified local budgets.
+sources:
+  - https://help.instagram.com/
+title:
+  required: true
+  maxLength: 100
+body:
+  minLength: 1
+  maxLength: 2200
+maxLinks: 1
+requiredLink: false
+bannedWords: []
+guidance:
+  - Caption budget 2200; make the opening sentence useful without a link.

@@ -18,9 +18,14 @@ export function honesty(text: string, product: Product, disclosure: boolean, acc
       .split(/(?<=[.!?])\s+/));
   for (const sentence of sentences) {
     const cited = [...sentence.matchAll(/\[claim:([^\]]+)\]/g)].map(m => m[1]);
-    const supported = (value: string) => product.claims.some(c => cited.includes(c.id) && c.sources?.length && c.text.toLowerCase().includes(value.toLowerCase()));
+    const supported = (value: string, fullCount = false) => product.claims.some(c => {
+      if (!cited.includes(c.id) || !c.sources?.length) return false;
+      if (!fullCount) return c.text.toLowerCase().includes(value.toLowerCase());
+      const escaped = value.trim().replace(/\s+/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp('(?<![\\w.,])' + escaped + '(?!\\w)', 'i').test(c.text.replace(/\s+/g, ' '));
+    });
     for (const match of sentence.matchAll(/\b(?:\d[\d,.]*\s*[kKmMbB]?|one|two|three|hundreds|thousands|millions)\s+(?:(?:active|happy|paying|registered|daily|monthly)\s+)*(?:users?|customers?|downloads?)\b/gi)) {
-      if (!supported(match[0])) add('unsupported-count', 'Audience count is not backed by a cited sourced claim: ' + match[0]);
+      if (!supported(match[0], true)) add('unsupported-count', 'Audience count is not backed by a cited sourced claim: ' + match[0]);
     }
     for (const quote of sentence.matchAll(/["“]([^"”]{8,})["”]/g)) {
       if (/\b(?:love|amazing|best|saved|excellent|recommend|great)\b/i.test(quote[1]) && !supported(quote[1]))

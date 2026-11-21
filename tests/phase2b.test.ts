@@ -84,6 +84,20 @@ it('limits customer impersonation to statements about the launch product', () =>
     expect(honesty(text, product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(true);
 });
 
+it('requires full count tokens instead of matching numeric suffixes in cited claims', () => {
+  const product = { name: 'Tool', features: [], claims: [
+    { id: 'count', text: 'We have 15 users.', sources: [{ type: 'file', ref: 'metrics.csv' }] }
+  ] };
+  expect(honesty('15 users [claim:count]', product, false)).toEqual([]);
+  expect(honesty('', product, false)).toEqual([]);
+  expect(honesty('5 users [claim:count]', product, false)[0].rule).toBe('honesty.unsupported-count');
+  for (const count of ['1,005 users', '1.5 users', '25 users']) {
+    const other = { ...product, claims: [{ ...product.claims[0], text: count }] };
+    expect(honesty('5 users [claim:count]', other, false)[0].rule).toBe('honesty.unsupported-count');
+  }
+  expect(honesty('15 users [claim:missing]', product, false)[0].rule).toBe('honesty.unsupported-count');
+});
+
 it.each(['cli-tool', 'mobile-expo', 'saas-next'])('phase 2b gate: %s', async fixture => {
   const cwd = mkdtempSync(join(tmpdir(), 'voice-gate-'));
   try {

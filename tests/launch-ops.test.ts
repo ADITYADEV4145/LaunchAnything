@@ -82,6 +82,7 @@ it('followup uses recorded data and SHA-cited commits; retro compares tolerant t
 it('release reads tags and cadence without mutating git and handles empty/error ranges', async () => {
   const { cwd } = await workspace(); await repository(cwd);
   const result = await release(cwd); expect(result.commits).toBe(1);
+  expect(result.notes).toBe(join(cwd, '.launch', 'releases', git(cwd, 'rev-parse', '--short', 'HEAD'), 'notes.md'));
   expect(await readFile(result.notes, 'utf8')).toContain(git(cwd, 'rev-parse', 'HEAD'));
   expect((await release(cwd, { from: 'v0.1.0', to: 'HEAD', type: 'feature' })).commits).toBe(1);
   expect((await release(cwd, { cadence: 'weekly', now: new Date('2026-01-03T00:00:00Z') })).commits).toBe(2);
@@ -91,6 +92,18 @@ it('release reads tags and cadence without mutating git and handles empty/error 
   await expect(release(cwd, { type: 'bad' })).rejects.toThrow('--type');
   expect(git(cwd, 'tag')).toBe('v0.1.0');
   git(cwd, 'tag', '-d', 'v0.1.0'); await expect(release(cwd)).rejects.toThrow('Unable to read git');
+});
+it('release uses the exact target tag rather than the requested ref label', async () => {
+  const { cwd } = await workspace(); await repository(cwd);
+  git(cwd, 'tag', 'v0.2.0');
+  const tagged = await release(cwd, { from: 'v0.1.0', to: 'HEAD' });
+  expect(tagged.notes).toBe(join(cwd, '.launch', 'releases', 'v0-2-0', 'notes.md'));
+  await writeLocal(join(cwd, 'CHANGELOG.md'), 'More changes');
+  git(cwd, 'add', 'CHANGELOG.md'); git(cwd, 'commit', '-m', 'fix: another change');
+  const untagged = await release(cwd);
+  expect(untagged.notes).toBe(join(cwd, '.launch', 'releases', git(cwd, 'rev-parse', '--short', 'HEAD'), 'notes.md'));
+  expect(untagged.notes).not.toBe(tagged.notes);
+  expect((await release(cwd, { from: 'v0.1.0', to: 'v0.2.0' })).notes).toBe(tagged.notes);
 });
 it.each(['warroom', 'friends', 'followup', 'retro', 'release'])('%s emits structured JSON failures', async command => {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-empty-')); dirs.push(cwd);

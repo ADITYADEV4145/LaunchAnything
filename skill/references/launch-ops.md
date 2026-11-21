@@ -54,10 +54,11 @@ uses latest reachable tag..HEAD by default. `--cadence weekly|monthly` instead
 selects the past seven days/calendar month (through now), and cannot combine with
 `--from`. `--to` defaults to HEAD. Missing default tag or empty commit range fails.
 Notes group feature/fix/other commits, each with its full SHA, under
-`.launch/releases/<sanitized-to-label>/notes.md`, plus `plan.md`.
+`.launch/releases/<sanitized-target-tag-or-short-sha>/notes.md`, plus `plan.md`.
+The label uses an exact tag at the target commit, otherwise its short SHA.
 Changelog plans use github-release and blog; feature plans add x. Bundled channel
 rules supply suggested windows; verify suitability with the human. This small
 release plan deliberately does not reuse new-product profile channel exclusions.
-No tags are created; only `.launch/` is written. Reusing a to-label replaces drafts.
+No tags are created; only `.launch/` is written. Reusing a target label replaces drafts.
 
 The phase-6 cumulative selftest includes offline launch-ops checks on all fixtures.

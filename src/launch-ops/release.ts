@@ -28,7 +28,10 @@ export async function release(cwd: string, options: { from?: string; to?: string
       const rule = loadRule('channels', channel);
       return `- [ ] ${channel}: prepare a concise, source-linked ${type} draft. Suggested window: ${(rule.bestPostingTimes as string[]).join(', ')} (${config.timezone}); check channel rules before sharing.`;
     }), '', 'Human review and approval required. Paste or publish manually; nothing is sent.', ''].join('\n');
-  const folder = join(root(cwd), 'releases', slug(to));
+  let label: string;
+  try { label = git(cwd, 'describe', '--tags', '--exact-match', target); }
+  catch { label = git(cwd, 'rev-parse', '--short', target); }
+  const folder = join(root(cwd), 'releases', slug(label));
   const notes = join(folder, 'notes.md'), planPath = join(folder, 'plan.md');
   await writeLocal(notes, `# ${type} release\n\nRange: ${base ?? since.toISOString()}..${target}\n\n${commitNotes(rows)}`);
   await writeLocal(planPath, plan);

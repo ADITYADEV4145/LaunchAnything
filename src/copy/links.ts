@@ -32,9 +32,23 @@ function markdownLink(text: string, startIndex: number) {
     const target = text.slice(start, cursor);
     if (!/^https?:\/\//i.test(target)) return;
     if (angle) cursor++;
-    const closing = text.slice(cursor).match(/^[ \t]*(?:\r?\n[ \t]*)?(?:(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^()\r\n]*\))[ \t]*(?:\r?\n[ \t]*)?)?\)/);
-    if (!closing) return;
-    return { target, end: cursor + closing[0].length };
+    while (/\s/u.test(text[cursor] ?? '') && cursor < text.length) cursor++;
+    const delimiter = text[cursor];
+    if (delimiter === '"' || delimiter === "'" || delimiter === '(') {
+      const closing = delimiter === '(' ? ')' : delimiter;
+      cursor++;
+      for (; cursor < text.length; cursor++) {
+        if (text[cursor] === '\\') { cursor++; continue; }
+        if (text[cursor] === closing) break;
+        if (delimiter === '(' && text[cursor] === '(') return;
+        if (/^\r?\n[ \t]*\r?\n/.test(text.slice(cursor))) return;
+      }
+      if (cursor >= text.length) return;
+      cursor++;
+      while (/\s/u.test(text[cursor] ?? '') && cursor < text.length) cursor++;
+    }
+    if (text[cursor] !== ')') return;
+    return { target, end: cursor + 1 };
 }
 
 export function extractLinks(text: string) {

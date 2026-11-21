@@ -120,6 +120,16 @@ it('extracts adjacent Markdown targets and deduplicates decorated bare links', (
   })).not.toContain('links.count');
   expect(rules({ body: '**https://a.test** [b](https://b.test)[c](https://c.test)' })).toContain('links.count');
 });
+it('consumes Markdown titles that wrap across lines', () => {
+  for (const newline of ['\n', '\r\n']) {
+    for (const [open, close] of [['"', '"'], ["'", "'"], ['(', ')']]) {
+      const text = '[x](https://a.example' + newline + '  ' + open + 'see https://b.example' + newline + '  for more' + close + ')';
+      expect(extractLinks(text)).toEqual(['https://a.example']);
+      expect(rules({ body: text + ' https://c.example' })).not.toContain('links.count');
+    }
+  }
+});
+
 it('rejects hostless URL schemes across link sources', () => {
   expect(extractLinks('https:// http://')).toEqual([]);
   expect(extractLinks('[x](https://) <http://> https://?q=x')).toEqual([]);

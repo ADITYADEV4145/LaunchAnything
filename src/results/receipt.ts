@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { checked, readJson, writeLocal } from './files.js';
-import { addMetric, type Results } from './metrics.js';
+import { addMetric, type PublishedPost, type Results } from './metrics.js';
 import { plain } from './report.js';
 
 const xml = (value: string) => value.replace(/[\uFFFE\uFFFF]/g, '').replace(/[&<>"']/g, char => ({
@@ -15,7 +15,7 @@ const labels: Record<string, string> = {
 const format = new Intl.NumberFormat('en-US');
 const signed = new Intl.NumberFormat('en-US', { signDisplay: 'exceptZero' });
 
-function renderReceipt(results: Results, name: string, footer: boolean) {
+function renderReceipt(results: Results, name: string, footer: boolean, trackedRelease: boolean) {
   const rows = results.channels.filter(row => row.views !== undefined);
   const views = rows.reduce((sum, row) => addMetric(sum, row.views!), 0);
   const stars = results.channels.filter(row => row.starsDelta !== undefined);
@@ -24,7 +24,7 @@ function renderReceipt(results: Results, name: string, footer: boolean) {
     { label: 'RECORDED VIEWS', value: rows.length ? format.format(views) : 'Not reported' },
     { label: 'NET GITHUB STARS', value: stars.length ? signed.format(starDelta) : 'Not reported' },
   ];
-  const channels = results.channels.filter(row => row.channel !== 'github-release' ||
+  const channels = results.channels.filter(row => row.channel !== 'github-release' || trackedRelease ||
     row.views !== undefined || row.likes !== undefined || row.comments !== undefined ||
     row.clicks !== undefined || row.signups !== undefined || row.starsDelta === undefined);
   const title = plain(name, 42) || 'Launch receipt';
@@ -57,7 +57,10 @@ export async function receipt(cwd: string, footer = true) {
   const results = checked<Results>('results', await readJson(paths.results));
   const product = await readJson(paths.product, true);
   const name = product === undefined ? 'Launch' : checked<{ name: string }>('product', product).name;
+  const published = await readJson(paths.published, true);
+  const trackedRelease = published === undefined || checked<{ posts: PublishedPost[] }>('published', published).posts.some(
+    post => post.channel === 'github-release' && post.status !== 'failed' && post.status !== 'cancelled');
   const path = join(paths.root, 'receipt.svg');
-  await writeLocal(path, renderReceipt(results, name, footer));
+  await writeLocal(path, renderReceipt(results, name, footer, trackedRelease));
   return { path };
 }

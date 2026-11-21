@@ -138,6 +138,18 @@ it('makes a standalone SVG without active markup or claimed unique reach', async
   expect(await readFile(image.path, 'utf8')).not.toContain('launched with Liftoff');
 });
 
+it('includes a tracked GitHub release with only stars but does not list untracked repository-wide stars as a channel', async () => {
+  const { cwd, paths } = await workspace();
+  await writeJson(paths.results, { observedAt: now.toISOString(), channels: [{ channel: 'github-release', starsDelta: 12 }] });
+  let image = await receipt(cwd);
+  expect(await readFile(image.path, 'utf8')).not.toContain('>GitHub release</text>');
+  await writeJson(paths.published, { posts: [{ channel: 'github-release', id: 'release', status: 'published' }] });
+  image = await receipt(cwd);
+  const svg = await readFile(image.path, 'utf8');
+  expect(svg).toContain('>GitHub release</text>');
+  expect(svg).not.toContain('None recorded');
+});
+
 it('returns one structured CLI result and exits nonzero on bad input', async () => {
   const { cwd, paths } = await workspace();
   const cli = (...args: string[]) => spawnSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', ...args, '--cwd', cwd, '--json'],

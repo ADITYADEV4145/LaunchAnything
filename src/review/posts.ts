@@ -63,8 +63,8 @@ function parsePost(source: string, channel: string) {
   if (!match) throw new Error(`${channel}: expected YAML front matter`);
   const front: unknown = parse(match[1]);
   if (!front || typeof front !== 'object' || Array.isArray(front)) throw new Error(`${channel}: invalid front matter`);
-  const { linkFirstComment, subreddit, flair, selfPromotion, media, ...base } = front as Post &
-    { linkFirstComment?: unknown; subreddit?: unknown; flair?: unknown; selfPromotion?: unknown };
+  const { linkFirstComment, subreddit, flair, selfPromotion, name, tagline, makerComment, media, ...base } = front as Post &
+    { linkFirstComment?: unknown; subreddit?: unknown; flair?: unknown; selfPromotion?: unknown; name?: unknown; tagline?: unknown; makerComment?: unknown };
   const data = { ...base, ...(!('body' in front) && { body: match[2].trim() }),
     media: Array.isArray(media) ? media.map(item => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return item;

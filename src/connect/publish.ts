@@ -57,7 +57,7 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
       try {
         await fillForm(driver, post, paths.root);
         const url = await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, options.timeout ?? 600000);
-        receipt = { channel: post.channel, id: `manual:${post.channel}:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
+        receipt = { channel: post.channel, id: `browser:${post.channel}:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
       } finally { await driver.close(); }
     }
     const previous = await readReceipts(cwd);

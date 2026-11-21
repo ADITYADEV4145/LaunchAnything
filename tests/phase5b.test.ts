@@ -12,6 +12,7 @@ import { assistedReminder, instagramPayload, productHuntPayload } from '../src/c
 import type { ReviewPost } from '../src/review/posts.js';
 import { loadReview } from '../src/review/posts.js';
 import { assistedPublish } from '../src/connect/publish.js';
+import { publish } from '../src/adapters/publish.js';
 import { dailyCaps } from '../src/connect/caps.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import type { Route } from '../src/connect/registry.js';
@@ -75,6 +76,16 @@ it.each([
 
 it('runs the mock-only gate including approvals, secret isolation and cap refusal', async () => {
   await phase5bGate(await workspace());
+});
+it('retains the browser-published URL and status after later offline staging', async () => {
+  const { cwd, paths, home } = await approvedPost('show-hn');
+  await connect({ platform: 'show-hn', route: 'browser', account: 'owner', profile: cwd }, undefined, new MemoryKeychain(), home);
+  const { posts: [published] } = await assistedPublish(cwd, { home, browser: async () => new MockBrowser() });
+  const staged = await publish(cwd, true, {});
+  expect(staged.posts[0].status).toBe('manual');
+  expect(staged.posts[0].id).not.toBe(published.id);
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toEqual([published, ...staged.posts]);
+  expect(published).toMatchObject({ status: 'published', url: 'https://news.ycombinator.com/item?id=123' });
 });
 it('validates route and token without persisting invalid connections', async () => {
   const home = await workspace();

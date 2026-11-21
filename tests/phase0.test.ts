@@ -111,3 +111,22 @@ it('normalizes recorded source payloads into the common evidence contract', asyn
     expect(items[0]).toMatchObject({ source, text: expect.stringContaining('I lost my launch draft'), date: expect.stringMatching(/^2026-01-01T00:00:00/), url: expect.stringMatching(/^https:\/\//), author_handle: expect.any(String), score: expect.any(Number), replies: expect.any(Number) });
   }
 });
+it.each(['app-store', 'play-store'])('separates %s app targets in the cache', async source => {
+  const samples = JSON.parse(await readFile(new URL('../fixtures/cli-tool/.liftoff-fixture/phase0-adapters.json', import.meta.url), 'utf8'));
+  const network = vi.fn(async () => new Response(JSON.stringify(samples[source])));
+  const run = (target: string, token = 'fixture-token') => fetchResearch(cwd, ['launch'], {
+    fetch: network,
+    adapters: adapters({ APP_STORE_ID: target, GOOGLE_PLAY_PACKAGE: target, GOOGLE_PLAY_ACCESS_TOKEN: token }).filter(a => a.source === source),
+  });
+  expect((await run('first')).results[0].cached).toBe(false);
+  expect((await run('second')).results[0].cached).toBe(false);
+  expect((await run('first', 'rotated-fixture-token')).results[0].cached).toBe(true);
+  expect(network).toHaveBeenCalledTimes(2);
+});
+it('includes custom adapter target configuration in the cache identity', async () => {
+  const run = vi.fn(async () => []);
+  for (const targetIdentity of ['repo:a/b', 'repo:c/d', 'repo:a/b']) {
+    await fetchResearch(cwd, ['launch'], { adapters: [{ source: 'custom', targetIdentity, run }] });
+  }
+  expect(run).toHaveBeenCalledTimes(2);
+});

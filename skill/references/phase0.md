@@ -9,7 +9,9 @@ it cannot truthfully create human pain clusters on its own.
 2. Run `liftoff research fetch --file queries.json --json` (JSON string array or
    one query per line); positional queries also work. Get human permission first.
 3. Read `.launch/research/raw/`: raw responses and normalized items are cached by
-   source + query. Cache hits make zero network calls, even without credentials.
+   source + query + target identity (App Store ID or Play package). Cache hits
+   make zero network calls, even without credentials. Custom adapters must set
+   targetIdentity for any result-changing configuration, such as a fixed repo list.
    Remove a specific cache file only when deliberately refreshing it.
 4. Cluster evidence and write `.launch/research/pains.json` using
    `schemas/pains.schema.json`. Include idea, pains and competitors. Each pain

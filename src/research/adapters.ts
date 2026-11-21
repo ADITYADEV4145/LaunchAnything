@@ -1,6 +1,6 @@
 export interface Item { source: string; url: string; author_handle: string; date: string; text: string; score: number; replies: number }
 export type Fetch = typeof fetch;
-export interface Adapter { source: string; skip?: string; run: (query: string, get: (url: string, headers?: Record<string, string>) => Promise<any>) => Promise<Item[]> }
+export interface Adapter { source: string; targetIdentity?: string; skip?: string; run: (query: string, get: (url: string, headers?: Record<string, string>) => Promise<any>) => Promise<Item[]> }
 const entities: Record<string, string> = { apos: "'", quot: '"', amp: '&', lt: '<', gt: '>', nbsp: ' ', ndash: '–', mdash: '—', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', copy: '©', reg: '®', trade: '™', bull: '•' };
 const plain = (s: string = '') => s.replace(/<\/?p\b[^>]*>|<br\b[^>]*>/gi, ' ').replace(/<[^>]*>/g, '')
   .replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
@@ -23,7 +23,7 @@ export function normalize(source: string, raw: any): Item[] {
   }).filter((r: Item) => r.url && r.text);
 }
 export function adapters(env: NodeJS.ProcessEnv = process.env): Adapter[] {
-  const simple = (source: string, url: (q: string) => string, skip?: string, headers?: Record<string, string>): Adapter => ({ source, skip, run: async (q, get) => normalize(source, await get(url(encodeURIComponent(q)), headers)) });
+  const simple = (source: string, url: (q: string) => string, skip?: string, headers?: Record<string, string>): Adapter => ({ source, targetIdentity: source === 'app-store' ? env.APP_STORE_ID : undefined, skip, run: async (q, get) => normalize(source, await get(url(encodeURIComponent(q)), headers)) });
   return [
     simple('hn', q => `https://hn.algolia.com/api/v1/search?query=${q}&hitsPerPage=100`),
     simple('reddit', q => `https://oauth.reddit.com/search?q=${q}&limit=100`, !env.REDDIT_ACCESS_TOKEN ? 'Set REDDIT_ACCESS_TOKEN from your own Reddit OAuth app. Otherwise use the agent browser on https://www.reddit.com/search/ and record linked evidence; the CLI never scrapes Reddit.' : undefined, { Authorization: `Bearer ${env.REDDIT_ACCESS_TOKEN}`, 'User-Agent': 'liftoff-research/0.1' }),
@@ -49,7 +49,7 @@ export function adapters(env: NodeJS.ProcessEnv = process.env): Adapter[] {
       return normalize('product-hunt', raw);
     } },
     simple('app-store', () => `https://itunes.apple.com/us/rss/customerreviews/id=${encodeURIComponent(env.APP_STORE_ID ?? '')}/sortBy=mostRecent/json`, !env.APP_STORE_ID ? 'Mobile profile: set APP_STORE_ID to fetch App Store reviews.' : undefined),
-    { source: 'play-store', skip: !env.GOOGLE_PLAY_ACCESS_TOKEN || !env.GOOGLE_PLAY_PACKAGE ? 'Mobile profile: set GOOGLE_PLAY_PACKAGE and GOOGLE_PLAY_ACCESS_TOKEN for your authorized Play Console app; competitor reviews require agent browser evidence.' : undefined, async run(_q, get) {
+    { source: 'play-store', targetIdentity: env.GOOGLE_PLAY_PACKAGE, skip: !env.GOOGLE_PLAY_ACCESS_TOKEN || !env.GOOGLE_PLAY_PACKAGE ? 'Mobile profile: set GOOGLE_PLAY_PACKAGE and GOOGLE_PLAY_ACCESS_TOKEN for your authorized Play Console app; competitor reviews require agent browser evidence.' : undefined, async run(_q, get) {
       const raw = await get(`https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(env.GOOGLE_PLAY_PACKAGE!)}/reviews?maxResults=100`, { Authorization: `Bearer ${env.GOOGLE_PLAY_ACCESS_TOKEN}` });
       return normalize('play-store', { ...raw, packageName: env.GOOGLE_PLAY_PACKAGE });
     } },

@@ -15,7 +15,7 @@ export async function fetchResearch(cwd: string, queries: string[], options: { f
   const paths = researchPaths(cwd); await mkdir(paths.raw, { recursive: true });
   const results: { source: string; query: string; cached?: boolean; count?: number; skipped?: string }[] = [];
   for (const adapter of options.adapters ?? adapters(options.env)) for (const query of [...new Set(queries)]) {
-    const key = createHash('sha256').update(adapter.source + '\0' + query).digest('hex');
+    const key = createHash('sha256').update(JSON.stringify([adapter.source, query, adapter.targetIdentity ?? ''])).digest('hex');
     const path = join(paths.raw, `${key}.json`);
     try { const cached = JSON.parse(await readFile(path, 'utf8')); results.push({ source: adapter.source, query, cached: true, count: cached.items.length }); continue; }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }

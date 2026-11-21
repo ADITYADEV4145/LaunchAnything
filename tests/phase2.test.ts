@@ -98,6 +98,12 @@ it('deduplicates links after removing trailing prose punctuation', () => {
   })).not.toContain('links.count');
   expect(rules({ body: 'https://a.test https://b.test https://c.test.' })).toContain('links.count');
 });
+it('requires an HTTP(S) URL for tryable Show HN links', () => {
+  for (const link of [undefined, 'mailto:maker@example.test', 'ftp://example.test/demo', 'javascript:alert(0)', 'https://'])
+    expect(rules({ title: 'Show HN: Demo', link }, 'show-hn')).toContain('links.required');
+  for (const link of ['https://example.test/demo', 'http://example.test/demo'])
+    expect(rules({ title: 'Show HN: Demo', link }, 'show-hn')).not.toContain('links.required');
+});
 it('excludes thread separators from the X total budget', () => {
   expect(rules({ body: Array(10).fill('a'.repeat(280)).join('\n---\n') })).toEqual([]);
   expect(rules({ body: Array(10).fill('a'.repeat(280)).join('\r\n---\r\n') })).toEqual([]);

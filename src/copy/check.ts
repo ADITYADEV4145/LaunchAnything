@@ -102,7 +102,8 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   const urls = new Set(((text + '\n' + (post.link ?? '')).match(/https?:\/\/[^\s<>]+/g) ?? [])
     .map(url => url.replace(/[.,;:!?'"’”\)\]\}]+$/u, '')));
   if (urls.size > rules.maxLinks) add('links.count', 'Too many links', 'Use at most ' + rules.maxLinks + ' distinct links');
-  if (rules.requiredLink && !post.link) add('links.required', 'A tryable product link is required', 'Set front matter link to a working demo or runnable repository');
+  if (rules.requiredLink && (!post.link || !/^https?:\/\//i.test(post.link) || !URL.canParse(post.link)))
+    add('links.required', 'A tryable HTTP(S) product link is required', 'Set front matter link to an HTTP(S) demo or runnable repository');
   const known = new Set(product.claims.map(c => c.id));
   const cited = [...(post.title + '\n' + post.body).matchAll(/\[claim:([^\]]+)\]/g)].map(m => m[1]);
   if ([...post.claims, ...cited].some(id => !known.has(id))) add('claims.unknown', 'Unknown claim ID', 'Use IDs from product.json');

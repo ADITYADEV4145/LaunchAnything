@@ -136,6 +136,21 @@ it.each(['missing', 'unreadable'])('shows a null-hash failure even when the only
   await expect(publish(cwd, true)).rejects.toThrow();
 });
 
+it('does not apply a null-hash verdict after the missing post is created', async () => {
+  const { cwd, paths, markdown } = await project();
+  const source = join(paths.posts, 'show-hn.md');
+  await rm(source);
+  await writeFile(join(paths.posts, 'check-results.json'), JSON.stringify({ posts: [
+    { channel: 'show-hn', sourceHash: null, issues: [{ rule: 'post.missing', message: 'Missing planned post' }] },
+  ] }));
+  const page = async () => readFile((await buildReview(cwd)).path, 'utf8');
+  expect(await page()).toContain('<code>post.missing</code>: Missing planned post');
+  await writeFile(source, markdown);
+  const restored = await page();
+  expect(restored).toContain('Last platform check</dt><dd>Not checked');
+  expect(restored).not.toContain('Missing planned post');
+});
+
 it('shows stale approvals with the previous approver after copy or attachment bytes change', async () => {
   const { cwd, paths, markdown } = await project();
   const postFile = join(paths.posts, 'show-hn.md');

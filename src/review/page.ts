@@ -206,8 +206,7 @@ export async function buildReview(cwd?: string) {
     const pending = previous.length
       ? `Approval stale: copy or attachments changed (previously approved by ${previous.join(', ')})`
       : 'Awaiting approval';
-    const verdict = verdicts.find(entry => entry.channel === post.channel &&
-      (entry.sourceHash === post.sourceHash || entry.sourceHash === null));
+    const verdict = verdicts.find(entry => entry.channel === post.channel && entry.sourceHash === post.sourceHash);
     return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone, verdict);
   });
   for (const verdict of unavailable.filter(entry => !posts.some(post => post.channel === entry.channel))) {

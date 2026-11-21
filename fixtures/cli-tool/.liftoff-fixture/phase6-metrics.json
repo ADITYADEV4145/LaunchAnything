@@ -1,0 +1,13 @@
+{
+  "posts": [
+    {
+      "channel": "x", "id": "fixture-x", "owned": true,
+      "metrics": { "views": 4200, "likes": 51, "comments": 2, "clicks": 38, "starsDelta": 7 },
+      "hook": "Audit a workspace from the terminal",
+      "comments": [
+        { "id": "open", "author": "Fixture reader", "body": "Can I run this offline?", "answered": false, "likes": 3 },
+        { "id": "closed", "author": "Fixture maintainer", "body": "Answered fixture comment", "answered": true }
+      ]
+    }
+  ]
+}

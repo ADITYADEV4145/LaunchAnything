@@ -10,7 +10,7 @@ program.name('liftoff').description('Grounded, human-approved launch kits')
 registerCommands(program);
 function configureErrors(command: Command) {
   command.configureOutput({
-    writeErr: text => { if (!process.argv.includes('--json')) process.stderr.write(text); },
+    writeErr: () => {},
   });
   command.exitOverride();
   for (const child of command.commands) configureErrors(child);

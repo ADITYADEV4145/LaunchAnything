@@ -10,6 +10,17 @@ const cli = (...args: string[]) => spawnSync(process.execPath,
   ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args], { encoding: 'utf8' });
 
 it.each([
+  ['--through', 'argument missing'],
+  ['--unknown', 'unknown option'],
+])('prints a subcommand usage error exactly once without JSON: %s', (option, message) => {
+  const run = cli('selftest', option);
+  expect(run.status).not.toBe(0);
+  expect(run.stdout).toBe('');
+  expect(run.stderr.split(message)).toHaveLength(2);
+  expect(run.stderr.trim().split('\n')).toHaveLength(1);
+});
+
+it.each([
   ['selftest', '--through', '--json'],
   ['selftest', '--unknown', '--json'],
   ['--json', 'selftest', '--through'],

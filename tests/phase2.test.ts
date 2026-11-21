@@ -67,6 +67,16 @@ it('parses front matter and rejects missing, empty and invalid metadata', () => 
   expect(parsePost('---\nchannel: x\ntitle: Demo\nmedia: []\nclaims: []\n---\nHello').body).toBe('Hello');
   for (const text of ['', '---\n[]\n---\nHi', '---\ntitle: Demo\n---\n']) expect(() => parsePost(text)).toThrow();
 });
+it('accepts phase 5b metadata in check while rejecting invalid extension types', () => isolated(cwd => {
+  checks[0].run({ cwd, fixture: 'cli-tool' });
+  const text = '---\nchannel: x\ntitle: Launch\nmedia: []\nclaims: []\nhashtags: [local, build]\ncoverFrame: 2\nname: Product\ntagline: Local launch\nmakerComment: Hello\n---\nTry this small project.';
+  writeFileSync(join(cwd, '.launch/posts/x.md'), text);
+  expect(checkPosts(cwd, ['x']).issues.filter(issue => issue.rule === 'post.schema')).toEqual([]);
+  expect(parsePost(text)).toMatchObject({ hashtags: ['local', 'build'], coverFrame: 2, name: 'Product', tagline: 'Local launch', makerComment: 'Hello' });
+  expect(parsePost(text.replace('hashtags: [local, build]', 'hashtags: []'))).toMatchObject({ hashtags: [] });
+  for (const [valid, invalid] of [['hashtags: [local, build]', 'hashtags: wrong'], ['coverFrame: 2', 'coverFrame: -1'], ['name: Product', 'name: []'], ['tagline: Local launch', 'tagline: 3'], ['makerComment: Hello', 'makerComment: true']])
+    expect(() => parsePost(text.replace(valid, invalid))).toThrow('Invalid phase 2 metadata');
+}));
 it('checks citations without counting their length', () => {
   expect(rules({ body: 'Task editor works [claim:edit].', claims: ['edit'] })).toEqual([]);
   expect(rules({ body: 'Task editor works.' })).toContain('claims.uncited');

@@ -16,12 +16,15 @@ import { scoreVoice } from '../voice/score.js';
 export interface Post {
   channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
   claims: string[]; link?: string; linkFirstComment?: boolean; subreddit?: string; flair?: string; selfPromotion?: boolean; account?: string;
+  hashtags?: string[]; coverFrame?: number; name?: string; tagline?: string; makerComment?: string;
 }
 const extensionValidator = new Ajv2020({ allErrors: true }).compile({
   type: 'object', additionalProperties: false, properties: {
     account: { type: 'string', minLength: 1 },
     linkFirstComment: { type: 'boolean' }, subreddit: { type: 'string', pattern: '^r/[A-Za-z0-9_]+$' },
     flair: { type: 'string', minLength: 1, pattern: '\\S' }, selfPromotion: { type: 'boolean' },
+    hashtags: { type: 'array', items: { type: 'string' } }, coverFrame: { type: 'number', minimum: 0 },
+    name: { type: 'string' }, tagline: { type: 'string' }, makerComment: { type: 'string' },
     media: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['slot'], properties: {
       slot: { type: 'string', minLength: 1 }, path: { type: 'string', minLength: 1 },
       width: { type: 'integer', minimum: 1 }, height: { type: 'integer', minimum: 1 }
@@ -48,8 +51,8 @@ export function parsePost(text: string): Post {
   const metadata: unknown = parse(match[1]);
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new Error('Front matter must be an object');
   const post = { ...metadata, body: match[2].trim() };
-  const { linkFirstComment, subreddit, flair, selfPromotion, media, account, ...base } = post as Post;
-  const extensions = { linkFirstComment, subreddit, flair, selfPromotion, media, account };
+  const { linkFirstComment, subreddit, flair, selfPromotion, hashtags, coverFrame, name, tagline, makerComment, media, account, ...base } = post as Post;
+  const extensions = { linkFirstComment, subreddit, flair, selfPromotion, hashtags, coverFrame, name, tagline, makerComment, media, account };
   if (!extensionValidator(extensions)) throw new Error('Invalid phase 2 metadata: ' + JSON.stringify(extensionValidator.errors));
   const result = validateFile('post', { ...base, media: media?.map(({ width, height, ...item }) => item) });
   if (!result.valid) throw new Error(result.errors.join('; '));

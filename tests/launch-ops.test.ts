@@ -46,6 +46,25 @@ it('warroom tracks new comments, hashes exact drafts and revokes approval after 
   await expect(warroom(cwd, { readStatus, approve: 'missing', by: 'Human' })).rejects.toThrow('missing or ambiguous');
   await expect(warroom(cwd, { by: 'Human' })).rejects.toThrow('required together');
 });
+it('warroom preserves edited and approved drafts until a comment is observed answered', async () => {
+  const { cwd, paths } = await workspace();
+  await warroom(cwd, { readStatus });
+  const file = join(paths.root, 'warroom.json');
+  const state = await readJson(file) as { drafts: { text: string }[] };
+  state.drafts[0].text = 'A human-edited reply.';
+  await writeJson(file, state);
+  await warroom(cwd, { readStatus, approve: 'c1', by: 'Human' });
+  const approved = await readJson(file);
+  await writeJson(join(paths.root, 'metrics.json'), { posts: [{ channel: 'x', id: 'one', comments: [] }] });
+  expect((await warroom(cwd, { readStatus })).markdown).toContain('READY');
+  expect(await readJson(file)).toEqual(approved);
+  await rm(join(paths.root, 'metrics.json'));
+  expect((await warroom(cwd, { readStatus: async () => undefined })).markdown).toContain('A human-edited reply.');
+  expect((await warroom(cwd, { readStatus })).markdown).toContain('READY');
+  expect(await readJson(file)).toEqual(approved);
+  await warroom(cwd, { readStatus: async () => ({ ...await readStatus(), comments: [{ ...((await readStatus()).comments[0]), answered: true }] }) });
+  expect(await readJson(file)).toMatchObject({ drafts: [] });
+});
 it('warroom handles empty and unavailable status without inventing counts, and rejects invalid metrics', async () => {
   const { cwd, paths } = await workspace();
   const result = await warroom(cwd, { readStatus: async () => { throw new Error('private'); } });

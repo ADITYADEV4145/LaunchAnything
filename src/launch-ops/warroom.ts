@@ -33,16 +33,20 @@ export async function warroom(cwd: string, options: { metrics?: string; approve?
         metrics: { ...adapter.metrics, ...entered?.metrics }, owned: entered?.owned ?? adapter.owned,
         comments: entered?.comments ?? adapter.comments });
     }
-    const fresh: string[] = [], active: Draft[] = [];
+    const fresh: string[] = [], active: Draft[] = [...state.drafts];
     for (const post of observed) for (const comment of post.comments ?? []) {
       const key = JSON.stringify([post.channel, post.id, comment.id]);
       if (!state.seen.includes(key)) fresh.push(`${safe(post.channel)} / ${safe(comment.id)} / ${safe(comment.author)}: ${safe(comment.body)}`);
       state.seen.push(key);
+      if (comment.answered) {
+        const index = active.findIndex(d => d.key === key);
+        if (index >= 0) active.splice(index, 1);
+      }
       if (post.owned === true && comment.answered === false) {
         const rendered = renderReplies([{ ...post, comments: [comment] }], 'Launch day');
         const text = rendered.markdown.split('**Draft (edit before approval):** ')[1]?.split('\n')[0];
         if (!text) throw new Error('Reply drafting failed');
-        active.push(state.drafts.find(d => d.key === key) ?? { key, commentId: comment.id, text });
+        if (!active.some(d => d.key === key)) active.push({ key, commentId: comment.id, text });
       }
     }
     if (options.approve) {

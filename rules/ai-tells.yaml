@@ -1,0 +1,19 @@
+version: 1
+lastVerified: null
+patterns:
+  - id: fast-paced
+    phrase: "in today's fast-paced world"
+    message: Replace the stock introduction with a concrete observation.
+  - id: game-changer
+    phrase: game-changer
+    message: Explain the actual change without hype.
+  - id: delve
+    regex: '\bdelve\b'
+    message: Use the founder's ordinary vocabulary.
+  - id: not-just
+    regex: 'not just\b[^.!?\n]+,?\s+but\b'
+    message: Remove the stock contrast framing.
+emDashPer100Words: 2
+ruleOfThree:
+  regex: '\b\w+ly,\s+\w+ly,?\s+and\s+\w+ly\b'
+  message: Remove rule-of-three adverb padding.

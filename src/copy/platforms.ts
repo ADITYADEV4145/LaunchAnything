@@ -6,6 +6,7 @@ import { packageRoot } from '../core/package-root.js';
 
 export const channels = ['show-hn','product-hunt','x','linkedin','reddit','devto','indie-hackers','github-release','tiktok','reels','shorts','instagram','email','blog','press-release'] as const;
 export interface Platform {
+  style?: string[]; requiresAffiliationDisclosure?: boolean;
   kind: 'platform'; id: string; name: string; version: number; lastVerified: string | null; sources: string[];
   verified: boolean; verifiedFields: string[]; verificationNotes: string[];
   title: { required: boolean; maxLength: number; prefix?: string };
@@ -22,6 +23,8 @@ const validate = new Ajv2020({ allErrors: true }).compile({
   type: 'object', additionalProperties: false,
   required: ['kind','id','name','version','lastVerified','sources','title','body','maxLinks','requiredLink','bannedWords','guidance','verified','verifiedFields','verificationNotes'],
   properties: {
+    style: { type: 'array', items: { type: 'string' } },
+    requiresAffiliationDisclosure: { type: 'boolean' },
     kind: { const: 'platform' }, id: { enum: channels }, name: { type: 'string', minLength: 1 },
     version: length, lastVerified: { anyOf: [{ type: 'null' }, { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }] },
     verified: { type: 'boolean' },

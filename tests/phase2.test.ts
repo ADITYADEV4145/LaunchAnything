@@ -249,9 +249,9 @@ it('enforces structured channel specifics and metadata without changing the shar
     {slot: 'gallery-1', width: 1270, height: 760}, {slot: 'gallery-2', width: 1270, height: 760}
   ] }, 'product-hunt')).toEqual([]);
   expect(rules({ subreddit: 'r/webdev' }, 'reddit')).toContain('reddit.flair-required');
-  expect(rules({ subreddit: 'r/webdev', flair: 'Showoff' }, 'reddit')).toEqual([]);
+  expect(rules({ subreddit: 'r/webdev', flair: 'Showoff', body: 'I built this.' }, 'reddit')).toEqual([]);
   expect(rules({ subreddit: 'r/programming' }, 'reddit')).toContain('reddit.self-promotion');
-  expect(rules({ subreddit: 'r/programming', selfPromotion: false }, 'reddit')).toEqual([]);
+  expect(rules({ subreddit: 'r/programming', selfPromotion: false, body: 'I built this.' }, 'reddit')).toEqual([]);
   expect(rules({ subreddit: 'r/unknown' }, 'reddit')).toContain('reddit.subreddit');
   expect(rules({ linkFirstComment: true, link: 'https://example.test' }, 'linkedin')).toEqual([]);
   expect(rules({ linkFirstComment: true }, 'linkedin')).toContain('links.comment-required');
@@ -281,7 +281,7 @@ it('tracks failures, missing/schema/duplicate posts and removes stale fixes', ()
   writeFileSync(join(posts, 'x.md'), 'bad');
   expect(checkPosts(cwd, ['x']).issues[0].rule).toBe('post.schema');
   expect(checkPosts(cwd, ['x']).askUser).toBe(true);
-  const good = readFileSync(join(cwd, '.liftoff-fixture/phase2/good/x.md'), 'utf8');
+  const good = readFileSync(join(cwd, '.liftoff-fixture/phase2/good/x.md'), 'utf8') + '\nI built this.\n';
   writeFileSync(join(posts, 'x.md'), good);
   writeFileSync(join(posts, 'reddit.md'), good.replace('channel: x', 'channel: reddit'));
   expect(checkPosts(cwd, ['x','reddit']).issues.some(i => i.rule === 'text.duplicate')).toBe(true);
@@ -323,7 +323,7 @@ it('records missing, invalid and passing source hashes while preserving unchecke
 it('records cross-channel issues for each affected channel and clears them on recheck', () => isolated(cwd => {
   checks[0].run({ cwd, fixture: 'cli-tool' });
   const posts = join(cwd, '.launch/posts');
-  const good = readFileSync(join(cwd, '.liftoff-fixture/phase2/good/x.md'), 'utf8');
+  const good = readFileSync(join(cwd, '.liftoff-fixture/phase2/good/x.md'), 'utf8') + '\nI built this.\n';
   writeFileSync(join(posts, 'x.md'), good);
   writeFileSync(join(posts, 'reddit.md'), good.replace('channel: x', 'channel: reddit\nsubreddit: r/SideProject'));
   expect(checkPosts(cwd, ['x','reddit']).passed).toBe(false);

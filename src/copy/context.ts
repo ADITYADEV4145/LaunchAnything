@@ -8,7 +8,7 @@ import { loadPlatform } from './platforms.js';
 
 export interface Product {
   name: string; features: {name: string; description: string}[];
-  claims: {id: string; text: string}[];
+  claims: {id: string; text: string; sources?: {type: string; ref: string}[]}[];
 }
 export function context(cwd: string, selected?: string[]) {
   const paths = launchDir(cwd);

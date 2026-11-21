@@ -1,4 +1,5 @@
 kind: platform
+style: ["Short concrete hook followed by a thread. Each post must stand alone."]
 id: x
 name: X
 version: 2

@@ -145,6 +145,12 @@ it('detects short and non-Latin duplicates with Unicode-aware similarity', () =>
   expect(similarity('你好', '再见')).toBe(0);
   expect(similarity('', '')).toBe(0);
 });
+it('preserves Hindi vowel marks and Unicode numbers in similarity tokens', () => {
+  expect(similarity('कि कि कि', 'की की की')).toBe(0);
+  expect(similarity('कि', 'की')).toBe(0);
+  expect(similarity('कि कि कि', 'कि कि कि!')).toBe(1);
+  expect(similarity('पाठ १', 'पाठ २')).toBe(0);
+});
 it('enforces structured channel specifics and metadata without changing the shared schema', () => {
   expect(rules({ body: 'A launch without a section.' }, 'product-hunt')).toContain('maker-comment.required');
   expect(rules({ body: '## Maker comment\n\n' }, 'product-hunt')).toContain('maker-comment.required');

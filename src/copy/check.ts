@@ -41,7 +41,7 @@ export function similarity(a: string, b: string) {
   const left = normalize(a), right = normalize(b);
   if (!left || !right) return 0;
   if (left === right) return 1;
-  const tokens = (text: string) => text.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const tokens = (text: string) => text.match(/[\p{L}\p{M}\p{N}]+/gu) ?? [];
   const leftWords = tokens(left), rightWords = tokens(right);
   const size = Math.min(3, leftWords.length, rightWords.length);
   if (!size) return 0;

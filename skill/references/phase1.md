@@ -19,10 +19,15 @@ pass both explicitly for repeatable launches.
 ## Offline scan
 
 Scan skips dependency/build/state directories and symlinks. It records README sections,
-package metadata, LICENSE text, route/command source paths, media candidates and commits
+package metadata, LICENSE text, URL routes (CLI commands remain source paths), media candidates and commits
 after the nearest reachable tag. With no tag it uses all commits; with no Git history
 it uses an empty list. README HTTP(S) links are fallback landing URL candidates;
 inspect the result because a README's first URL is not necessarily a landing page.
+
+Next app routes come only from page.* and route.* files, with route groups and
+parallel slot names removed and private _folders excluded. Pages routes omit API
+handlers and framework pages (_app, _document, _error). Expo dependencies select
+Expo file-based routing instead, including index and named screens but not layouts.
 
 GitHub stars are fetched only with --github or LIFTOFF_ALLOW_NETWORK=1, from a standard
 GitHub origin remote. No tokens are sent. Only a public repo response contributes a

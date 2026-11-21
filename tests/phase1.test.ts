@@ -103,12 +103,33 @@ describe('scan', () => {
     await writeFile(join(cwd, 'assets/screenshot.png'), 'candidate');
     const result = await scan(cwd);
     expect(result.scan.landingUrl).toBe('https://teamnest.example');
-    expect(result.scan.routes).toContain('app/pricing/page.tsx');
+    expect(result.scan.routes).toContain('/pricing');
     expect(result.scan.license).toContain('MIT License');
     expect(result.scan.screenshots).toEqual(['assets/screenshot.png']);
     expect((result.scan.readmeSections as unknown[]).length).toBeGreaterThan(2);
     expect(routesFromFiles(['pages/dashboard/index.tsx', 'app/_layout.tsx', 'app/index.tsx', 'bin/tool', 'node_modules/x.js']))
-      .toEqual(['pages/dashboard/index.tsx', 'app/index.tsx', 'bin/tool']);
+      .toEqual(['/dashboard', 'bin/tool']);
+  });
+  it('derives only real Next routes, ignoring components, route groups, private folders and framework pages', () => {
+    expect(routesFromFiles([
+      'app/page.tsx', 'app/(marketing)/pricing/page.tsx', 'app/components/Button.tsx', 'app/lib/db.ts',
+      'app/_private/page.tsx', 'app/_private/nested/route.ts', 'app/(marketing)/layout.tsx',
+      'src/app/(dashboard)/teams/[id]/page.jsx', 'src/app/api/health/route.ts',
+      'src/app/@modal/(group)/page.tsx', 'pages/_app.tsx', 'pages/_document.tsx', 'pages/_error.tsx',
+      'pages/api/users.ts', 'pages/api/index.ts', 'pages/index.tsx', 'src/pages/docs/index.tsx',
+      'pages/blog/[slug].tsx', 'bin/tool',
+    ])).toEqual(['/', '/pricing', '/teams/[id]', '/api/health', '/docs', '/blog/[slug]', 'bin/tool']);
+    expect(routesFromFiles([])).toEqual([]);
+    expect(routesFromFiles(['app/components/Button.tsx', 'app/lib/db.ts'])).toEqual([]);
+  });
+  it('retains Expo file-based routes without mistaking them for Next pages', async () => {
+    await fixture('mobile-expo');
+    await mkdir(join(cwd, 'app/(tabs)'), { recursive: true });
+    await writeFile(join(cwd, 'app/(tabs)/index.tsx'), 'export default function Home() {}');
+    await writeFile(join(cwd, 'app/(tabs)/settings.tsx'), 'export default function Settings() {}');
+    await writeFile(join(cwd, 'app/_layout.tsx'), 'export default function Layout() {}');
+    expect((await scan(cwd)).scan.routes).toEqual(['/', '/settings']);
+    expect(routesFromFiles(['app/index.tsx', 'app/settings.tsx', 'app/_layout.tsx'], 'expo')).toEqual(['/', '/settings']);
   });
   it('falls back to README URLs and all commits before a tag, then scans only commits since tag', async () => {
     await writeFile(join(cwd, 'README.md'), '# Example\nSee [site](https://example.test/launch).\n');

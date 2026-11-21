@@ -28,12 +28,34 @@ export async function repositoryFiles(cwd: string): Promise<string[]> {
   await walk(cwd);
   return files.sort();
 }
-export function routesFromFiles(files: string[]): string[] {
-  return files.filter(path =>
-    /^(?:src\/)?app\/(?:.*\/)?(?:page\.[jt]sx?|index\.[jt]sx?|[^/]+\.[jt]sx?)$/.test(path)
-      && !/(?:^|\/)(?:layout|_layout|not-found|error|loading|global-error|template)\.[jt]sx?$/.test(path) ||
-    /^(?:src\/)?pages\/(?!api\/)(?!_).*\.[jt]sx?$/.test(path) ||
-    /^(?:bin|commands|src\/commands)\//.test(path));
+export function routesFromFiles(files: string[], router: 'next' | 'expo' = 'next'): string[] {
+  const routes = new Set<string>();
+  for (const path of files) {
+    if (/^(?:bin|commands|src\/commands)\//.test(path)) { routes.add(path); continue; }
+    const app = /^(?:src\/)?app\/(.+)\.[jt]sx?$/.exec(path);
+    if (app) {
+      const segments = app[1].split('/');
+      const name = segments.pop()!;
+      if (segments.some(segment => segment.startsWith('_'))) continue;
+      if (router === 'next' && name !== 'page' && name !== 'route') continue;
+      if (router === 'expo') {
+        if (name.startsWith('_') || name.startsWith('+')) continue;
+        if (name !== 'index') segments.push(name);
+      }
+      const visible = segments.filter(segment => !/^\([^)]*\)$/.test(segment) && !segment.startsWith('@'));
+      routes.add('/' + visible.join('/'));
+      continue;
+    }
+    const pages = /^(?:src\/)?pages\/(.+)\.[jt]sx?$/.exec(path);
+    if (pages && router === 'next') {
+      const segments = pages[1].split('/');
+      const name = segments.pop()!;
+      if (segments[0] === 'api' || (segments.length === 0 && name === 'api') || ['_app', '_document', '_error'].includes(name)) continue;
+      if (name !== 'index') segments.push(name);
+      routes.add('/' + segments.join('/'));
+    }
+  }
+  return [...routes];
 }
 function landingUrl(pkg: Record<string, unknown>, readme: string): string | undefined {
   const candidates = [typeof pkg.homepage === 'string' ? pkg.homepage : '', ...(readme.match(/https?:\/\/[^\s<>)"\]]+/g) ?? [])];
@@ -45,6 +67,8 @@ export function githubRepository(remote: string): string | undefined {
 export async function scan(cwd: string, options: { github?: boolean } = {}) {
   const pkgText = await optionalText(join(cwd, 'package.json'));
   const pkg = pkgText ? JSON.parse(pkgText) as Record<string, unknown> : {};
+  const dependencies = { ...pkg.dependencies as Record<string, unknown>, ...pkg.devDependencies as Record<string, unknown> };
+  const router = dependencies.expo || dependencies['expo-router'] || dependencies['react-native'] ? 'expo' : 'next';
   const readme = await optionalText(join(cwd, 'README.md')) || await optionalText(join(cwd, 'readme.md'));
   const license = await optionalText(join(cwd, 'LICENSE')) || await optionalText(join(cwd, 'LICENSE.md'));
   const files = await repositoryFiles(cwd);
@@ -57,7 +81,7 @@ export async function scan(cwd: string, options: { github?: boolean } = {}) {
   const data: Record<string, unknown> = {
     readmeSections: readmeSections(readme), package: pkg, license,
     commits: log.split('\n').filter(Boolean).map(line => { const [sha, ...subject] = line.split('\t'); return { sha, subject: subject.join('\t') }; }),
-    routes: routesFromFiles(files),
+    routes: routesFromFiles(files, router),
     screenshots: files.filter(path => /\.(?:png|jpe?g|gif|webp|svg)$/i.test(path) && /(?:screenshot|screen-shot|snapshot|demo|capture|\.gif$)/i.test(path)),
     ...(url ? { landingUrl: url } : {}),
   };

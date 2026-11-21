@@ -9,6 +9,16 @@ import { honesty } from '../src/voice/honesty.js';
 import { checks } from '../src/selftest/phase2b.js';
 import { packageRoot } from '../src/core/package-root.js';
 
+it('associates soft-wrapped citations with their factual sentence, not other paragraphs', () => {
+  const product = { name: 'Tool', features: [], claims: [
+    { id: 'count', text: '100 users', sources: [{ type: 'file', ref: 'metrics.csv' }] }
+  ] };
+  for (const text of ['100 users\n[claim:count]', '100 users.\n[claim:count]', '100 users\r\n[claim:count]'])
+    expect(honesty(text, product, false)).toEqual([]);
+  expect(honesty('100 users\n\n[claim:count]', product, false)[0].rule).toBe('honesty.unsupported-count');
+  expect(honesty('100 users. Unrelated sentence [claim:count].', product, false)[0].rule).toBe('honesty.unsupported-count');
+});
+
 it('learns bounded owned samples, validates stored profiles, rejects empty and missing inputs', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'voice-'));
   try {

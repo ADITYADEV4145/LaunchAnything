@@ -7,7 +7,12 @@ export function honesty(text: string, product: Product, disclosure: boolean, acc
   if (/\bas (?:a|an) (?:happy |paying )?(?:customer|user)\b|\bi (?:bought|purchased) this\b/i.test(text)) add('posing-as-customer', 'Do not pose as a customer of your own product.');
   if (disclosure && !/\bI (?:built|made|maintain|created|developed)|\b(?:our|my) (?:project|product|app|tool)|\b(?:founder|maker|author|affiliated)\b/i.test(text))
     add('affiliation', 'Disclose your affiliation; this is a conservative local community policy, not verified live policy.');
-  for (const sentence of text.split(/(?<=[.!?])\s+|\n/)) {
+  const sentences = text.replace(/^[ \t]*(?:\d+[.)]|[-+*])[ \t]+/gm, '\n\n')
+    .split(/\r?\n---\r?\n|\r?\n[ \t]*\r?\n/).flatMap(paragraph => paragraph
+      .replace(/\r?\n/g, ' ')
+      .replace(/([.!?])\s+((?:\[claim:[^\]]+\]\s*)+)/g, ' $2$1 ')
+      .split(/(?<=[.!?])\s+/));
+  for (const sentence of sentences) {
     const cited = [...sentence.matchAll(/\[claim:([^\]]+)\]/g)].map(m => m[1]);
     const supported = (value: string) => product.claims.some(c => cited.includes(c.id) && c.sources?.length && c.text.toLowerCase().includes(value.toLowerCase()));
     for (const match of sentence.matchAll(/\b(?:\d[\d,.]*\s*[kKmMbB]?|one|two|three|hundreds|thousands|millions)\s+(?:(?:active|happy|paying|registered|daily|monthly)\s+)*(?:users?|customers?|downloads?)\b/gi)) {

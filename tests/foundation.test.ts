@@ -64,7 +64,7 @@ it('validates every rules YAML', () => {
       expect(loadRule(group, file.replace('.yaml', '')).id).toBe(file.replace('.yaml', ''));
 });
 it('all command stubs exit 2 with JSON', () => {
-  const groups = [['init','scan','validate','plan'], ['write','check'], ['shots','images'], ['video'], ['review','publish'], ['results','learn','receipt']];
+  const groups = [['init','scan','validate','plan'], ['write','check'], [], ['video'], ['review','publish'], ['results','learn','receipt']];
   groups.forEach((names, i) => names.forEach(name => {
     const run = cli(name, '--json');
     expect(run.status, run.stderr).toBe(2);

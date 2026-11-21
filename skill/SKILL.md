@@ -11,8 +11,8 @@ The agent is the model; the CLI never calls an LLM API. All commands support
 ## Run order
 
 doctor → init → confirm profile → scan → agent writes product.json → validate → plan.
-Only product understanding and planning are implemented in phase 1. Later commands
-remain stubs; never claim they created assets or published anything.
+Phase 1 product understanding and planning and phase 5 review/local staging are
+implemented. Phases 2–4 and 6 remain stubs; never claim they created assets.
 
 ## doctor
 
@@ -51,7 +51,8 @@ See [phase1.md](references/phase1.md) for detection, scheduling and history hook
 ## selftest
 
 Run `liftoff selftest --through 1` to exercise all three fixture repositories.
-Higher gates intentionally fail until those phases are implemented.
+Phase 5 also has fixture checks. Higher cumulative gates still fail at the
+unimplemented phases 2–4 (and phase 6).
 
 ## write and check — phase 2
 
@@ -67,8 +68,10 @@ Future: render real-footage demos and vertical cuts with optional-tool fallbacks
 
 ## review and publish — phase 5
 
-Future: human approval of exact post+media hashes, then approved scheduling or manual
-paste-ready submissions. Nothing may publish without matching human approval.
+Run `liftoff review` to build a local approval page for exact post+media hashes.
+`liftoff publish` defaults to a no-network dry run; `--confirm` writes local paste
+files, reminders and receipts, not external posts. Nothing may be staged without
+matching human approval.
 
 ## results, learn and receipt — phase 6
 

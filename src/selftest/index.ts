@@ -6,6 +6,7 @@ import { packageRoot } from '../core/package-root.js';
 import type { Phase } from './types.js';
 import { checks as phase0 } from './phase0.js';
 import { checks as phase1 } from './phase1.js';
+import { checks as phase1b } from './phase1b.js';
 import { checks as phase2 } from './phase2.js';
 import { checks as phase3 } from './phase3.js';
 import { checks as phase4 } from './phase4.js';
@@ -14,7 +15,7 @@ import { checks as phase6 } from './phase6.js';
 import { checks as phase2b } from './phase2b.js';
 import { checks as launchOps } from './launch-ops.js';
 
-export const phases: Phase[] = [{ phase: 0, checks: phase0 }, { phase: 1, checks: phase1 }, { phase: 2, checks: phase2 }, { phase: '2b', checks: phase2b }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: 6, checks: phase6 }];
+export const phases: Phase[] = [{ phase: 0, checks: phase0 }, { phase: 1, checks: phase1 }, { phase: '1b', checks: phase1b }, { phase: 2, checks: phase2 }, { phase: '2b', checks: phase2b }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: 6, checks: phase6 }];
 phases.find(phase => phase.phase === 6)!.checks = [{
   name: 'phase 6 results and launch operations',
   async run(context) {

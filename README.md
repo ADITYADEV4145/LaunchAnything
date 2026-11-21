@@ -38,6 +38,10 @@ download or execute npm packages. Later phases may add local-package adapters.
 
 ## Folder contract
 
+For offline launch readiness, run `liftoff prelaunch --init`, then follow the
+[pre-launch guide](skill/references/prelaunch.md) to score readiness, audit launch
+pages and support, and draft tracking links and a signup form.
+
 All paths below are relative to `<cwd>/.launch/`:
 
 ```text

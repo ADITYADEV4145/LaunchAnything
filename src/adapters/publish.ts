@@ -2,9 +2,11 @@ import { writeFile } from 'node:fs/promises';
 import { destination, readReceipts, selectAdapter } from './index.js';
 import { decisions, requireApproval } from '../review/approvals.js';
 import { loadReview, validate } from '../review/posts.js';
+import { requireLaunchReadiness } from '../prelaunch/score.js';
 import type { PublishReceipt } from './index.js';
 
 export async function publish(cwd?: string, confirm = false, env = process.env) {
+  if (confirm) requireLaunchReadiness(cwd);
   const { paths, config, posts } = await loadReview(cwd);
   const { approvals, skips } = await decisions(paths);
   const skipped = posts.filter(post => skips[post.channel] === post.hash).map(post => post.channel);

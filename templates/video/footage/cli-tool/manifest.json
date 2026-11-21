@@ -1,0 +1,49 @@
+{
+  "fixture": "cli-tool",
+  "frame": "terminal",
+  "capturedAt": "2026-11-21T21:26:15.775Z",
+  "author": "Aditya",
+  "method": "Executed fixture bin/tasklight.js from a fresh isolated working directory; verbatim stdout rendered in terminal-styled HTML and screenshotted by Chrome (1000x610, deviceScaleFactor 2).",
+  "transcript": [
+    {
+      "command": "node bin/tasklight.js add Write launch notes",
+      "stdout": "1. [ ] Write launch notes\n"
+    },
+    {
+      "command": "node bin/tasklight.js add Record product demo",
+      "stdout": "1. [ ] Write launch notes\n2. [ ] Record product demo\n"
+    },
+    {
+      "command": "node bin/tasklight.js add Review the launch checklist",
+      "stdout": "1. [ ] Write launch notes\n2. [ ] Record product demo\n3. [ ] Review the launch checklist\n"
+    },
+    {
+      "command": "node bin/tasklight.js",
+      "stdout": "1. [ ] Write launch notes\n2. [ ] Record product demo\n3. [ ] Review the launch checklist\n"
+    }
+  ],
+  "files": [
+    {
+      "file": "add.png",
+      "commands": [
+        "node bin/tasklight.js add Write launch notes",
+        "node bin/tasklight.js add Record product demo"
+      ]
+    },
+    {
+      "file": "list.png",
+      "commands": [
+        "node bin/tasklight.js add Review the launch checklist",
+        "node bin/tasklight.js"
+      ]
+    }
+  ],
+  "sceneFiles": [
+    "add.png",
+    "list.png",
+    "add.png",
+    "list.png",
+    "add.png",
+    "list.png"
+  ]
+}

@@ -16,8 +16,8 @@
     "schemas/",
     "rules/",
     "skill/",
-    "fixtures/",
-    "templates/"
+    "templates/",
+    "fixtures/"
   ],
   "scripts": {
     "build": "tsc",

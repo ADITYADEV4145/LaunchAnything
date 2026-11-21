@@ -1,4 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -29,9 +30,13 @@ export async function doctor(cwd: string, home = homedir()) {
     ['git', ['--version']], ['ffmpeg', ['-version']],
     ['playwright', ['--version']], ['remotion', ['versions']],
   ];
-  const tools = Object.fromEntries(probes.map(([name, args]) => {
-    const result = spawnSync(name, args, { cwd: tmpdir(), encoding: 'utf8', timeout: 5000, stdio: 'ignore' });
-    return [name, { available: !result.error && result.status === 0 }];
-  }));
-  return { skills, mcpServers, tools, warnings };
+  const probeDir = mkdtempSync(join(tmpdir(), 'liftoff-probes-'));
+  try {
+    chmodSync(probeDir, 0o700);
+    const tools = Object.fromEntries(probes.map(([name, args]) => {
+      const result = spawnSync(name, args, { cwd: probeDir, encoding: 'utf8', timeout: 5000, stdio: 'ignore' });
+      return [name, { available: !result.error && result.status === 0 }];
+    }));
+    return { skills, mcpServers, tools, warnings };
+  } finally { rmSync(probeDir, { recursive: true, force: true }); }
 }

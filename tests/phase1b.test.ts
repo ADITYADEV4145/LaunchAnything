@@ -21,6 +21,21 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('allows feature and pain names in fixed headings without heading citations', () => {
+    setup();
+    const path = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(path, 'utf8'));
+    product.features[0].name = 'FAQ';
+    writeFileSync(path, JSON.stringify(product));
+    const pains = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
+    pains.pains[0].name = 'Positioning statement';
+    writeFileSync(join(cwd, '.launch/research/pains.json'), JSON.stringify(pains));
+    const result = brief(cwd);
+    expect(validateBrief(cwd).valid).toBe(true);
+    expect(readFileSync(result.path, 'utf8')).toContain('\n## FAQ\n');
+    edit(s => s.replace('## Open risks', '## Open risks\nFAQ has an uncited mention.'));
+    expect(validateBrief(cwd).errors.join()).toContain('requires an indexed feature citation');
+  });
   it('preserves edited Markdown and HTML when forced regeneration fails', () => {
     setup();
     const result = brief(cwd);

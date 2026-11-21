@@ -91,6 +91,7 @@ function validateText(ctx: ReturnType<typeof inputs>, path: string, text: string
   ] as const) {
     for (const match of text.matchAll(pattern)) if (match[1] !== match[2] || !values[Number(match[1])]) errors.push(`Unknown ${group} citation: ${match[0]}`);
     for (const [index, value] of values.entries()) for (const line of text.split('\n')) {
+      if (line.startsWith('#')) continue;
       if (line.toLowerCase().includes(value.name.toLowerCase()) && !line.includes(`[${group}:${index}](`)) errors.push(`${group} ${value.name} requires an indexed ${group} citation on the same line`);
     }
   }

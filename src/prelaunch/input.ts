@@ -8,7 +8,7 @@ const evidence = {
   type: 'object', additionalProperties: false, required: ['passed', 'notes'],
   properties: { passed: { type: 'boolean' }, notes: { type: 'string', maxLength: 1000 } },
   if: { properties: { passed: { const: true } } },
-  then: { properties: { notes: { pattern: '\\S' } } },
+  then: { properties: { notes: { type: 'string', pattern: '\\S' } } },
 } as const;
 const text = (maxLength: number) => ({ type: 'string', maxLength });
 const schema = {

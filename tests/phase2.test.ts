@@ -132,6 +132,18 @@ it('preserves internal apostrophes and separates arrow-joined bare URLs', () => 
   }
 });
 
+it('excludes multiline Markdown titles from link destinations', () => {
+  for (const newline of ['\n', '\r\n']) {
+    for (const title of ['"see https://b.com"', "'see https://b.com'", '(see https://b.com)']) {
+      const markdown = '[x](https://a.com' + newline + '  ' + title + ')';
+      expect(extractLinks(markdown)).toEqual(['https://a.com']);
+      expect(rules({ body: markdown + ' https://c.com', link: 'https://a.com' })).not.toContain('links.count');
+    }
+  }
+  expect(extractLinks('[x](<https://a.com>\n  "see https://b.com")')).toEqual(['https://a.com']);
+  expect(extractLinks('[x](https://a.com\n  "unterminated https://b.com)')).toContain('https://b.com');
+});
+
 it('preserves balanced parentheses and brackets across every URL source', () => {
   const wiki = 'https://en.wikipedia.org/wiki/Foo_(bar)';
   const query = 'https://example.test/?filter[key]=[value]';

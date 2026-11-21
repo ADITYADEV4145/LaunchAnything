@@ -33,7 +33,7 @@ export function extractLinks(text: string) {
     const target = text.slice(start, cursor);
     if (!/^https?:\/\//i.test(target)) continue;
     if (angle) cursor++;
-    const closing = text.slice(cursor).match(/^[ \t]*(?:(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^()\r\n]*\))[ \t]*)?\)/);
+    const closing = text.slice(cursor).match(/^[ \t]*(?:\r?\n[ \t]*)?(?:(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^()\r\n]*\))[ \t]*(?:\r?\n[ \t]*)?)?\)/);
     if (!closing) continue;
     links.push(target);
     bare += text.slice(consumed, match.index) + ' ';

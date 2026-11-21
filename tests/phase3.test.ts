@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 import { mkdtemp, cp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,6 +29,29 @@ it('detects secrets split across inline text nodes without scanning redacted tex
     await page.setContent('<span>ordinary</span><span> text</span>');
     expect(await guard(page, [])).toBe(0);
   } finally { await app.close(); }
+});
+it('scans and redacts open shadow roots and nested frames, failing closed on unreadable frames', async () => {
+  const app = await browser(); const page = await app.newPage();
+  const server = createServer((_req, res) => res.end('<p class="private">person@example.test</p>'));
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    await page.setContent('<div id="host"></div>');
+    await page.locator('#host').evaluate(el => { el.attachShadow({ mode: 'open' }).innerHTML = '<p class="private">person@example.test</p>'; });
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    expect(await guard(page, ['.private'])).toBe(1);
+    expect(await page.locator('#host').locator('.private').evaluate(el => getComputedStyle(el).filter)).toBe('blur(18px)');
+    await page.setContent('<iframe srcdoc="<iframe srcdoc=\'person@example.test\'></iframe>"></iframe>');
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    expect(await guard(page, ['iframe'])).toBe(1);
+    await page.setContent(`<iframe src="http://127.0.0.1:${(server.address() as { port: number }).port}"></iframe>`);
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    expect(await guard(page, ['.private'])).toBe(1);
+    const frame = page.frames().find(f => f !== page.mainFrame())!;
+    const evaluation = vi.spyOn(frame, 'evaluate').mockRejectedValue(new Error('inaccessible'));
+    await expect(guard(page, [])).rejects.toThrow('unable to inspect frame');
+    expect(await guard(page, ['iframe'])).toBe(1);
+    evaluation.mockRestore();
+  } finally { await app.close(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 it('contrast and safe areas', () => {
   expect(contrast([0, 0, 0], [255, 255, 255])).toBeCloseTo(21); expect(contrast([42, 42, 42], [42, 42, 42])).toBe(1);

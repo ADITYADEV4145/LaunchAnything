@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { launchDir } from '../core/launch-dir.js';
 import { decisions } from './approvals.js';
+import { fixListPath, readCopyVerdicts } from './checks.js';
+import type { CopyVerdict } from './checks.js';
 import { loadReview, mediaType } from './posts.js';
 import type { ReviewPost } from './posts.js';
 
@@ -10,7 +13,15 @@ const escape = (value: string) => value.replace(/[&<>"']/g, char =>
 const safeLink = (value: string) => /^https?:\/\//i.test(value);
 const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
 
-function card(post: ReviewPost, state: string, timezone: string) {
+function checkMarkup(verdict?: CopyVerdict) {
+  if (!verdict) return 'Not checked — run <code>liftoff check</code>';
+  if (verdict.sourceHash !== null && !verdict.issues.length) return 'Pass';
+  return `Fail<ul>${verdict.issues.map(({ rule, message }) =>
+    `<li><code>${escape(rule)}</code>: ${escape(message)}</li>`).join('')}</ul>
+    Fix list: <code>${fixListPath}</code>`;
+}
+
+function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyVerdict) {
   const media = post.media.map(({ path, slot, bytes }) => {
     const mime = mediaType(path);
     const src = mime && 'data:' + mime + ';base64,' + bytes.toString('base64');
@@ -26,13 +37,14 @@ function card(post: ReviewPost, state: string, timezone: string) {
   <header><strong>${escape(post.label)}</strong><span class="state">${escape(state)}</span></header>
   <h2>${escape(post.title)}</h2>
   <div class="body">${escape(post.body)}</div>
-  ${post.link ? `<p>${safeLink(post.link) ? `<a href="${escape(post.link)}" target="_blank" rel="noopener noreferrer">${escape(post.link)}</a>`
+  ${post.link ? `<p>${post.linkFirstComment ? 'First comment: ' : ''}${safeLink(post.link) ? `<a href="${escape(post.link)}" target="_blank" rel="noopener noreferrer">${escape(post.link)}</a>`
     : escape(post.link)}</p>` : ''}
   ${media}
   <dl>
     <div><dt>Scheduled</dt><dd><time datetime="${post.scheduledAt}">${escape(time)} (${escape(timezone)})</time></dd></div>
     <div><dt>Characters</dt><dd>${titleCount} title · ${bodyCount} body</dd></div>
     <div><dt>Checks</dt><dd>Post schema passed · ${post.media.length} local attachments verified</dd></div>
+    <div><dt>Last platform check</dt><dd>${checkMarkup(verdict)}</dd></div>
   </dl>
   <div class="actions">
     <button type="button" data-action="approve">Approve</button>
@@ -92,7 +104,7 @@ async function mergeApproval(dir, approval) {
     throw error;
   }
 }
-for (const article of document.querySelectorAll('article')) {
+for (const article of document.querySelectorAll('article[data-channel]')) {
   const channel = article.dataset.channel;
   const post = snapshot.posts[channel];
   const feedback = article.querySelector('.feedback');
@@ -174,7 +186,9 @@ a{color:#1b4faf}
 `;
 
 export async function buildReview(cwd?: string) {
-  const { paths, config, posts } = await loadReview(cwd);
+  const verdicts = await readCopyVerdicts(launchDir(cwd).posts);
+  const unavailable = verdicts.filter(entry => entry.sourceHash === null);
+  const { paths, config, posts } = await loadReview(cwd, new Set(unavailable.map(entry => entry.channel)));
   const { approvals, skips } = await decisions(paths);
   const approvers = config.approvers ?? [];
   const selector = approvers.length ? `<select id="approver"><option value="">Choose your name</option>
@@ -192,8 +206,13 @@ export async function buildReview(cwd?: string) {
     const pending = previous.length
       ? `Approval stale: copy or attachments changed (previously approved by ${previous.join(', ')})`
       : 'Awaiting approval';
-    return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone);
+    const verdict = verdicts.find(entry => entry.channel === post.channel && entry.sourceHash === post.sourceHash);
+    return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone, verdict);
   });
+  for (const verdict of unavailable.filter(entry => !posts.some(post => post.channel === entry.channel))) {
+    cards.push(`<article><h2>${escape(verdict.channel)} · Post unavailable</h2>
+      <dl><div><dt>Last platform check</dt><dd>${checkMarkup(verdict)}</dd></div></dl></article>`);
+  }
   const scriptHash = createHash('sha256').update(script).digest('base64');
   const html = `<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

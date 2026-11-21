@@ -19,6 +19,7 @@ interface Post {
   body: string;
   media: { slot: string; path?: string }[];
   link?: string;
+  linkFirstComment?: boolean;
   claims: string[];
 }
 interface Media { slot: string; path: string; bytes: Buffer }
@@ -30,6 +31,7 @@ export interface ReviewPost extends Omit<Post, 'channel' | 'media'> {
   media: Media[];
   scheduledAt: string;
   hash: string;
+  sourceHash: string;
 }
 
 export function validate<T>(kind: string, value: unknown): T {
@@ -61,12 +63,21 @@ function parsePost(source: string, channel: string) {
   if (!match) throw new Error(`${channel}: expected YAML front matter`);
   const front: unknown = parse(match[1]);
   if (!front || typeof front !== 'object' || Array.isArray(front)) throw new Error(`${channel}: invalid front matter`);
-  const data = { ...front, ...(!('body' in front) && { body: match[2].trim() }) };
+  const { linkFirstComment, subreddit, flair, selfPromotion, media, ...base } = front as Post &
+    { linkFirstComment?: unknown; subreddit?: unknown; flair?: unknown; selfPromotion?: unknown };
+  const data = { ...base, ...(!('body' in front) && { body: match[2].trim() }),
+    media: Array.isArray(media) ? media.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+      const { width, height, ...attachment } = item as typeof item & { width?: unknown; height?: unknown };
+      return attachment;
+    }) : media };
   const post = validate<Post>('post', data);
   if (post.channel && post.channel !== channel) throw new Error(`${channel}: post channel does not match filename`);
   if (match[2].trim() && 'body' in front && match[2].trim() !== post.body.trim())
     throw new Error(`${channel}: Markdown and front matter bodies disagree`);
-  return post;
+  if (linkFirstComment !== undefined && typeof linkFirstComment !== 'boolean')
+    throw new Error(`${channel}: linkFirstComment must be a boolean`);
+  return { ...post, linkFirstComment };
 }
 
 function wallTime(date: string, time: string, timezone: string) {
@@ -112,7 +123,7 @@ export function mediaType(path: string) {
   return types[extname(path).toLowerCase()];
 }
 
-export async function loadReview(cwd?: string) {
+export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>) {
   const paths = launchDir(cwd);
   const config = validate<Config>('config', JSON.parse(await readFile(paths.config, 'utf8')));
   const names = (config.approvers ?? []).map(({ name }) => name);
@@ -122,13 +133,18 @@ export async function loadReview(cwd?: string) {
     throw new Error('Enterprise launches need a configured legal-review approver');
   const root = await realpath(paths.root);
   const plan = await readOptional(paths.plan);
-  const filenames = (await readdir(paths.posts)).filter(name => name.endsWith('.md')).sort();
-  if (!filenames.length) throw new Error('No .launch/posts/<channel>.md files found');
+  const filenames = (await readdir(paths.posts)).filter(name => name.endsWith('.md') && name !== 'fix-list.md').sort();
+  if (!filenames.length && !unavailable?.size) throw new Error('No .launch/posts/<channel>.md files found');
   const posts: ReviewPost[] = [];
   for (const filename of filenames) {
     const channel = filename.slice(0, -3);
     const rule = loadRule('channels', channel);
-    const raw = await readLocalFile(root, join(root, 'posts', filename));
+    let raw: Buffer;
+    try { raw = await readLocalFile(root, join(root, 'posts', filename)); }
+    catch (error) {
+      if (unavailable?.has(channel)) continue;
+      throw error;
+    }
     const source = raw.toString('utf8');
     const post = parsePost(source, channel);
     const media: Media[] = [];
@@ -138,6 +154,7 @@ export async function loadReview(cwd?: string) {
       media.push({ slot, path, bytes: await readLocalFile(root, resolved) });
     }
     posts.push({ ...post, channel, filename, source, media, hash: postHash(raw, media),
+      sourceHash: createHash('sha256').update(raw).digest('hex'),
       label: String(rule.name),
       scheduledAt: schedule(plan, channel, config, (rule.bestPostingTimes as string[])[0]) });
   }

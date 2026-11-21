@@ -11,6 +11,7 @@ interface Product { name: string; oneLiner: string; audience: string; problem: s
 const rules = parse(readFileSync(join(packageRoot(), 'rules/brief.yaml'), 'utf8')) as { version: number; faqMin: number; faqMax: number; sections: { title: string; words: number }[] };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const inline = (s: string) => s.replace(/^\s*(?:[-+*]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim();
+const mentionsName = (line: string, name: string) => inline(line).toLowerCase().includes(inline(name).toLowerCase());
 const excerpt = (s: string, limit: number) => words(s) <= limit ? s : s.trim().split(/\s+/).slice(0, Math.max(0, limit)).join(' ') + '…';
 function budgetText(texts: string[], limit: number, render: (values: string[]) => string) {
   const lengths = texts.map(words);
@@ -59,8 +60,8 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
   const top = pains.map((pain, index) => ({ pain, index })).sort((a, b) => b.pain.mentionCount - a.pain.mentionCount).slice(0, 3);
   const cite = (text: string) => text.split('\n').map(line => {
     if (/^#{1,2} |^<!--/.test(line)) return line;
-    p.features.forEach((f, i) => { if (line.toLowerCase().includes(f.name.toLowerCase()) && !line.includes(`[feature:${i}](`)) line += ` [feature:${i}](product.json#/features/${i})`; });
-    pains.forEach((pain, i) => { if (line.toLowerCase().includes(pain.name.toLowerCase()) && !line.includes(`[pain:${i}](`)) line += ` [pain:${i}](research/pains.json#/pains/${i})`; });
+    p.features.forEach((f, i) => { if (mentionsName(line, f.name) && !line.includes(`[feature:${i}](`)) line += ` [feature:${i}](product.json#/features/${i})`; });
+    pains.forEach((pain, i) => { if (mentionsName(line, pain.name) && !line.includes(`[pain:${i}](`)) line += ` [pain:${i}](research/pains.json#/pains/${i})`; });
     return line;
   }).join('\n');
   const fit = (index: number, texts: string[], render: (values: string[]) => string) => budgetText(texts, rules.sections[index].words, values => cite(render(values)));
@@ -119,7 +120,7 @@ function validateText(ctx: ReturnType<typeof inputs>, path: string, text: string
     for (const match of text.matchAll(pattern)) if (match[1] !== match[2] || !values[Number(match[1])]) errors.push(`Unknown ${group} citation: ${match[0]}`);
     for (const [index, value] of values.entries()) for (const line of text.split('\n')) {
       if (/^#{1,2} /.test(line)) continue;
-      if (line.toLowerCase().includes(inline(value.name).toLowerCase()) && !line.includes(`[${group}:${index}](`)) errors.push(`${group} ${value.name} requires an indexed ${group} citation on the same line`);
+      if (mentionsName(line, value.name) && !line.includes(`[${group}:${index}](`)) errors.push(`${group} ${value.name} requires an indexed ${group} citation on the same line`);
     }
   }
   for (const [i] of ctx.product.features.entries()) if (!bodies[5].includes(`[feature:${i}](product.json#/features/${i})`)) errors.push(`Feature map missing feature:${i}`);

@@ -21,6 +21,26 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('matches feature and pain names regardless of case or whitespace on either side', () => {
+    setup();
+    const productPath = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(productPath, 'utf8'));
+    product.features[0].name = 'Fast Sync';
+    writeFileSync(productPath, JSON.stringify(product));
+    const pains = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
+    pains.pains[0].name = 'Setup   friction';
+    writeFileSync(join(cwd, '.launch/research/pains.json'), JSON.stringify(pains));
+    const line = '- Review fAsT  \tSyNc and SETUP\t friction.';
+    writeFileSync(join(cwd, '.launch/plan.md'), line);
+    const result = brief(cwd);
+    const original = readFileSync(result.path, 'utf8');
+    expect(original).toContain(`${line} [feature:0](product.json#/features/0) [pain:0](research/pains.json#/pains/0)`);
+    expect(validateBrief(cwd).valid).toBe(true);
+    for (const [group, citation] of [['feature', '[feature:0](product.json#/features/0)'], ['pain', '[pain:0](research/pains.json#/pains/0)']]) {
+      writeFileSync(result.path, original.split('\n').map(text => text.startsWith(line) ? text.replace(` ${citation}`, '') : text).join('\n'));
+      expect(validateBrief(cwd).errors.join()).toContain(`requires an indexed ${group} citation`);
+    }
+  });
   it('budgets citations added to flattened plan headings at the section limit', () => {
     setup();
     const productPath = join(cwd, '.launch/product.json');

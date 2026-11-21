@@ -21,6 +21,37 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('keeps full input wording when sections fit and marks omissions when they do not', () => {
+    setup();
+    const productPath = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(productPath, 'utf8'));
+    product.audience = 'developers '.repeat(30).trim();
+    product.problem = 'workflow '.repeat(45).trim();
+    product.proofPoints[0] = 'documented '.repeat(150).trim();
+    product.features[0].description = 'supported '.repeat(100).trim();
+    writeFileSync(productPath, JSON.stringify(product));
+    const result = brief(cwd);
+    const full = readFileSync(result.path, 'utf8');
+    const positioning = full.split('## Positioning statement')[1].split('\n## ')[0];
+    expect(positioning).toContain(product.audience);
+    expect(positioning).toContain(product.problem);
+    expect(full).toContain(product.proofPoints[0]);
+    expect(full).toContain(product.features[0].description);
+    expect(full).not.toContain('…');
+    product.audience = 'developers '.repeat(1000).trim();
+    product.problem = 'workflow '.repeat(1000).trim();
+    product.proofPoints[0] = 'documented '.repeat(1000).trim();
+    product.features[0].description = 'supported '.repeat(1000).trim();
+    writeFileSync(productPath, JSON.stringify(product));
+    writeFileSync(join(cwd, '.launch/plan.md'), 'Launch schedule. '.repeat(1000));
+    brief(cwd, true);
+    const shortened = readFileSync(result.path, 'utf8');
+    for (const title of ['Positioning statement', 'Target users and top pains', 'Key messages', 'Proof points with sources', 'Feature-to-pain map', 'FAQ', 'Channel plan with dates']) {
+      expect(shortened.split(`## ${title}\n`)[1].split('\n## ')[0]).toContain('…');
+    }
+    expect(shortened).toContain('… [Full text in product.json](product.json)');
+    expect(validateBrief(cwd).valid).toBe(true);
+  });
   it('renders the full plan and safe local citations without enabling unsafe links', () => {
     setup();
     writeFileSync(join(cwd, '.launch/plan.md'), 'Review launch dates. '.repeat(400));

@@ -10,11 +10,19 @@ interface Pain { name: string; description: string; mentionCount: number; dateRa
 interface Product { name: string; oneLiner: string; audience: string; problem: string; proofPoints: string[]; features: { name: string; description: string; sources: { ref: string }[] }[] }
 const rules = parse(readFileSync(join(packageRoot(), 'rules/brief.yaml'), 'utf8')) as { version: number; faqMin: number; faqMax: number; sections: { title: string; words: number }[] };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
-const excerpt = (s: string, limit: number) => s.trim().split(/\s+/).slice(0, Math.max(0, limit)).join(' ');
-function budgetEntries(entries: { prefix: string; text: string; suffix: string }[], limit: number) {
-  const required = entries.reduce((sum, entry) => sum + words(entry.prefix) + words(entry.suffix), 0);
-  const allowance = Math.max(0, Math.floor((limit - required) / Math.max(1, entries.length)));
-  return entries.map(entry => [entry.prefix, excerpt(entry.text, allowance), entry.suffix].filter(Boolean).join(' ')).join('\n');
+const excerpt = (s: string, limit: number) => words(s) <= limit ? s : s.trim().split(/\s+/).slice(0, Math.max(0, limit)).join(' ') + '…';
+function budgetText(texts: string[], limit: number, render: (values: string[]) => string) {
+  const lengths = texts.map(words);
+  let result = render(texts);
+  while (words(result) > limit && lengths.some(length => length > 0)) {
+    const longest = lengths.indexOf(Math.max(...lengths));
+    lengths[longest] = Math.max(0, lengths[longest] - Math.max(1, words(result) - limit));
+    result = render(texts.map((text, i) => excerpt(text, lengths[i])));
+  }
+  return result;
+}
+function budgetEntries(entries: { prefix: string; text: string; suffix: string }[], limit: number, transform: (text: string) => string) {
+  return budgetText(entries.map(entry => entry.text), limit, values => transform(entries.map((entry, i) => [entry.prefix, values[i], entry.suffix].filter(Boolean).join(' ')).join('\n')));
 }
 const url = (s: string) => { try { return ['http:', 'https:'].includes(new URL(s).protocol); } catch { return false; } };
 function inputs(cwd: string) {
@@ -42,29 +50,34 @@ function inputs(cwd: string) {
 function scaffold(ctx: ReturnType<typeof inputs>) {
   const { product: p, pains, plan, hash } = ctx;
   const top = pains.map((pain, index) => ({ pain, index })).sort((a, b) => b.pain.mentionCount - a.pain.mentionCount).slice(0, 3);
-  const contents = [
-    `${excerpt(p.name, 10)}: ${p.oneLiner} For ${excerpt(p.audience, 25)}. Problem: ${excerpt(p.problem, 40)} [product.json](product.json)`,
-    `Audience: ${excerpt(p.audience, 25)} [product.json](product.json)\n\n` + (top.length ? top.map(({ pain, index }) => `- ${pain.name}: ${excerpt(pain.description, 15)} [pain:${index}](research/pains.json#/pains/${index})\n` + pain.quotes.map(q => `  - “${q.text}” [quote](${q.url})`).join('\n')).join('\n') : 'Pain research unavailable; no validated pains supplied.'),
-    `One-liner: ${p.oneLiner} [product.json](product.json)\n\n` + [1, 2, 3].map(n => `- Tagline ${n}: Pending agent wording grounded in product.json.`).join('\n'),
-    [p.oneLiner, `For ${excerpt(p.audience, 25)}.`, excerpt(p.problem, 40)].map(s => `- ${s} [product.json](product.json)`).join('\n'),
-    budgetEntries(p.proofPoints.map((s, i) => ({ prefix: '-', text: s, suffix: `[product.json](product.json#/proofPoints/${i})` })), rules.sections[4].words - 20),
-    budgetEntries(p.features.map((f, i) => ({ prefix: `- ${f.name}:`, text: f.description, suffix: `[feature:${i}](product.json#/features/${i}) — Pain mapping unverified.` })), rules.sections[5].words - 20),
-    'No verified competitor claims available.',
-    '- Is this suitable for our workflow? Review the sourced features; suitability requires human evaluation.',
-    ['Who is this for?', 'What problem does it address?', 'What does it do?', 'Where is the evidence?', 'What does it cost?', 'Is there a free tier?', 'How do I get started?', 'What remains unverified?'].map((q, i) => `### ${i + 1}. ${q}\n${i === 0 ? excerpt(p.audience, 25) : i === 1 ? excerpt(p.problem, 40) : 'Pending agent answer from verified sources; do not invent details.'} [product.json](product.json)`).join('\n\n'),
-    'Pricing and free-tier details unverified. Agent must inspect authoritative pricing sources before making promises.',
-    words(plan) <= rules.sections[10].words - 20 ? plan.replace(/^#{1,6} /gm, '') : `Plan excerpt (review full dates and checklist in plan.md):\n\n${excerpt(plan.replace(/^#{1,6} /gm, ''), rules.sections[10].words - 40)}\n\n[Full launch plan](plan.md)`,
-    ['08:00 — Verify assets and approvals.', '09:00 — Review scheduled channel times in plan.md.', '10:00 — Human launches approved channels at their planned times.', '11:00 — Monitor feedback.', '12:00 — Review questions.', '13:00 — Record issues.', '14:00 — Review replies with human.', '15:00 — Check links.', '16:00 — Capture initial metrics.', '17:00 — Record follow-ups.'].join('\n\n'),
-    'Targets pending human agreement. Track visits, activation and qualified feedback; no baseline or outcome is assumed.',
-    'Unverified pricing, competitor research and feature-to-pain mapping require agent and human review. This deterministic scaffold is not approved launch copy.'
-  ];
-  const markdown = `<!-- liftoff-brief-v${rules.version} inputs:${hash} -->\n# Launch Brief: ${p.name}\n\n` + rules.sections.map((s, i) => `## ${s.title}\n\n${contents[i]}\n`).join('\n');
-  return markdown.split('\n').map(line => {
+  const cite = (text: string) => text.split('\n').map(line => {
     if (/^#{1,2} |^<!--/.test(line)) return line;
     p.features.forEach((f, i) => { if (line.toLowerCase().includes(f.name.toLowerCase()) && !line.includes(`[feature:${i}](`)) line += ` [feature:${i}](product.json#/features/${i})`; });
     pains.forEach((pain, i) => { if (line.toLowerCase().includes(pain.name.toLowerCase()) && !line.includes(`[pain:${i}](`)) line += ` [pain:${i}](research/pains.json#/pains/${i})`; });
     return line;
   }).join('\n');
+  const fit = (index: number, texts: string[], render: (values: string[]) => string) => budgetText(texts, rules.sections[index].words, values => cite(render(values)));
+  const contents = [
+    fit(0, [p.name, p.audience, p.problem], ([name, audience, problem]) => `${name}: ${p.oneLiner} For ${audience}. Problem: ${problem} [product.json](product.json)`),
+    fit(1, [p.audience, ...top.map(({ pain }) => pain.description)], ([audience, ...descriptions]) => `Audience: ${audience} [product.json](product.json)\n\n` + (top.length ? top.map(({ pain, index }, i) => `- ${pain.name}: ${descriptions[i]} [pain:${index}](research/pains.json#/pains/${index})\n` + pain.quotes.map(q => `  - “${q.text}” [quote](${q.url})`).join('\n')).join('\n') : 'Pain research unavailable; no validated pains supplied.')),
+    `One-liner: ${p.oneLiner} [product.json](product.json)\n\n` + [1, 2, 3].map(n => `- Tagline ${n}: Pending agent wording grounded in product.json.`).join('\n'),
+    fit(3, [p.audience, p.problem], ([audience, problem]) => [p.oneLiner, `For ${audience}.`, problem].map(s => `- ${s} [product.json](product.json)`).join('\n')),
+    budgetEntries(p.proofPoints.map((s, i) => ({ prefix: '-', text: s, suffix: `[product.json](product.json#/proofPoints/${i})` })), rules.sections[4].words, cite),
+    budgetEntries(p.features.map((f, i) => ({ prefix: `- ${f.name}:`, text: f.description, suffix: `[feature:${i}](product.json#/features/${i}) — Pain mapping unverified.` })), rules.sections[5].words, cite),
+    'No verified competitor claims available.',
+    '- Is this suitable for our workflow? Review the sourced features; suitability requires human evaluation.',
+    fit(8, [p.audience, p.problem], ([audience, problem]) => ['Who is this for?', 'What problem does it address?', 'What does it do?', 'Where is the evidence?', 'What does it cost?', 'Is there a free tier?', 'How do I get started?', 'What remains unverified?'].map((q, i) => {
+      const answer = i === 0 ? audience : i === 1 ? problem : 'Pending agent answer from verified sources; do not invent details.';
+      return `### ${i + 1}. ${q}\n${answer} [${answer.endsWith('…') ? 'Full text in product.json' : 'product.json'}](product.json)`;
+    }).join('\n\n')),
+    'Pricing and free-tier details unverified. Agent must inspect authoritative pricing sources before making promises.',
+    words(cite(plan)) <= rules.sections[10].words ? plan.replace(/^#{1,6} /gm, '') : fit(10, [plan.replace(/^#{1,6} /gm, '')], ([text]) => `Plan excerpt (review full dates and checklist in plan.md):\n\n${text}\n\n[Full launch plan](plan.md)`),
+    ['08:00 — Verify assets and approvals.', '09:00 — Review scheduled channel times in plan.md.', '10:00 — Human launches approved channels at their planned times.', '11:00 — Monitor feedback.', '12:00 — Review questions.', '13:00 — Record issues.', '14:00 — Review replies with human.', '15:00 — Check links.', '16:00 — Capture initial metrics.', '17:00 — Record follow-ups.'].join('\n\n'),
+    'Targets pending human agreement. Track visits, activation and qualified feedback; no baseline or outcome is assumed.',
+    'Unverified pricing, competitor research and feature-to-pain mapping require agent and human review. This deterministic scaffold is not approved launch copy.'
+  ];
+  const markdown = `<!-- liftoff-brief-v${rules.version} inputs:${hash} -->\n# Launch Brief: ${p.name}\n\n` + rules.sections.map((s, i) => `## ${s.title}\n\n${contents[i]}\n`).join('\n');
+  return cite(markdown);
 }
 export function validateBrief(cwd: string, file?: string) {
   const ctx = inputs(cwd);

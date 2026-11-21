@@ -1,0 +1,4 @@
+kind: profile
+id: b2b-saas
+defaultChannels: ["linkedin","x","email","blog","product-hunt"]
+tone: Customer problem first, evidence-led

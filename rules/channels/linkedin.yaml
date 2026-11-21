@@ -1,0 +1,9 @@
+kind: channel
+id: linkedin
+name: Linkedin
+profiles: ["indie-saas","b2b-saas","enterprise"]
+bestPostingTimes: ["09:00", "14:00"]
+bestPostingDays: [tue, wed, thu]
+leadTimeDays: 1
+version: "0.1.0"
+lastVerified: "2026-11-21"

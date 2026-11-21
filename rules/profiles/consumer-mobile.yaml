@@ -1,0 +1,4 @@
+kind: profile
+id: consumer-mobile
+defaultChannels: ["tiktok","reels","shorts","instagram","x"]
+tone: Short hooks, visual demonstrations

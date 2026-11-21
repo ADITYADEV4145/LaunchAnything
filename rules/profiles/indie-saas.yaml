@@ -1,0 +1,4 @@
+kind: profile
+id: indie-saas
+defaultChannels: ["product-hunt","x","indie-hackers","reddit","linkedin"]
+tone: Personal founder story

@@ -1,0 +1,10 @@
+{
+  "profile": "consumer-mobile",
+  "allowedChannels": [
+    "tiktok",
+    "reels",
+    "shorts",
+    "instagram",
+    "x"
+  ]
+}

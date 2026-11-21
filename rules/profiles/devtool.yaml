@@ -1,0 +1,4 @@
+kind: profile
+id: devtool
+defaultChannels: ["show-hn","reddit","x","devto","github-release"]
+tone: Technical, concrete, no hype

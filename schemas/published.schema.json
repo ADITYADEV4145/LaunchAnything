@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://launch-liftoff.dev/schemas/published.schema.json",
+  "type": "object",
+  "properties": {
+    "posts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "enum": [
+              "show-hn",
+              "product-hunt",
+              "x",
+              "linkedin",
+              "reddit",
+              "devto",
+              "indie-hackers",
+              "github-release",
+              "tiktok",
+              "reels",
+              "shorts",
+              "instagram",
+              "email",
+              "blog",
+              "press-release"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status": {
+            "enum": [
+              "manual",
+              "scheduled",
+              "published",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "channel",
+          "id",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "posts"
+  ],
+  "additionalProperties": false
+}

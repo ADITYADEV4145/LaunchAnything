@@ -8,7 +8,7 @@ export function honesty(text: string, product: Product, disclosure: boolean, acc
   const target = '(?:' + productName + '|this (?:product|app|tool))(?![a-z0-9_])';
   const customer = new RegExp('\\bas (?:a|an) (?:happy |paying )?(?:customer|user) (?:of |using )?' + target
     + '|\\bi (?:bought|purchased) ' + target, 'i');
-  if (customer.test(text)) add('posing-as-customer', 'Do not pose as a customer of your own product.');
+  if (customer.test(text.replace(/\s+/g, ' '))) add('posing-as-customer', 'Do not pose as a customer of your own product.');
   if (disclosure && !/\bI (?:built|made|maintain|created|developed)|\b(?:our|my) (?:project|product|app|tool)|\b(?:founder|maker|author|affiliated)\b/i.test(text))
     add('affiliation', 'Disclose your affiliation; this is a conservative local community policy, not verified live policy.');
   const sentences = text.replace(/^[ \t]*(?:\d+[.)]|[-+*])[ \t]+/gm, '\n\n')

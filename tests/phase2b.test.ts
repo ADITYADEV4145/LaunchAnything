@@ -98,6 +98,14 @@ it('limits customer impersonation to statements about the launch product', () =>
     expect(honesty(text, product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(true);
 });
 
+it('detects soft-wrapped customer statements without flagging other tools', () => {
+  const product = { name: 'Tool', features: [], claims: [] };
+  for (const text of ['As a customer of\nTool, I recommend it.', 'As\r\na\tpaying customer\nof this\napp, I recommend it.', 'I purchased\nthis tool.'])
+    expect(honesty(text, product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(true);
+  for (const text of ['', 'As a user of\nSQLite, I needed better backups.', 'As a customer of\nToolbox, I needed better backups.'])
+    expect(honesty(text, product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(false);
+});
+
 it('requires full count tokens instead of matching numeric suffixes in cited claims', () => {
   const product = { name: 'Tool', features: [], claims: [
     { id: 'count', text: 'We have 15 users.', sources: [{ type: 'file', ref: 'metrics.csv' }] }

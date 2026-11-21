@@ -40,6 +40,16 @@ export function extractLinks(text: string) {
     consumed = cursor + closing[0].length;
   }
   bare += text.slice(consumed);
-  links.push(...(bare.match(/https?:\/\/[^\s<>"']+/gi) ?? []));
+  for (const match of bare.matchAll(/https?:\/\//gi)) {
+    let cursor = match.index;
+    let depth = 0;
+    for (; cursor < bare.length; cursor++) {
+      const char = bare[cursor];
+      if (/[\s<>"→]/u.test(char) || (char === ')' && depth === 0)) break;
+      if (char === '(') depth++;
+      else if (char === ')') depth--;
+    }
+    links.push(bare.slice(match.index, cursor));
+  }
   return links.map(normalizeLink);
 }

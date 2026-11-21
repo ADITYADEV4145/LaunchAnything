@@ -120,6 +120,18 @@ it('extracts adjacent Markdown targets and deduplicates decorated bare links', (
   })).not.toContain('links.count');
   expect(rules({ body: '**https://a.test** [b](https://b.test)[c](https://c.test)' })).toContain('links.count');
 });
+it('preserves internal apostrophes and separates arrow-joined bare URLs', () => {
+  const url = "https://example.com/it's";
+  expect(extractLinks(url)).toEqual([url]);
+  expect(extractLinks("see https://x.com/a's page")).toEqual(["https://x.com/a's"]);
+  expect(extractLinks("'" + url + "'")).toEqual([url]);
+  expect(rules({ body: '[visit](' + url + ') ' + url, link: url })).not.toContain('links.count');
+  for (const arrow of ['->', '→']) {
+    expect(extractLinks('(https://a.com)' + arrow + '(https://b.com)')).toEqual(['https://a.com', 'https://b.com']);
+    expect(rules({ body: '(https://a.com)' + arrow + '(https://b.com) https://c.com' })).toContain('links.count');
+  }
+});
+
 it('preserves balanced parentheses and brackets across every URL source', () => {
   const wiki = 'https://en.wikipedia.org/wiki/Foo_(bar)';
   const query = 'https://example.test/?filter[key]=[value]';

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { access, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
-import { delimiter, join } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -28,6 +28,7 @@ export function parseFormats(value = '16x9,9x16,1x1'): Format[] {
 async function exists(path: string) { try { await access(path); return true; } catch { return false; } }
 export async function fileHash(path: string) { return createHash('sha256').update(await readFile(path)).digest('hex'); }
 export async function remotionCli(cwd: string): Promise<string | undefined> {
+  cwd = resolve(cwd);
   try { return createRequire(join(cwd, 'package.json')).resolve('@remotion/cli/remotion-cli.js'); }
   catch {
     const local = join(cwd, 'node_modules', '.bin', 'remotion');

@@ -1,10 +1,11 @@
 import { mkdir, rename } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { launchDir } from '../core/launch-dir.js';
 import { shots } from './script.js';
 
 export async function record(cwd: string, base: string) {
+  cwd = resolve(cwd);
   const url = new URL(base);
   if (!['http:','https:'].includes(url.protocol)) throw new Error('--url must be an HTTP(S) base URL');
   const selected = (await shots(cwd)).filter(s => s.record);

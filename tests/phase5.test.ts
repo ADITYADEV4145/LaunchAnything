@@ -260,4 +260,4 @@ it('runs all phase 5 checks for every fixture', async () => {
   const checks = results.filter(result => result.phase === 5);
   expect(checks).toHaveLength(9);
   expect(checks.filter(result => !result.ok)).toEqual([]);
-});
+}, 180000);

@@ -3,11 +3,16 @@
   "$id": "https://launch-liftoff.dev/schemas/shots.schema.json",
   "type": "object",
   "properties": {
+    "baseUrl": { "type": "string" },
+    "startCommand": { "type": "string" },
+    "readyTimeoutMs": { "type": "integer", "minimum": 1 },
     "shots": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
+          "commands": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "fullPage": { "type": "boolean" },
           "id": {
             "type": "string",
             "minLength": 1
@@ -79,9 +84,9 @@
         },
         "required": [
           "id",
-          "route",
           "viewport"
         ],
+        "anyOf": [{ "required": ["route"] }, { "required": ["commands"] }],
         "additionalProperties": false
       },
       "minItems": 1

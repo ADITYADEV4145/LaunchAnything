@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
 export async function doctor(cwd: string, home = homedir()) {
@@ -29,7 +29,7 @@ export async function doctor(cwd: string, home = homedir()) {
     ['playwright', ['--version']], ['remotion', ['versions']],
   ];
   const tools = Object.fromEntries(probes.map(([name, args]) => {
-    const result = spawnSync(name, args, { cwd, encoding: 'utf8', timeout: 5000, stdio: 'ignore' });
+    const result = spawnSync(name, args, { cwd: tmpdir(), encoding: 'utf8', timeout: 5000, stdio: 'ignore' });
     return [name, { available: !result.error && result.status === 0 }];
   }));
   return { skills, mcpServers, tools, warnings };

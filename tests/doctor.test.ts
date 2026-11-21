@@ -14,3 +14,12 @@ it('uses supported version commands for installed optional tools', async () => {
   expect(spawnSync).toHaveBeenCalledWith('ffmpeg', ['-version'], expect.any(Object));
   expect(spawnSync).toHaveBeenCalledWith('remotion', ['versions'], expect.any(Object));
 });
+
+it('never uses the inspected repository as the tool execution directory', async () => {
+  vi.mocked(spawnSync).mockReturnValue({ status: 0 } as ReturnType<typeof spawnSync>);
+  await doctor(process.cwd(), tmpdir());
+  for (const call of vi.mocked(spawnSync).mock.calls) {
+    expect(call[2]?.cwd).toBe(tmpdir());
+    expect(call[2]?.cwd).not.toBe(process.cwd());
+  }
+});

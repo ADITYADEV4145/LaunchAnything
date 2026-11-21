@@ -17,6 +17,7 @@ export function frontMatter(post: ReviewPost): Record<string, unknown> {
 }
 export async function fillForm(driver: BrowserDriver, post: ReviewPost, _root: string) {
   const staging = await mkdtemp(join(tmpdir(), 'liftoff-upload-'));
+  const cleanup = () => rm(staging, { recursive: true, force: true });
   try {
     const media: string[] = [];
     for (const [index, item] of post.media.entries()) {
@@ -25,7 +26,8 @@ export async function fillForm(driver: BrowserDriver, post: ReviewPost, _root: s
       media.push(path);
     }
     await fillStagedForm(driver, post, media);
-  } finally { await rm(staging, { recursive: true, force: true }); }
+    return cleanup;
+  } catch (error) { await cleanup(); throw error; }
 }
 async function fillStagedForm(driver: BrowserDriver, post: ReviewPost, media: string[]) {
   const channel = post.channel as BrowserPlatform;

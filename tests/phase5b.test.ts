@@ -138,13 +138,15 @@ it.each(['reddit', 'product-hunt'] as const)('fills %s without any submit operat
   const browser = new MockBrowser(channel === 'reddit' ? 'https://www.reddit.com/r/test/comments/abc/title/' : 'https://www.producthunt.com/posts/my-product');
   const post = { channel, title: 'Product', body: 'Description', scheduledAt: '2026-07-14T12:00:00Z',
     source: '---\nsubreddit: test\nflair: Launch\n---\n', media: [{ path: 'media/gallery.png', slot: 'gallery', bytes: Buffer.from('mock') }, { path: 'media/9x16.mp4', slot: 'video', bytes: Buffer.from('mock') }] } as ReviewPost;
-  await fillForm(browser, post, '/launch');
-  expect(browser.actions.some(a => a.action === 'upload')).toBe(true);
-  expect(await browser.waitForUrl(forms[channel].result, 1)).toBe(browser.result);
-  expect('click' in browser).toBe(false);
-  expect(browser.actions.some(a => /submit|button/.test(a.selector ?? ''))).toBe(false);
-  browser.result = forms[channel].url;
-  await expect(browser.waitForUrl(forms[channel].result, 1)).rejects.toThrow('Timed out');
+  const cleanup = await fillForm(browser, post, '/launch');
+  try {
+    expect(browser.actions.some(a => a.action === 'upload')).toBe(true);
+    expect(await browser.waitForUrl(forms[channel].result, 1)).toBe(browser.result);
+    expect('click' in browser).toBe(false);
+    expect(browser.actions.some(a => /submit|button/.test(a.selector ?? ''))).toBe(false);
+    browser.result = forms[channel].url;
+    await expect(browser.waitForUrl(forms[channel].result, 1)).rejects.toThrow('Timed out');
+  } finally { await cleanup(); }
 });
 it.each(['changed', 'symlink', 'upload failure'])('uploads only approved bytes and cleans staging after %s', async change => {
   const { cwd, paths } = await approvedPost('reddit', ['gallery.png'], { subreddit: 'r/test' });
@@ -165,8 +167,35 @@ it.each(['changed', 'symlink', 'upload failure'])('uploads only approved bytes a
     if (change === 'upload failure') throw new Error('Upload failed');
   };
   if (change === 'upload failure') await expect(fillForm(browser, post, paths.root)).rejects.toThrow('Upload failed');
-  else await fillForm(browser, post, paths.root);
+  else {
+    const cleanup = await fillForm(browser, post, paths.root);
+    expect(await readFile(uploaded, 'utf8')).toBe('fixture media');
+    await cleanup();
+  }
   expect(uploaded).not.toBe('');
+  await expect(readFile(uploaded)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+it.each(['published', 'timeout', 'close failure'])('keeps approved uploads through browser completion: %s', async outcome => {
+  const { cwd, paths, home } = await approvedPost('reddit', ['gallery.png'], { subreddit: 'r/test' });
+  await connect({ platform: 'reddit', route: 'browser', account: 'owner', profile: cwd }, undefined, new MemoryKeychain(), home);
+  const browser = new MockBrowser('https://www.reddit.com/r/test/comments/abc/title/');
+  let uploaded = '';
+  browser.upload = async (_selector, files) => { uploaded = files[0]; };
+  browser.waitForUrl = async () => {
+    expect(await readFile(uploaded, 'utf8')).toBe('fixture media');
+    if (outcome === 'timeout') throw new Error('Timed out');
+    return browser.result;
+  };
+  let closed = false;
+  browser.close = async () => {
+    expect(await readFile(uploaded, 'utf8')).toBe('fixture media');
+    closed = true;
+    if (outcome === 'close failure') throw new Error('Close failed');
+  };
+  const result = assistedPublish(cwd, { home, browser: async () => browser });
+  if (outcome === 'published') expect((await result).posts[0].status).toBe('published');
+  else await expect(result).rejects.toThrow(outcome === 'timeout' ? 'Timed out' : 'Close failed');
+  expect(closed).toBe(true);
   await expect(readFile(uploaded)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 it('builds Instagram assets and first comment and refuses missing assets', () => {

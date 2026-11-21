@@ -54,11 +54,15 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
     } else {
       await writeFile(join(paths.root, `${post.channel}-assisted.ics`), assistedReminder(post.channel, post.scheduledAt));
       const driver = await (options.browser ?? chromeBrowser)(connection.profile!);
+      let cleanup: (() => Promise<void>) | undefined;
       try {
-        await fillForm(driver, post, paths.root);
+        cleanup = await fillForm(driver, post, paths.root);
         const url = await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, options.timeout ?? 600000);
         receipt = { channel: post.channel, id: `browser:${post.channel}:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
-      } finally { await driver.close(); }
+      } finally {
+        try { await driver.close(); }
+        finally { await cleanup?.(); }
+      }
     }
     const previous = await readReceipts(cwd);
     const merged = previous.posts.filter(p => p.channel !== receipt.channel || p.id !== receipt.id);

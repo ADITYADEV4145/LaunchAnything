@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { stringify } from 'yaml';
 import { phase5bGate } from '../src/selftest/phase5b.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
@@ -13,13 +13,14 @@ import type { ReviewPost } from '../src/review/posts.js';
 import { loadReview } from '../src/review/posts.js';
 import { assistedPublish } from '../src/connect/publish.js';
 import { publish } from '../src/adapters/publish.js';
-import { dailyCaps } from '../src/connect/caps.js';
+import { dailyCaps, reserveCap } from '../src/connect/caps.js';
+import { lockTimeout, tryLock } from '../src/connect/lock.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import type { Route } from '../src/connect/registry.js';
 
 const temp: string[] = [];
 async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-5b-')); temp.push(path); return path; }
-afterEach(async () => { await Promise.all(temp.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
+afterEach(async () => { vi.restoreAllMocks(); await Promise.all(temp.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
 async function approvedPost(channel: string, media: string[] = [], extra = {}) {
   const cwd = await workspace();
@@ -133,6 +134,50 @@ it('releases the registry lock without saving after a keychain error', async () 
   expect(await connections(home)).toEqual([]);
   await connect(input, 'token', keys, home);
   expect(await connections(home)).toHaveLength(1);
+});
+it.each(['dead', 'expired', 'legacy', 'malformed'])('recovers %s locks for connections and caps', async state => {
+  const home = await workspace();
+  const root = await workspace();
+  const timestamp = Date.now() - lockTimeout - 1000;
+  if (state === 'dead') vi.spyOn(process, 'kill').mockImplementation(() => { throw Object.assign(new Error('No process'), { code: 'ESRCH' }); });
+  for (const path of [join(home, 'connections.lock'), join(root, 'publish-caps.lock')]) {
+    await writeFile(path, state === 'legacy' ? '' : state === 'malformed' ? '{' : JSON.stringify({ pid: state === 'dead' ? 2147483647 : process.pid, timestamp: state === 'dead' ? Date.now() : timestamp }));
+    if (state === 'legacy' || state === 'malformed') await utimes(path, new Date(timestamp), new Date(timestamp));
+  }
+  const keys = new MemoryKeychain();
+  await connect({ platform: 'x', route: 'buffer', account: 'owner' }, 'token', keys, home);
+  expect((await connections(home))[0].account).toBe('owner');
+  await reserveCap(root, 'reddit', 'owner');
+  await expect(reserveCap(root, 'reddit', 'other')).rejects.toThrow('daily cap');
+  await expect(readFile(join(home, 'connections.lock'))).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(readFile(join(root, 'publish-caps.lock'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+it('records lock ownership and leaves a fresh live or permission-protected lock alone', async () => {
+  const root = await workspace();
+  const path = join(root, 'publish-caps.lock');
+  const release = await tryLock(path);
+  expect(release).toBeTypeOf('function');
+  const record = JSON.parse(await readFile(path, 'utf8'));
+  expect(record).toMatchObject({ pid: process.pid, timestamp: expect.any(Number), owner: expect.any(String) });
+  expect(Date.now() - record.timestamp).toBeLessThan(lockTimeout);
+  expect(await tryLock(path)).toBeUndefined();
+  vi.spyOn(process, 'kill').mockImplementation(() => { throw Object.assign(new Error('Not permitted'), { code: 'EPERM' }); });
+  await expect(reserveCap(root, 'x', 'owner')).rejects.toThrow('Another assisted publish');
+  expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(record);
+  await release!();
+});
+it('does not release a replacement lock when an expired owner finishes', async () => {
+  const root = await workspace();
+  const path = join(root, 'connections.lock');
+  const releaseOld = await tryLock(path);
+  const record = JSON.parse(await readFile(path, 'utf8'));
+  await writeFile(path, JSON.stringify({ ...record, timestamp: Date.now() - lockTimeout - 1000 }));
+  const releaseNew = await tryLock(path);
+  expect(releaseNew).toBeTypeOf('function');
+  await releaseOld!();
+  expect(await tryLock(path)).toBeUndefined();
+  await releaseNew!();
+  await expect(readFile(path)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 it.each(['reddit', 'product-hunt'] as const)('fills %s without any submit operation', async channel => {
   const browser = new MockBrowser(channel === 'reddit' ? 'https://www.reddit.com/r/test/comments/abc/title/' : 'https://www.producthunt.com/posts/my-product');

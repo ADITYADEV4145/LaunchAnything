@@ -1,9 +1,10 @@
-import { mkdir, open, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { setTimeout } from 'node:timers/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readOptional } from '../review/posts.js';
 import type { Keychain } from './keychain.js';
+import { tryLock } from './lock.js';
 
 export type Route = 'postiz' | 'buffer' | 'api' | 'browser';
 export interface Connection { platform: string; route: Route; account: string; connectedAt: string; profile?: string }
@@ -25,12 +26,10 @@ async function withRegistryLock<T>(home: string, action: () => Promise<T>): Prom
   await mkdir(home, { recursive: true, mode: 0o700 });
   const path = join(home, 'connections.lock');
   for (let attempt = 0; attempt < 100; attempt++) {
-    const lock = await open(path, 'wx', 0o600).catch(error => {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    });
-    if (lock) {
+    const release = await tryLock(path);
+    if (release) {
       try { return await action(); }
-      finally { await lock.close(); await unlink(path); }
+      finally { await release(); }
     }
     await setTimeout(100);
   }

@@ -39,14 +39,13 @@ export function routesFromFiles(files: string[], router: 'next' | 'expo' | 'none
       const entrypoint = segments.pop()!;
       const name = router === 'expo' ? entrypoint.replace(/\.(?:ios|android|web|native)$/, '') : entrypoint;
       if (segments.some(segment => segment.startsWith('_'))) continue;
+      if (router === 'next' && segments.some(segment => /^\(\.{1,3}\)/.test(segment))) continue;
       if (router === 'next' && name !== 'page' && name !== 'route') continue;
       if (router === 'expo') {
         if (name.startsWith('_') || name.startsWith('+')) continue;
         if (name !== 'index') segments.push(name);
       }
-      const visible = segments
-        .map(segment => router === 'next' ? segment.replace(/^(?:\(\.{1,3}\))+/, '') : segment)
-        .filter(segment => segment && !/^\([^)]*\)$/.test(segment) && !segment.startsWith('@'));
+      const visible = segments.filter(segment => !/^\([^)]*\)$/.test(segment) && !segment.startsWith('@'));
       routes.add('/' + visible.join('/'));
       continue;
     }

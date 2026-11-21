@@ -156,11 +156,17 @@ describe('scan', () => {
     ], 'expo')).toEqual(['/profile', '/', '/settings']);
     expect(routesFromFiles(['app/profile.ios.tsx'])).toEqual([]);
   });
-  it('strips Next intercepting prefixes and deduplicates matching routes', () => {
-    expect(routesFromFiles([
+  it('skips Next intercepting overlays, including nested intercepts, without inventing routes', () => {
+    const overlays = [
       'app/(.)photo/page.tsx', 'app/(..)photo/page.tsx', 'app/(..)(..)photo/page.tsx',
-      'app/(...)photo/page.tsx', 'app/photo/page.tsx',
+      'app/(...)photo/page.tsx',
       'src/app/(group)/@modal/(.)photo/[id]/page.tsx',
+      'app/feed/(..)photo/[id]/page.tsx', 'app/feed/deep/(..)(..)photo/[id]/page.tsx',
+      'app/feed/(...)photo/[id]/page.tsx', 'app/feed/(.)photo/[id]/route.ts',
+    ];
+    expect(routesFromFiles(overlays)).toEqual([]);
+    expect(routesFromFiles([
+      ...overlays, 'app/photo/page.tsx',
       'app/(group)/photo/[id]/page.tsx',
     ])).toEqual(['/photo', '/photo/[id]']);
     expect(routesFromFiles(['app/(.)photo/component.tsx'])).toEqual([]);

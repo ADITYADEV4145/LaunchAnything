@@ -24,6 +24,6 @@ export async function writeJson(path: string, data: unknown, exclusive = false):
 
 export function git(cwd: string, args: string[]): string | undefined {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_')));
-  try { return execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim(); }
+  try { return execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, maxBuffer: 64 * 1024 * 1024 }).trim(); }
   catch { return undefined; }
 }

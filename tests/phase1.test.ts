@@ -125,6 +125,21 @@ describe('scan', () => {
     expect(result.scan.commits).toEqual([{ sha: git('rev-parse', 'HEAD'), subject: 'Add feature' }]);
     expect(result.scan.landingUrl).toBe('https://example.test/launch');
   });
+  it('reads history larger than 1 MiB and warns if Git cannot read history', async () => {
+    git('init', '--initial-branch=main');
+    const subject = 'Large history subject ' + 'x'.repeat(65_000);
+    for (let i = 0; i < 18; i++) git('-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', subject);
+    const result = await scan(cwd);
+    const commits = result.scan.commits as { sha: string; subject: string }[];
+    expect(commits).toHaveLength(18);
+    expect(commits.every(commit => commit.subject === subject)).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(commits))).toBeGreaterThan(1024 * 1024);
+    expect(result.warnings).toEqual([]);
+    await writeFile(join(cwd, '.git/HEAD'), 'ref: refs/heads/missing\n');
+    const unreadable = await scan(cwd);
+    expect(unreadable.scan.commits).toEqual([]);
+    expect(unreadable.warnings).toContain('Git history could not be read; commits are empty (Git may be unavailable or the repository may have no commits).');
+  });
   it('keeps network opt-in, accepts only public star counts and tolerates all fetch failures', async () => {
     git('init', '--initial-branch=main');
     git('remote', 'add', 'origin', 'git@github.com:example/product.git');
@@ -137,9 +152,9 @@ describe('scan', () => {
     network.mockResolvedValueOnce({ ok: true, json: async () => ({ private: true, stargazers_count: 12 }) });
     expect((await scan(cwd, { github: true })).scan).not.toHaveProperty('stars');
     network.mockRejectedValueOnce(new Error('offline'));
-    expect((await scan(cwd, { github: true })).warnings).toHaveLength(1);
+    expect((await scan(cwd, { github: true })).warnings).toContain('GitHub stars unavailable; continuing with local facts.');
     network.mockResolvedValueOnce({ ok: false, status: 404 });
-    expect((await scan(cwd, { github: true })).warnings).toHaveLength(1);
+    expect((await scan(cwd, { github: true })).warnings).toContain('GitHub stars unavailable; continuing with local facts.');
     vi.stubEnv('LIFTOFF_ALLOW_NETWORK', '1');
     expect((await scan(cwd)).scan.stars).toBe(12);
     expect(githubRepository('https://github.com/owner/repo.git')).toBe('owner/repo');

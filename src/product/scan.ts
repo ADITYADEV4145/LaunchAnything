@@ -48,8 +48,11 @@ export async function scan(cwd: string, options: { github?: boolean } = {}) {
   const readme = await optionalText(join(cwd, 'README.md')) || await optionalText(join(cwd, 'readme.md'));
   const license = await optionalText(join(cwd, 'LICENSE')) || await optionalText(join(cwd, 'LICENSE.md'));
   const files = await repositoryFiles(cwd);
+  const warnings: string[] = [];
   const tag = git(cwd, ['describe', '--tags', '--abbrev=0']);
-  const log = git(cwd, ['log', '--format=%H%x09%s', ...(tag ? [`${tag}..HEAD`] : [])]) ?? '';
+  const history = git(cwd, ['log', '--format=%H%x09%s', ...(tag ? [`${tag}..HEAD`] : [])]);
+  if (history === undefined) warnings.push('Git history could not be read; commits are empty (Git may be unavailable or the repository may have no commits).');
+  const log = history ?? '';
   const url = landingUrl(pkg, readme);
   const data: Record<string, unknown> = {
     readmeSections: readmeSections(readme), package: pkg, license,
@@ -58,7 +61,6 @@ export async function scan(cwd: string, options: { github?: boolean } = {}) {
     screenshots: files.filter(path => /\.(?:png|jpe?g|gif|webp|svg)$/i.test(path) && /(?:screenshot|screen-shot|snapshot|demo|capture|\.gif$)/i.test(path)),
     ...(url ? { landingUrl: url } : {}),
   };
-  const warnings: string[] = [];
   if (options.github ?? process.env.LIFTOFF_ALLOW_NETWORK === '1') {
     const remote = git(cwd, ['config', '--get', 'remote.origin.url']) ?? '';
     const repo = githubRepository(remote);

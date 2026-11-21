@@ -120,6 +120,12 @@ it('extracts adjacent Markdown targets and deduplicates decorated bare links', (
   })).not.toContain('links.count');
   expect(rules({ body: '**https://a.test** [b](https://b.test)[c](https://c.test)' })).toContain('links.count');
 });
+it('consumes redirect URLs without rescanning embedded destinations', () => {
+  const redirect = 'https://r.example/?to=https://docs.example';
+  expect(extractLinks(redirect)).toEqual([redirect]);
+  expect(rules({ body: redirect + ' https://docs.example' })).not.toContain('links.count');
+});
+
 it('preserves internal apostrophes and separates arrow-joined bare URLs', () => {
   const url = "https://example.com/it's";
   expect(extractLinks(url)).toEqual([url]);

@@ -11,13 +11,12 @@ function normalizeLink(url: string) {
   return normalized;
 }
 
-export function extractLinks(text: string) {
-  const links: string[] = [];
-  const opening = /!?\[[^\]\r\n]*\]\([ \t]*/g;
-  let bare = '', consumed = 0;
-  for (const match of text.matchAll(opening)) {
-    if (match.index < consumed) continue;
-    let cursor = match.index + match[0].length;
+function markdownLink(text: string, startIndex: number) {
+    const opening = /!?\[[^\]\r\n]*\]\([ \t]*/y;
+    opening.lastIndex = startIndex;
+    const match = opening.exec(text);
+    if (!match) return;
+    let cursor = startIndex + match[0].length;
     const angle = text[cursor] === '<';
     if (angle) cursor++;
     const start = cursor;
@@ -29,27 +28,37 @@ export function extractLinks(text: string) {
       if (!angle && char === '(') depth++;
       else if (!angle && char === ')') depth--;
     }
-    if (cursor >= text.length || depth !== 0) continue;
+    if (cursor >= text.length || depth !== 0) return;
     const target = text.slice(start, cursor);
-    if (!/^https?:\/\//i.test(target)) continue;
+    if (!/^https?:\/\//i.test(target)) return;
     if (angle) cursor++;
     const closing = text.slice(cursor).match(/^[ \t]*(?:\r?\n[ \t]*)?(?:(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^()\r\n]*\))[ \t]*(?:\r?\n[ \t]*)?)?\)/);
-    if (!closing) continue;
-    links.push(target);
-    bare += text.slice(consumed, match.index) + ' ';
-    consumed = cursor + closing[0].length;
-  }
-  bare += text.slice(consumed);
-  for (const match of bare.matchAll(/https?:\/\//gi)) {
-    let cursor = match.index;
+    if (!closing) return;
+    return { target, end: cursor + closing[0].length };
+}
+
+export function extractLinks(text: string) {
+  const links: string[] = [];
+  const scheme = /https?:\/\//iy;
+  for (let index = 0; index < text.length;) {
+    const markdown = (text[index] === '[' || text[index] === '!') ? markdownLink(text, index) : undefined;
+    if (markdown) {
+      links.push(markdown.target);
+      index = markdown.end;
+      continue;
+    }
+    scheme.lastIndex = index;
+    if (!scheme.test(text)) { index++; continue; }
+    let cursor = index;
     let depth = 0;
-    for (; cursor < bare.length; cursor++) {
-      const char = bare[cursor];
+    for (; cursor < text.length; cursor++) {
+      const char = text[cursor];
       if (/[\s<>"→]/u.test(char) || (char === ')' && depth === 0)) break;
       if (char === '(') depth++;
       else if (char === ')') depth--;
     }
-    links.push(bare.slice(match.index, cursor));
+    links.push(text.slice(index, cursor));
+    index = cursor;
   }
   return links.map(normalizeLink);
 }

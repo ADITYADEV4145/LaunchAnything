@@ -7,7 +7,8 @@ import { contrast, pngSize, safeArea } from '../src/visuals/check.js';
 import { validateFile } from '../src/core/schema.js';
 import { checks } from '../src/selftest/phase3.js';
 import { PNG } from 'pngjs';
-import { runTerminal, sanitizedEnv } from '../src/visuals/runtime.js';
+import { browser, runTerminal, sanitizedEnv } from '../src/visuals/runtime.js';
+import { guard } from '../src/visuals/capture.js';
 import { takeShots } from '../src/visuals/shots.js';
 import { makeImages } from '../src/visuals/images.js';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -15,6 +16,17 @@ describe('privacy', () => {
   const examples = { email: 'person@example.com', aws: 'AKIA1234567890123456', github: 'ghp_abcdefghijklmnopqrstuvwxyz', slack: 'xoxb-123456789012345', stripe: 'sk_live_123456789012345678', ai: 'sk-ant-abcdefghijklmnopqrstuvwxyz', google: 'AIza123456789012345678901234', jwt: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature', privateKey: '-----BEGIN RSA PRIVATE KEY-----', assignment: 'api_key=abcdefghijklmnopqrstuvwxyz' };
   for (const [name, value] of Object.entries(examples)) it(name, () => { expect(scanSecrets(value)).toContain(name); expect(maskSecrets(value)).not.toContain(value); expect(() => assertPrivate(value)).toThrow('[REDACTED]'); });
   it('accepts empty and normal text', () => { expect(scanSecrets('')).toEqual([]); expect(scanSecrets('Ship a calmer weekly plan. token: short')).toEqual([]); });
+});
+it('detects secrets split across inline text nodes without scanning redacted text', async () => {
+  const app = await browser(); const page = await app.newPage();
+  try {
+    await page.setContent('<span>a</span><span>@b.com</span>');
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: email');
+    await page.setContent('<div class="private"><span>a</span><span>@b.com</span></div><p>Safe text</p>');
+    expect(await guard(page, ['.private'])).toBe(1);
+    await page.setContent('<span>ordinary</span><span> text</span>');
+    expect(await guard(page, [])).toBe(0);
+  } finally { await app.close(); }
 });
 it('contrast and safe areas', () => {
   expect(contrast([0, 0, 0], [255, 255, 255])).toBeCloseTo(21); expect(contrast([42, 42, 42], [42, 42, 42])).toBe(1);

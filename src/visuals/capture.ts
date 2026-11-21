@@ -12,9 +12,10 @@ export async function guard(page: Page, selectors: string[]) {
     const redacted = selectors.flatMap(s => Array.from(document.querySelectorAll(s)));
     for (const el of redacted) (el as HTMLElement).style.filter = 'blur(18px)';
     const visible = Array.from(document.querySelectorAll('*')).filter(el => !redacted.some(r => r.contains(el)) && (el as HTMLElement).getClientRects().length);
+    const textContent = visible.flatMap(el => Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent)).join('');
     const text = visible.map(el => [Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(' '), ...['title', 'alt', 'placeholder'].map(a => el.getAttribute(a)), 'value' in el ? String(el.value) : ''].join(' ')).join('\n');
-    return { text, redactedCount: new Set(redacted).size };
-  }, selectors).then(result => { assertPrivate(result.text); return result.redactedCount; });
+    return { text, textContent, redactedCount: new Set(redacted).size };
+  }, selectors).then(result => { assertPrivate(result.text); assertPrivate(result.textContent); return result.redactedCount; });
 }
 export async function ocrCheck(png: Buffer): Promise<boolean> {
   try { await exec('tesseract', ['--version']); } catch { return false; }

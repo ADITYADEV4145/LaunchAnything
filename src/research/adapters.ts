@@ -1,7 +1,13 @@
 export interface Item { source: string; url: string; author_handle: string; date: string; text: string; score: number; replies: number }
 export type Fetch = typeof fetch;
 export interface Adapter { source: string; skip?: string; run: (query: string, get: (url: string, headers?: Record<string, string>) => Promise<any>) => Promise<Item[]> }
-const plain = (s: string = '') => s.replace(/<[^>]*>/g, '').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+const entities: Record<string, string> = { apos: "'", quot: '"', amp: '&', lt: '<', gt: '>', nbsp: ' ', ndash: '–', mdash: '—', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', copy: '©', reg: '®', trade: '™', bull: '•' };
+const plain = (s: string = '') => s.replace(/<\/?p\b[^>]*>|<br\b[^>]*>/gi, ' ').replace(/<[^>]*>/g, '')
+  .replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
+    if (!name.startsWith('#')) return entities[name.toLowerCase()] ?? entity;
+    const point = name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : Number(name.slice(1));
+    return point > 0 && point <= 0x10ffff && !(point >= 0xd800 && point <= 0xdfff) ? String.fromCodePoint(point) : entity;
+  }).replace(/\s+/gu, ' ').trim();
 const date = (v: any) => typeof v === 'number' ? new Date(v * 1000).toISOString() : v || '1970-01-01T00:00:00Z';
 export function normalize(source: string, raw: any): Item[] {
   const rows = source === 'play-store' ? raw.reviews : source === 'hn' ? raw.hits : source === 'reddit' ? raw.data?.children?.map((x: any) => x.data) : source === 'x' ? raw.data : source === 'app-store' ? raw.feed?.entry : source === 'product-hunt' ? raw.data?.posts?.edges?.flatMap((e: any) => e.node.comments.edges.map((c: any) => c.node)) : raw.items;

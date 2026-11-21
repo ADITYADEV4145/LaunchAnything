@@ -21,6 +21,17 @@ it('normalizes recorded evidence and caches raw responses with zero calls on hit
   expect(network).toHaveBeenCalledTimes(1);
   expect((await checkResearch(cwd)).valid).toBe(true);
 });
+it('decodes visible HTML entities and separates paragraphs for verbatim quotes', async () => {
+  const text = "I can't ship “today” — really… Next line © & < > 😀";
+  const raw = structuredClone(fixture.hn);
+  raw.hits[0].comment_text = '<p>I can&#x27;t ship &ldquo;today&rdquo; &mdash; really&hellip;</p><p>Next<br>line &#169; &amp; &lt; &gt; &#x1F600;</p>';
+  expect(normalize('hn', raw)[0].text).toBe(text);
+  expect(normalize('hn', { hits: [{ objectID: '1', comment_text: '&#0; &#x110000; &unknown;' }] })[0].text).toBe('&#0; &#x110000; &unknown;');
+  await fetchResearch(cwd, ['entities'], { fetch: async () => new Response(JSON.stringify(raw)), adapters: [adapters({})[0]] });
+  const data = structuredClone(fixture.pains); data.pains[0].quotes[0].text = text;
+  await writeFile(researchPaths(cwd).pains, JSON.stringify(data));
+  expect((await checkResearch(cwd)).valid).toBe(true);
+});
 it('skips absent credentials and rejects empty queries and HTTP failures', async () => {
   const network = vi.fn();
   const result = await fetchResearch(cwd, ['launch'], { fetch: network, adapters: adapters({}).filter(a => a.skip) });

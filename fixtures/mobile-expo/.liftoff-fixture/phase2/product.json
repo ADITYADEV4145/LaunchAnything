@@ -1,0 +1,35 @@
+{
+  "name": "Trailnote",
+  "oneLiner": "A pocket trail journal with a simple daily note screen.",
+  "audience": "Walkers keeping a daily trail journal",
+  "problem": "Keep a small daily workflow understandable without complex setup.",
+  "proofPoints": [
+    "Includes a focused working interface",
+    "Source is available in the repository",
+    "Setup instructions are included in the README"
+  ],
+  "features": [
+    {
+      "name": "Daily note editor",
+      "description": "A pocket trail journal with a simple daily note screen.",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "App.tsx"
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "interface",
+      "text": "The daily note editor updates a character count.",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "App.tsx"
+        }
+      ]
+    }
+  ]
+}

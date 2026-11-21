@@ -1,0 +1,26 @@
+kind: platform
+id: x
+name: X
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source fetch returned no content. 280 characters, 10-post threads and 2 links are unverified
+    local budgets.
+sources:
+  - https://help.x.com/en/using-x/how-to-post
+title:
+  required: true
+  maxLength: 100
+body:
+  minLength: 1
+  maxLength: 2800
+maxLinks: 2
+requiredLink: false
+bannedWords: []
+postMax: 280
+threadMax: 10
+guidance:
+  - Conservative budget counts URL characters literally; separate thread posts with --- on its own
+    line.

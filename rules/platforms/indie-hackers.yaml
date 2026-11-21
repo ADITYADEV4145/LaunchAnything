@@ -1,0 +1,23 @@
+kind: platform
+id: indie-hackers
+name: Indie Hackers
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source fetched but did not state the numeric copy limits. All numeric budgets are unverified
+    local editorial limits, not platform guarantees.
+sources:
+  - https://www.indiehackers.com/
+title:
+  required: true
+  maxLength: 120
+body:
+  minLength: 1
+  maxLength: 10000
+maxLinks: 3
+requiredLink: false
+bannedWords: []
+guidance:
+  - Describe lessons and evidence, not a generic advertisement.

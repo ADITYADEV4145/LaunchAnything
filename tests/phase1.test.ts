@@ -142,6 +142,12 @@ describe('scan', () => {
     await writeFile(join(cwd, 'app/profile.tsx'), 'export default function Profile() {}');
     expect((await scan(cwd)).scan.routes).toEqual([]);
   });
+  it('includes the pages/api page while excluding handlers inside pages/api/', () => {
+    expect(routesFromFiles(['pages/api.tsx', 'pages/api/users.ts', 'src/pages/api/status.ts']))
+      .toEqual(['/api']);
+    expect(routesFromFiles(['src/pages/api.jsx', 'pages/api/index.ts', 'pages/api/v1/users.ts']))
+      .toEqual(['/api']);
+  });
   it('falls back to README URLs and all commits before a tag, then scans only commits since tag', async () => {
     await writeFile(join(cwd, 'README.md'), '# Example\nSee [site](https://example.test/launch).\n');
     git('init', '--initial-branch=main');

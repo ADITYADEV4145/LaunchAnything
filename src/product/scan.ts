@@ -51,7 +51,7 @@ export function routesFromFiles(files: string[], router: 'next' | 'expo' | 'none
     if (pages && router === 'next') {
       const segments = pages[1].split('/');
       const name = segments.pop()!;
-      if (segments[0] === 'api' || (segments.length === 0 && name === 'api') || ['_app', '_document', '_error'].includes(name)) continue;
+      if (segments[0] === 'api' || ['_app', '_document', '_error'].includes(name)) continue;
       if (name !== 'index') segments.push(name);
       routes.add('/' + segments.join('/'));
     }

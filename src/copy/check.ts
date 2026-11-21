@@ -100,7 +100,13 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   const cited = [...(post.title + '\n' + post.body).matchAll(/\[claim:([^\]]+)\]/g)].map(m => m[1]);
   if ([...post.claims, ...cited].some(id => !known.has(id))) add('claims.unknown', 'Unknown claim ID', 'Use IDs from product.json');
   if (cited.some(id => !post.claims.includes(id))) add('claims.undeclared', 'Citation missing from front matter', 'Declare cited IDs in claims');
-  const sentences = (post.title + '\n' + post.body).split(/(?<=[.!?])\s+|\n/).filter(Boolean);
+  const paragraphs = [post.title, ...post.body
+    .replace(/^[ \t]*(?:\d+[.)]|[-+*])[ \t]+/gm, '\n\n')
+    .split(/\r?\n[ \t]*\r?\n/)];
+  const sentences = paragraphs.flatMap(paragraph => paragraph
+    .replace(/\r?\n/g, ' ')
+    .replace(/([.!?])\s+((?:\[claim:[^\]]+\]\s*)+)/g, ' $2$1 ')
+    .split(/(?<=[.!?])\s+/)).filter(Boolean);
   if (sentences.some(sentence => {
     const clean = stripCitations(sentence).replace(/https?:\/\/\S+/g, '');
     return (/\d/.test(clean) || product.features.some(f => clean.toLowerCase().includes(f.name.toLowerCase())))

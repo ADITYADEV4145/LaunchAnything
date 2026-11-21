@@ -72,6 +72,16 @@ it('checks citations without counting their length', () => {
   expect(rules({ body: 'Works [claim:edit].' })).toContain('claims.undeclared');
   expect(rules({ body: 'a'.repeat(280) + ' [claim:edit]', claims: ['edit'] })).not.toContain('thread.post-length');
 });
+it('checks citations across soft wraps but ignores list numbering', () => {
+  expect(rules({ body: 'Task editor works\n[claim:edit].', claims: ['edit'] })).not.toContain('claims.uncited');
+  expect(rules({ body: 'Task editor\nworks.\n[claim:edit]', claims: ['edit'] })).not.toContain('claims.uncited');
+  expect(rules({ body: 'Only 2 steps.\n[claim:edit]\nAnother 3 steps.', claims: ['edit'] })).toContain('claims.uncited');
+  expect(rules({ body: '1. Try the project.\n2) Share feedback.' })).not.toContain('claims.uncited');
+  expect(rules({ body: '1. Task editor works\n   [claim:edit].\n2. Share feedback.', claims: ['edit'] })).not.toContain('claims.uncited');
+  expect(rules({ body: '1. Only 2 steps.' })).toContain('claims.uncited');
+  expect(rules({ body: 'Task editor works.\n\n[claim:edit]', claims: ['edit'] })).toContain('claims.uncited');
+  expect(rules({ body: 'Task editor works. Another sentence [claim:edit].', claims: ['edit'] })).toContain('claims.uncited');
+});
 it('checks titles, hooks, links and threads', () => {
   expect(rules({ title: 'Demo' }, 'show-hn')).toEqual(expect.arrayContaining(['title.prefix','links.required']));
   expect(rules({ title: 'Show HN: revolutionary demo', link: 'https://example.test' }, 'show-hn')).toContain('words.banned');

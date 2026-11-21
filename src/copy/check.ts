@@ -51,6 +51,15 @@ export function similarity(a: string, b: string) {
   if (!x.size || !y.size) return 0;
   return [...x].filter(s => y.has(s)).length / new Set([...x, ...y]).size;
 }
+function extractLinks(text: string) {
+  const links: string[] = [];
+  const bare = text.replace(/!?\[[^\]\r\n]*\]\(\s*<?(https?:\/\/[^\s<>)]+)>?(?:\s+["'][^"']*["'])?\s*\)/gi, (_match, target: string) => {
+    links.push(target);
+    return ' ';
+  });
+  links.push(...(bare.match(/https?:\/\/[^\s<>()\[\]]+/gi) ?? []));
+  return links.map(url => url.replace(/[.,;:!?'"’”*_)\]}>]+$/u, ''));
+}
 export function inspectPost(post: Post, channel: string, product: Product): Issue[] {
   const rules = loadPlatform(channel), issues: Issue[] = [];
   const add = (rule: string, message: string, fix: string) => issues.push({ channel, rule, message, fix });
@@ -99,8 +108,7 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   for (const word of rules.bannedWords) {
     if (text.toLowerCase().includes(word.toLowerCase())) add('words.banned', 'Banned phrase: ' + word, 'Replace hype with concrete evidence');
   }
-  const urls = new Set(((text + '\n' + (post.link ?? '')).match(/https?:\/\/[^\s<>]+/g) ?? [])
-    .map(url => url.replace(/[.,;:!?'"’”\)\]\}]+$/u, '')));
+  const urls = new Set(extractLinks(text + '\n' + (post.link ?? '')));
   if (urls.size > rules.maxLinks) add('links.count', 'Too many links', 'Use at most ' + rules.maxLinks + ' distinct links');
   if (rules.requiredLink && (!post.link || !/^https?:\/\//i.test(post.link) || !URL.canParse(post.link)))
     add('links.required', 'A tryable HTTP(S) product link is required', 'Set front matter link to an HTTP(S) demo or runnable repository');

@@ -105,6 +105,18 @@ it('deduplicates links after removing trailing prose punctuation', () => {
   })).not.toContain('links.count');
   expect(rules({ body: 'https://a.test https://b.test https://c.test.' })).toContain('links.count');
 });
+it('extracts adjacent Markdown targets and deduplicates decorated bare links', () => {
+  expect(rules({ body: '[a](https://a.test)[b](https://b.test)[c](https://c.test)' })).toContain('links.count');
+  expect(rules({
+    body: '**https://a.test** _https://a.test_ [a](https://a.test)[b](<https://b.test> "Title")',
+    link: 'https://a.test'
+  })).not.toContain('links.count');
+  expect(rules({
+    body: '[a](https://a.test)[again](https://a.test) https://b.test',
+    link: 'https://a.test'
+  })).not.toContain('links.count');
+  expect(rules({ body: '**https://a.test** [b](https://b.test)[c](https://c.test)' })).toContain('links.count');
+});
 it('requires an HTTP(S) URL for tryable Show HN links', () => {
   for (const link of [undefined, 'mailto:maker@example.test', 'ftp://example.test/demo', 'javascript:alert(0)', 'https://'])
     expect(rules({ title: 'Show HN: Demo', link }, 'show-hn')).toContain('links.required');

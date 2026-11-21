@@ -10,11 +10,15 @@ import { checks as phase3 } from './phase3.js';
 import { checks as phase4 } from './phase4.js';
 import { checks as phase5 } from './phase5.js';
 import { checks as phase6 } from './phase6.js';
+import { checks as phase2b } from './phase2b.js';
 
 export const phases: Phase[] = [{ phase: 1, checks: phase1 }, { phase: 2, checks: phase2 }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: 6, checks: phase6 }];
-export async function selftest(through: number) {
-  if (!Number.isInteger(through) || through < 1 || through > 6) throw new Error('--through must be an integer from 1 to 6');
-  const results: { phase: number; fixture: string; check: string; ok: boolean; error?: string }[] = [];
+phases.splice(2, 0, { phase: '2b', checks: phase2b });
+export async function selftest(through: number | string) {
+  const order = phases.map(p => String(p.phase));
+  const last = order.indexOf(String(through));
+  if (last < 0) throw new Error('--through must be one of ' + order.join(', '));
+  const results: { phase: number | string; fixture: string; check: string; ok: boolean; error?: string }[] = [];
   const fixtureRoot = join(packageRoot(), 'fixtures');
   const fixtures = (await readdir(fixtureRoot, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => e.name).sort();
   if (!fixtures.length) throw new Error('No fixtures found');
@@ -38,7 +42,7 @@ export async function selftest(through: number) {
       await writeFile(join(cwd, 'CHANGELOG.md'), '# Changes\n\nImprove launch documentation.\n');
       git('add', 'CHANGELOG.md');
       git('commit', '-m', 'Improve launch documentation');
-      for (const phase of phases.filter(p => p.phase <= through)) {
+      for (const phase of phases.slice(0, last + 1)) {
         for (const check of phase.checks) {
           try { await check.run({ cwd, fixture }); results.push({ phase: phase.phase, fixture, check: check.name, ok: true }); }
           catch (error) { results.push({ phase: phase.phase, fixture, check: check.name, ok: false, error: (error as Error).message }); }

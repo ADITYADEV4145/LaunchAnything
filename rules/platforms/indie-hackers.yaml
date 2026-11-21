@@ -1,4 +1,6 @@
 kind: platform
+style: ["Share first-person building lessons and disclose affiliation."]
+requiresAffiliationDisclosure: true
 id: indie-hackers
 name: Indie Hackers
 version: 2

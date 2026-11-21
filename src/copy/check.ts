@@ -8,13 +8,18 @@ import { context, type Product } from './context.js';
 import { channels, loadPlatform } from './platforms.js';
 import { assertSafePath, atomicWrite } from './safe-path.js';
 import { extractLinks } from './links.js';
+import { aiTells } from '../voice/ai-tells.js';
+import { honesty } from '../voice/honesty.js';
+import { loadVoice } from '../voice/learn.js';
+import { scoreVoice } from '../voice/score.js';
 
 export interface Post {
   channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
-  claims: string[]; link?: string; linkFirstComment?: boolean; subreddit?: string; flair?: string; selfPromotion?: boolean;
+  claims: string[]; link?: string; linkFirstComment?: boolean; subreddit?: string; flair?: string; selfPromotion?: boolean; account?: string;
 }
 const extensionValidator = new Ajv2020({ allErrors: true }).compile({
   type: 'object', additionalProperties: false, properties: {
+    account: { type: 'string', minLength: 1 },
     linkFirstComment: { type: 'boolean' }, subreddit: { type: 'string', pattern: '^r/[A-Za-z0-9_]+$' },
     flair: { type: 'string', minLength: 1, pattern: '\\S' }, selfPromotion: { type: 'boolean' },
     media: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['slot'], properties: {
@@ -43,8 +48,8 @@ export function parsePost(text: string): Post {
   const metadata: unknown = parse(match[1]);
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new Error('Front matter must be an object');
   const post = { ...metadata, body: match[2].trim() };
-  const { linkFirstComment, subreddit, flair, selfPromotion, media, ...base } = post as Post;
-  const extensions = { linkFirstComment, subreddit, flair, selfPromotion, media };
+  const { linkFirstComment, subreddit, flair, selfPromotion, media, account, ...base } = post as Post;
+  const extensions = { linkFirstComment, subreddit, flair, selfPromotion, media, account };
   if (!extensionValidator(extensions)) throw new Error('Invalid phase 2 metadata: ' + JSON.stringify(extensionValidator.errors));
   const result = validateFile('post', { ...base, media: media?.map(({ width, height, ...item }) => item) });
   if (!result.valid) throw new Error(result.errors.join('; '));
@@ -110,6 +115,9 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   }
   if (rules.hookMax && body.split(/\n\s*\n/)[0].length > rules.hookMax) add('hook.length', 'Opening hook too long', 'Keep first paragraph within ' + rules.hookMax + ' characters');
   const text = title + '\n' + body;
+  for (const issue of aiTells(text, channel)) add(issue.rule, issue.message, 'Rewrite concretely in your own voice; preserve citations.');
+  for (const issue of honesty(post.title + '\n\n' + post.body, product, !!rules.requiresAffiliationDisclosure))
+    add(issue.rule, issue.message, 'Use sourced claims and disclose ownership honestly.');
   for (const word of rules.bannedWords) {
     if (text.toLowerCase().includes(word.toLowerCase())) add('words.banned', 'Banned phrase: ' + word, 'Replace hype with concrete evidence');
   }
@@ -163,6 +171,15 @@ export function checkPosts(cwd: string, selected?: string[]) {
       hashes.set(channel, createHash('sha256').update(source).digest('hex'));
       const post = parsePost(source.toString('utf8'));
       issues.push(...inspectPost(post, channel, ctx.product));
+      const config = ctx.config as typeof ctx.config & { accounts?: Record<string, string> };
+      if (post.account && post.account !== config.accounts?.[channel])
+        issues.push({ channel, rule: 'honesty.account', message: 'Account is not the configured user-owned account', fix: 'Use config.accounts.' + channel });
+      const voice = loadVoice(cwd);
+      if (voice) {
+        const result = scoreVoice(post.body, voice, channel);
+        if (!result.passed) issues.push({ channel, rule: 'voice.score', message: 'Voice score ' + result.score + ' below ' + result.threshold,
+          fix: JSON.stringify(result.rewrite) });
+      }
       posts.push({ ...post, channel });
     } catch (error) { issues.push({ channel, rule: 'post.schema', message: String(error), fix: 'Follow the brief front matter format' }); }
   }

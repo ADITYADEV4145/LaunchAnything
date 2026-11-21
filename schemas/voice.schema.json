@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "sentenceLength",
+    "commonOpeners",
+    "wordsUsed",
+    "wordsNeverUsed",
+    "emojiRate",
+    "punctuation",
+    "formality",
+    "threshold",
+    "samples"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "sentenceLength": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 1
+      }
+    },
+    "commonOpeners": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "wordsUsed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "wordsNeverUsed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "emojiRate": {
+      "type": "number",
+      "minimum": 0
+    },
+    "punctuation": {
+      "type": "object",
+      "required": [
+        "exclamationRate",
+        "dashRate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "exclamationRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dashRate": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "formality": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "channel",
+          "text"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      }
+    }
+  }
+}

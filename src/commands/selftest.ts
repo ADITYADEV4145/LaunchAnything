@@ -5,7 +5,7 @@ export function register(program: Command) {
   program.command('selftest').description('Run phase checks against isolated fixture repositories')
     .option('--through <phase>', 'Last phase to run (1-6)', '1')
     .action(async (options: { through: string }) => {
-      const report = await selftest(Number(options.through));
+      const report = await selftest(options.through);
       const failed = report.results.some(r => !r.ok);
       const json = commandOptions(program).json;
       if (json) {

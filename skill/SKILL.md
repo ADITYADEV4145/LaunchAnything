@@ -5,6 +5,14 @@ description: Plan a product launch, feature release, changelog or relaunch from 
 
 # Liftoff
 
+## Phase 2b: founder voice
+
+See [phase2b](references/phase2b.md). Learn from 20–50 owned samples with
+`liftoff voice learn`; measure with `liftoff voice score --json`. The agent
+rewrites using the returned three references; the CLI never calls an LLM.
+Run check for versioned AI tells, grounded audience counts, honest affiliation,
+and voice fit. Keep private samples private.
+
 The agent is the model; the CLI never calls an LLM API. All commands support
 `--cwd <repository>` and `--json`. State lives in that repository's `.launch/`.
 

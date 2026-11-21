@@ -1,4 +1,6 @@
 kind: platform
+style: ["First person: tell the story of building and ask for specific feedback."]
+requiresAffiliationDisclosure: true
 id: reddit
 name: Reddit
 version: 2

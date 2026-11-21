@@ -81,6 +81,19 @@ it('escapes Markdown quote punctuation without changing the displayed evidence',
 it('handles empty normalized results', () => {
   for (const source of ['hn', 'reddit', 'github', 'stackoverflow', 'product-hunt', 'x', 'app-store']) expect(normalize(source, {})).toEqual([]);
 });
+it('checks only whole handles from cited evidence, escaping regex punctuation', async () => {
+  const raw = structuredClone(fixture.hn);
+  raw.hits[0].author = 'ann'; raw.hits[1].author = 'a.b+';
+  raw.hits.push({ ...raw.hits[0], objectID: 'unused', author: 'uncited_person' });
+  await fetchResearch(cwd, ['handles'], { fetch: async () => new Response(JSON.stringify(raw)), adapters: [adapters({})[0]] });
+  await writeFile(researchPaths(cwd).pains, JSON.stringify(fixture.pains));
+  for (const text of ['planning banner uncanny', 'uncited_person', '[source](https://example.test/ann)', 'aXb+']) {
+    expect((await checkResearch(cwd, text)).valid).toBe(true);
+  }
+  for (const text of ['ann said', '@ANN said', '(a.b+) said', '&lt;ann&gt; said']) {
+    expect((await checkResearch(cwd, text)).errors).toContain('Username printed in report');
+  }
+});
 it('fetches issues and enabled discussions from at most five related repositories', async () => {
   const get = vi.fn(async (url: string) => url.includes('/search/repositories')
     ? { items: Array.from({ length: 6 }, (_, i) => ({ full_name: `example/app${i}`, has_discussions: i === 0 })) }

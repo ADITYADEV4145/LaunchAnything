@@ -40,7 +40,8 @@ export async function cachedItems(cwd: string): Promise<Item[]> {
   try { files = await readdir(path); } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; }
   return (await Promise.all(files.filter(f => f.endsWith('.json')).map(async f => JSON.parse(await readFile(join(path, f), 'utf8')).items as Item[]))).flat();
 }
-const visible = (s: string) => s.replace(/https?:\/\/[^\s)]+/g, '').replace(/\\([\[\]`*_])/g, '$1');
+const visible = (s: string) => s.replace(/https?:\/\/[^\s)]+/g, '').replace(/\\([\\|\[\]`*_])/g, '$1')
+  .replace(/&(amp|lt|gt);/g, (_, name: string) => ({ amp: '&', lt: '<', gt: '>' })[name]!);
 export async function checkResearch(cwd: string, report?: string) {
   const data = await loadPains(cwd); const schema = validateFile('pains', data); const errors = [...schema.errors];
   if (!schema.valid) return { valid: false, errors };
@@ -58,8 +59,10 @@ export async function checkResearch(cwd: string, report?: string) {
     if (independent.size < 3) errors.push(`${pain.name}: fewer than 3 independent sources`);
   }
   if (report === undefined) { try { report = await readFile(researchPaths(cwd).report, 'utf8'); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; } }
-  if (report !== undefined) for (const handle of new Set(items.map(i => i.author_handle).filter(Boolean))) {
-    if (visible(report).toLowerCase().includes(handle.toLowerCase())) errors.push('Username printed in report');
+  const usedUrls = new Set(data.pains.flatMap(p => p.quotes.map(q => q.url)));
+  if (report !== undefined) for (const handle of new Set(items.filter(i => usedUrls.has(i.url)).map(i => i.author_handle).filter(Boolean))) {
+    const escaped = handle.replace(/^@/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`(^|[^\\p{L}\\p{N}_])@?${escaped}(?![\\p{L}\\p{N}_])`, 'iu').test(visible(report))) errors.push('Username printed in report');
   }
   return { valid: !errors.length, errors };
 }

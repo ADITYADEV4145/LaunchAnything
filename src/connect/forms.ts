@@ -1,5 +1,7 @@
 import { parse } from 'yaml';
-import { resolve } from 'node:path';
+import { extname, join } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import type { ReviewPost } from '../review/posts.js';
 import type { BrowserDriver } from './browser.js';
 import { productHuntPayload } from './payloads.js';
@@ -13,10 +15,21 @@ export type BrowserPlatform = keyof typeof forms;
 export function frontMatter(post: ReviewPost): Record<string, unknown> {
   return parse(/^---\s*\n([\s\S]*?)\n---/.exec(post.source)?.[1] ?? '') ?? {};
 }
-export async function fillForm(driver: BrowserDriver, post: ReviewPost, root: string) {
+export async function fillForm(driver: BrowserDriver, post: ReviewPost, _root: string) {
+  const staging = await mkdtemp(join(tmpdir(), 'liftoff-upload-'));
+  try {
+    const media: string[] = [];
+    for (const [index, item] of post.media.entries()) {
+      const path = join(staging, `${index}${extname(item.path)}`);
+      await writeFile(path, item.bytes, { mode: 0o600 });
+      media.push(path);
+    }
+    await fillStagedForm(driver, post, media);
+  } finally { await rm(staging, { recursive: true, force: true }); }
+}
+async function fillStagedForm(driver: BrowserDriver, post: ReviewPost, media: string[]) {
   const channel = post.channel as BrowserPlatform;
   const extra = frontMatter(post);
-  const media = post.media.map(m => resolve(root, m.path.replace(/^\.launch\//, '')));
   await driver.open(forms[channel].url);
   if (channel === 'show-hn') {
     await driver.fill('input[name="title"]', post.title);

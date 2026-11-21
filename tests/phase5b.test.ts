@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
@@ -95,6 +95,29 @@ it.each(['reddit', 'product-hunt'] as const)('fills %s without any submit operat
   expect(browser.actions.some(a => /submit|button/.test(a.selector ?? ''))).toBe(false);
   browser.result = forms[channel].url;
   await expect(browser.waitForUrl(forms[channel].result, 1)).rejects.toThrow('Timed out');
+});
+it.each(['changed', 'symlink', 'upload failure'])('uploads only approved bytes and cleans staging after %s', async change => {
+  const { cwd, paths } = await approvedPost('reddit', ['gallery.png'], { subreddit: 'r/test' });
+  const { posts: [post] } = await loadReview(cwd);
+  const original = join(paths.media, 'gallery.png');
+  if (change === 'symlink') {
+    const outside = join(cwd, 'outside.png');
+    await writeFile(outside, 'unapproved outside bytes');
+    await rm(original);
+    await symlink(outside, original);
+  } else await writeFile(original, 'unapproved changed bytes');
+  const browser = new MockBrowser();
+  let uploaded = '';
+  browser.upload = async (_selector, files) => {
+    uploaded = files[0];
+    expect(uploaded).not.toBe(original);
+    expect(await readFile(uploaded, 'utf8')).toBe('fixture media');
+    if (change === 'upload failure') throw new Error('Upload failed');
+  };
+  if (change === 'upload failure') await expect(fillForm(browser, post, paths.root)).rejects.toThrow('Upload failed');
+  else await fillForm(browser, post, paths.root);
+  expect(uploaded).not.toBe('');
+  await expect(readFile(uploaded)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 it('builds Instagram assets and first comment and refuses missing assets', () => {
   expect(instagramPayload({ gallery: ['a.png', 'b.png'], verticalVideo: '9x16.mp4', caption: 'Launch', hashtags: ['build', '#local'], coverFrame: 2 })).toMatchObject({

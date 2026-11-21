@@ -34,6 +34,23 @@ it('detects secrets split across inline text nodes without scanning redacted tex
     expect(await guard(page, [])).toBe(0);
   } finally { await app.close(); }
 });
+it('does not join unrelated text across rendered layout boundaries', async () => {
+  const app = await browser(); const page = await app.newPage();
+  try {
+    for (const display of ['block', 'flex', 'grid', 'table-cell']) {
+      await page.setContent(`<span style="display:${display}">token: short</span><span style="display:${display}">DashboardSettings</span>`);
+      expect(await guard(page, [])).toBe(0);
+    }
+    await page.setContent('<div>token: short</div><div>Dashboard</div><div>Settings</div>');
+    expect(await guard(page, [])).toBe(0);
+    await page.setContent('<span>token: short</span><br><span>DashboardSettings</span>');
+    expect(await guard(page, [])).toBe(0);
+    await page.setContent('<div style="display:flex"><span>token: short</span><span>DashboardSettings</span></div>');
+    expect(await guard(page, [])).toBe(0);
+    await page.setContent('<span>token: short</span><span>DashboardSettings</span>');
+    await expect(guard(page, [])).rejects.toThrow('Privacy guard: assignment');
+  } finally { await app.close(); }
+});
 it('scans and redacts open shadow roots and nested frames, failing closed on unreadable frames', async () => {
   const app = await browser(); const page = await app.newPage();
   const server = createServer((_req, res) => res.end('<p class="private">person@example.test</p>'));

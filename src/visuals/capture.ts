@@ -38,6 +38,8 @@ export async function guard(page: Page, selectors: string[]) {
           }
           const style = getComputedStyle(el);
           if (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(el.tagName) || style.display === 'none') return;
+          const boundary = el.tagName === 'BR' || !['inline', 'contents'].includes(style.display);
+          if (boundary) nodes.push('\n');
           const visible = el.getClientRects().length > 0 && style.visibility === 'visible';
           if (visible) {
             attributes.push(...['title', 'alt', 'placeholder'].map(a => el.getAttribute(a) ?? ''), 'value' in el ? String(el.value) : '');
@@ -50,6 +52,7 @@ export async function guard(page: Page, selectors: string[]) {
           };
           visitChildren(el);
           if (el.shadowRoot) visitChildren(el.shadowRoot);
+          if (boundary) nodes.push('\n');
         };
         visit(document.documentElement);
         return { text: [...nodes, ...attributes].join('\n'), textContent: nodes.join(''), redactedCount };

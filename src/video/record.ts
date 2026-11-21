@@ -12,7 +12,8 @@ export async function record(cwd: string, base: string) {
   let playwright;
   try {
     const path = createRequire(join(cwd,'package.json')).resolve('playwright');
-    playwright = await import(path);
+    const mod = await import(path);
+    playwright = mod.chromium ? mod : mod.default;
   } catch { throw new Error('Playwright is not installed locally. Install playwright and its Chromium browser to record shots.'); }
   const dir = launchDir(cwd).media;
   await mkdir(dir,{recursive:true});

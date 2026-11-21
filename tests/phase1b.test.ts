@@ -21,6 +21,23 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('preserves literal list markers in direct quotes while collapsing whitespace only', () => {
+    setup();
+    const pains = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
+    pains.pains[0].quotes[0].text = '* * * * * cron runs\n- keep literal markers';
+    pains.pains[0].quotes[1].text = '1. First attempt\n+ second attempt';
+    const painPath = join(cwd, '.launch/research/pains.json');
+    const source = JSON.stringify(pains);
+    writeFileSync(painPath, source);
+    const result = brief(cwd);
+    const markdown = readFileSync(result.path, 'utf8');
+    expect(markdown).toContain('  - “* * * * * cron runs - keep literal markers” [quote]');
+    expect(markdown).toContain('  - “1. First attempt + second attempt” [quote]');
+    const section = markdown.split('## Target users and top pains\n')[1].split('\n## ')[0];
+    expect(section.match(/^- /gm)).toHaveLength(1);
+    expect(validateBrief(cwd).valid).toBe(true);
+    expect(readFileSync(painPath, 'utf8')).toBe(source);
+  });
   it('matches feature and pain names regardless of case or whitespace on either side', () => {
     setup();
     const productPath = join(cwd, '.launch/product.json');
@@ -78,7 +95,7 @@ describe('phase 1b Launch Brief', () => {
     const result = brief(cwd);
     const markdown = readFileSync(result.path, 'utf8');
     expect(validateBrief(cwd).valid).toBe(true);
-    for (const text of ['Tasklight Portable', 'Local tasks Simple workflow', 'Developers Small teams', 'Complex setup Scattered guidance', 'Repository evidence Working interface', 'Local tasks: Add tasks Track progress', 'Setup friction: Too many steps Poor guidance', 'Setup is slow Guidance is unclear']) expect(markdown).toContain(text);
+    for (const text of ['Tasklight Portable', 'Local tasks Simple workflow', 'Developers Small teams', 'Complex setup Scattered guidance', 'Repository evidence Working interface', 'Local tasks: Add tasks Track progress', 'Setup friction: Too many steps Poor guidance', '“- Setup is slow - Guidance is unclear”']) expect(markdown).toContain(text);
     const messages = markdown.split('## Key messages\n')[1].split('\n## ')[0];
     expect(messages.match(/^- /gm)).toHaveLength(3);
     edit(s => s.replace('## Open risks', '## Open risks\nLocal tasks are available.'));

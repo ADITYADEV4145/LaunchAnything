@@ -10,7 +10,8 @@ interface Pain { name: string; description: string; mentionCount: number; dateRa
 interface Product { name: string; oneLiner: string; audience: string; problem: string; proofPoints: string[]; features: { name: string; description: string; sources: { ref: string }[] }[] }
 const rules = parse(readFileSync(join(packageRoot(), 'rules/brief.yaml'), 'utf8')) as { version: number; faqMin: number; faqMax: number; sections: { title: string; words: number }[] };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
-const inline = (s: string) => s.replace(/^\s*(?:[-+*]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim();
+const collapseWhitespace = (s: string) => s.replace(/\s+/g, ' ').trim();
+const inline = (s: string) => collapseWhitespace(s.replace(/^\s*(?:[-+*]|\d+[.)])\s+/gm, ''));
 const mentionsName = (line: string, name: string) => inline(line).toLowerCase().includes(inline(name).toLowerCase());
 const excerpt = (s: string, limit: number) => words(s) <= limit ? s : s.trim().split(/\s+/).slice(0, Math.max(0, limit)).join(' ') + '…';
 function budgetText(texts: string[], limit: number, render: (values: string[]) => string) {
@@ -56,7 +57,7 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
     proofPoints: ctx.product.proofPoints.map(inline),
     features: ctx.product.features.map(feature => ({ ...feature, name: inline(feature.name), description: inline(feature.description) })) };
   const pains = ctx.pains.map(pain => ({ ...pain, name: inline(pain.name), description: inline(pain.description),
-    quotes: pain.quotes.map(quote => ({ ...quote, text: inline(quote.text) })) }));
+    quotes: pain.quotes.map(quote => ({ ...quote, text: collapseWhitespace(quote.text) })) }));
   const top = pains.map((pain, index) => ({ pain, index })).sort((a, b) => b.pain.mentionCount - a.pain.mentionCount).slice(0, 3);
   const cite = (text: string) => text.split('\n').map(line => {
     if (/^#{1,2} |^<!--/.test(line)) return line;

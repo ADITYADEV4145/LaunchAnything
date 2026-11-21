@@ -71,5 +71,9 @@ export function extractLinks(text: string) {
     links.push(text.slice(index, cursor));
     index = cursor;
   }
-  return links.map(normalizeLink);
+  return links.map(normalizeLink).filter(link => {
+    if (!/^https?:\/\/[^/?#]+/i.test(link)) return false;
+    try { return Boolean(new URL(link).hostname); }
+    catch { return false; }
+  });
 }

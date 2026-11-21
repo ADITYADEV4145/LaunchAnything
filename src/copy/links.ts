@@ -41,6 +41,15 @@ export function extractLinks(text: string) {
   const links: string[] = [];
   const scheme = /https?:\/\//iy;
   for (let index = 0; index < text.length;) {
+    if (text[index] === '<') {
+      const end = text.indexOf('>', index + 1);
+      const target = end < 0 ? '' : text.slice(index + 1, end);
+      if (/^https?:\/\/[^\s<>]+$/i.test(target)) {
+        links.push(target);
+        index = end + 1;
+        continue;
+      }
+    }
     const markdown = (text[index] === '[' || text[index] === '!') ? markdownLink(text, index) : undefined;
     if (markdown) {
       links.push(markdown.target);

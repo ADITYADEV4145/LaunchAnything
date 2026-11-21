@@ -10,7 +10,8 @@ program.name('liftoff').description('Grounded, human-approved launch kits')
 registerCommands(program);
 function configureErrors(command: Command) {
   command.configureOutput({
-    writeErr: () => {},
+    writeErr: text => { if (!process.argv.includes('--json')) process.stderr.write(text); },
+    outputError: () => {},
   });
   command.exitOverride();
   for (const child of command.commands) configureErrors(child);
@@ -20,6 +21,9 @@ try {
   await program.parseAsync();
 } catch (error) {
   const failure = error as Error & { code?: string; exitCode?: number };
-  if (failure.exitCode !== 0) output(program.args[0] ?? 'liftoff', undefined,
-    process.argv.includes('--json'), failure.message, failure.exitCode ?? 1);
+  const json = process.argv.includes('--json');
+  if (failure.code === 'commander.help' && !json) process.exitCode = failure.exitCode ?? 1;
+  else if (failure.exitCode !== 0) output(program.args[0] ?? 'liftoff', undefined,
+    json, failure.code === 'commander.help' ? 'A command is required; run liftoff --help' : failure.message,
+    failure.exitCode ?? 1);
 }

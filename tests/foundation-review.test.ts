@@ -9,6 +9,32 @@ import { selftest } from '../src/selftest/index.js';
 const cli = (...args: string[]) => spawnSync(process.execPath,
   ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args], { encoding: 'utf8' });
 
+it.each([[], ['--help']])('shows full help and command list for %j', (...args) => {
+  const run = cli(...args);
+  const help = run.stdout + run.stderr;
+  expect(help).toContain('Usage: liftoff');
+  expect(help).toContain('Options:');
+  expect(help).toContain('Commands:');
+  for (const command of ['init', 'scan', 'validate', 'plan', 'doctor', 'selftest', 'write', 'check',
+    'shots', 'images', 'video', 'review', 'publish', 'results', 'learn', 'receipt'])
+    expect(help).toMatch(new RegExp('^  ' + command + '(?: |$)', 'm'));
+  expect(help).not.toContain('(outputHelp)');
+  expect(help.split('Usage: liftoff')).toHaveLength(2);
+  if (args.includes('--help')) {
+    expect(run.status).toBe(0);
+    expect(run.stderr).toBe('');
+  }
+});
+
+it('returns one JSON error when no command is supplied in JSON mode', () => {
+  const run = cli('--json');
+  expect(run.status).not.toBe(0);
+  expect(run.stderr).toBe('');
+  expect(JSON.parse(run.stdout)).toEqual({
+    ok: false, command: 'liftoff', error: 'A command is required; run liftoff --help',
+  });
+});
+
 it.each([
   ['--through', 'argument missing'],
   ['--unknown', 'unknown option'],

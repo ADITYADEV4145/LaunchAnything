@@ -99,7 +99,8 @@ export function inspectPost(post: Post, channel: string, product: Product): Issu
   for (const word of rules.bannedWords) {
     if (text.toLowerCase().includes(word.toLowerCase())) add('words.banned', 'Banned phrase: ' + word, 'Replace hype with concrete evidence');
   }
-  const urls = new Set((text + '\n' + (post.link ?? '')).match(/https?:\/\/[^\s<>)\]]+/g) ?? []);
+  const urls = new Set(((text + '\n' + (post.link ?? '')).match(/https?:\/\/[^\s<>]+/g) ?? [])
+    .map(url => url.replace(/[.,;:!?'"’”\)\]\}]+$/u, '')));
   if (urls.size > rules.maxLinks) add('links.count', 'Too many links', 'Use at most ' + rules.maxLinks + ' distinct links');
   if (rules.requiredLink && !post.link) add('links.required', 'A tryable product link is required', 'Set front matter link to a working demo or runnable repository');
   const known = new Set(product.claims.map(c => c.id));

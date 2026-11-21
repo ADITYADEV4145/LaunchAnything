@@ -14,7 +14,7 @@ import { loadReview } from '../src/review/posts.js';
 import { assistedPublish } from '../src/connect/publish.js';
 import { publish } from '../src/adapters/publish.js';
 import { dailyCaps, reserveCap } from '../src/connect/caps.js';
-import { lockTimeout, tryLock } from '../src/connect/lock.js';
+import { lockTimeout, recoveryTimeout, tryLock } from '../src/connect/lock.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import type { Route } from '../src/connect/registry.js';
 
@@ -178,6 +178,63 @@ it('does not release a replacement lock when an expired owner finishes', async (
   expect(await tryLock(path)).toBeUndefined();
   await releaseNew!();
   await expect(readFile(path)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+it('does not remove a replacement lock when a stale recoverer resumes', async () => {
+  const root = await workspace();
+  const path = join(root, 'connections.lock');
+  await writeFile(path, JSON.stringify({ pid: process.pid, timestamp: Date.now() - lockTimeout - 1000, owner: 'stale' }));
+  const observed = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<void>();
+  const first = tryLock(path, async () => { observed.resolve(); await resume.promise; });
+  await observed.promise;
+  const replacement = await tryLock(path);
+  expect(replacement).toBeTypeOf('function');
+  const current = await readFile(path, 'utf8');
+  resume.resolve();
+  expect(await first).toBeUndefined();
+  expect(await readFile(path, 'utf8')).toBe(current);
+  expect(await tryLock(path)).toBeUndefined();
+  await replacement!();
+});
+it('allows only one winner among simultaneous stale-lock recoverers', async () => {
+  const root = await workspace();
+  const path = join(root, 'publish-caps.lock');
+  await writeFile(path, JSON.stringify({ pid: process.pid, timestamp: Date.now() - lockTimeout - 1000, owner: 'stale' }));
+  const releases = await Promise.all(Array.from({ length: 8 }, () => tryLock(path)));
+  const winners = releases.filter(release => release !== undefined);
+  expect(winners).toHaveLength(1);
+  expect(await tryLock(path)).toBeUndefined();
+  await winners[0]!();
+});
+it.each(['dead', 'expired', 'empty', 'live'])('handles a %s recovery guard without wedging or stealing', async state => {
+  const root = await workspace();
+  const path = join(root, 'connections.lock');
+  const guard = path + '.recover';
+  const stale = JSON.stringify({ pid: process.pid, timestamp: Date.now() - lockTimeout - 1000, owner: 'stale' });
+  await writeFile(path, stale);
+  await mkdir(guard);
+  if (state === 'empty') {
+    const old = new Date(Date.now() - recoveryTimeout - 1000);
+    await utimes(guard, old, old);
+  } else {
+    await writeFile(join(guard, 'guard-owner'), JSON.stringify({ pid: state === 'dead' ? 2147483647 : process.pid,
+      timestamp: state === 'expired' ? Date.now() - recoveryTimeout - 1000 : Date.now() }));
+    if (state === 'dead') {
+      const kill = process.kill.bind(process);
+      vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+        if (pid === 2147483647) throw Object.assign(new Error('No process'), { code: 'ESRCH' });
+        return kill(pid, signal);
+      });
+    }
+  }
+  const release = await tryLock(path);
+  if (state === 'live') {
+    expect(release).toBeUndefined();
+    expect(await readFile(path, 'utf8')).toBe(stale);
+  } else {
+    expect(release).toBeTypeOf('function');
+    await release!();
+  }
 });
 it.each(['reddit', 'product-hunt'] as const)('fills %s without any submit operation', async channel => {
   const browser = new MockBrowser(channel === 'reddit' ? 'https://www.reddit.com/r/test/comments/abc/title/' : 'https://www.producthunt.com/posts/my-product');

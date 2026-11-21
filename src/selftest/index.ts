@@ -12,8 +12,15 @@ import { checks as phase4 } from './phase4.js';
 import { checks as phase5 } from './phase5.js';
 import { checks as phase6 } from './phase6.js';
 import { checks as phase2b } from './phase2b.js';
+import { checks as launchOps } from './launch-ops.js';
 
 export const phases: Phase[] = [{ phase: 0, checks: phase0 }, { phase: 1, checks: phase1 }, { phase: 2, checks: phase2 }, { phase: '2b', checks: phase2b }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: 6, checks: phase6 }];
+phases.find(phase => phase.phase === 6)!.checks = [{
+  name: 'phase 6 results and launch operations',
+  async run(context) {
+    for (const check of [...phase6, ...launchOps]) await check.run(context);
+  },
+}];
 export async function selftest(through: number | string) {
   const order = phases.map(p => String(p.phase));
   const last = order.indexOf(String(through));

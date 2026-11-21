@@ -28,3 +28,5 @@ Foundation owns doctor, the selftest runner/registry, core helpers and foundatio
 Do not change build/CI/config merely to support one phase without agreement.
 Run npm run typecheck, npm test, npm run build and the relevant selftest gate.
 No LLM API calls, auto-posting to HN/Reddit, or approval bypasses.
+
+| Launch ops | warroom, friends, followup, retro, release | src/launch-ops/, src/results/retro.ts, src/selftest/launch-ops.ts, tests/launch-ops.test.ts, skill/references/launch-ops.md |

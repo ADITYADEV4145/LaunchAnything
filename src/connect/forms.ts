@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { ReviewPost } from '../review/posts.js';
 import type { BrowserDriver } from './browser.js';
-import { productHuntPayload } from './payloads.js';
+import { productHuntDate, productHuntPayload } from './payloads.js';
 
 export const forms = {
   'show-hn': { url: 'https://news.ycombinator.com/submit', result: /^https:\/\/news\.ycombinator\.com\/item\?id=\d+/ },
@@ -45,7 +45,7 @@ async function fillStagedForm(driver: BrowserDriver, post: ReviewPost, media: st
   } else {
     const payload = productHuntPayload({ name: String(extra.name ?? post.title), tagline: String(extra.tagline ?? post.title),
       description: post.body, gallery: media.filter(p => !/\.(mp4|webm|mov)$/i.test(p)),
-      video: media.find(p => /\.(mp4|webm|mov)$/i.test(p)), makerComment: String(extra.makerComment ?? post.body), date: post.scheduledAt.slice(0, 10) });
+      video: media.find(p => /\.(mp4|webm|mov)$/i.test(p)), makerComment: String(extra.makerComment ?? post.body), date: productHuntDate(post.scheduledAt) });
     for (const [name, value] of Object.entries({ name: payload.name, tagline: payload.tagline, description: payload.description,
       makerComment: payload.makerComment, launchAt: payload.launchAt, timezone: payload.timezone }))
       await driver.fill(`[name="${name}"]`, value);

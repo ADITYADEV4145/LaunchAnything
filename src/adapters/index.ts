@@ -88,7 +88,7 @@ export async function readReceipts(cwd?: string) {
 }
 
 function reminder(id: string, post: ReviewPost, url: string) {
-  if (manualOnly.has(post.channel)) return assistedReminder(post.channel, post.scheduledAt, post.scheduledAt.slice(0, 10));
+  if (manualOnly.has(post.channel)) return assistedReminder(post.channel, post.scheduledAt);
   const icsDate = (date: string) => date.replaceAll(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Liftoff//Launch reminder//EN',
     'BEGIN:VEVENT', `UID:${id}@liftoff.local`, `DTSTAMP:${icsDate(new Date().toISOString())}`,

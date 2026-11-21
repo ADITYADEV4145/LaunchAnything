@@ -12,9 +12,12 @@ export function productHuntPayload(input: ProductHuntInput) {
   return { ...input, launchAt: `${input.date}T00:01:00`, timezone: 'America/Los_Angeles' };
 }
 const escape = (value: string) => value.replaceAll('\\', '\\\\').replaceAll('\n', '\\n').replaceAll(',', '\\,').replaceAll(';', '\\;');
-export function assistedReminder(channel: string, scheduledAt: string, date?: string) {
+export function productHuntDate(scheduledAt: string) {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(scheduledAt));
+}
+export function assistedReminder(channel: string, scheduledAt: string) {
   const start = channel === 'product-hunt'
-    ? `DTSTART;TZID=America/Los_Angeles:${date!.replaceAll('-', '')}T000100`
+    ? `DTSTART;TZID=America/Los_Angeles:${productHuntDate(scheduledAt).replaceAll('-', '')}T000100`
     : `DTSTART:${scheduledAt.replaceAll(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`;
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Liftoff//Assisted launch//EN', 'BEGIN:VEVENT',
     `UID:${channel}-${scheduledAt}@liftoff.local`, `DTSTAMP:${new Date().toISOString().replaceAll(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`,

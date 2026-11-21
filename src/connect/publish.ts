@@ -52,7 +52,7 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
       receipt = await adapter.schedule(post, cwd);
       if (instagram) await writeFile(new URL('instagram-payload.json', receipt.url), JSON.stringify(instagram, null, 2) + '\n');
     } else {
-      await writeFile(join(paths.root, `${post.channel}-assisted.ics`), assistedReminder(post.channel, post.scheduledAt, post.scheduledAt.slice(0, 10)));
+      await writeFile(join(paths.root, `${post.channel}-assisted.ics`), assistedReminder(post.channel, post.scheduledAt));
       const driver = await (options.browser ?? chromeBrowser)(connection.profile!);
       try {
         await fillForm(driver, post, paths.root);

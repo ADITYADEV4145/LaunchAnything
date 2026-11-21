@@ -70,10 +70,18 @@ it('requires relevant sourced citations for counts and praise and honest identit
   expect(honesty('We have 1000 users [claim:count].', product, false)[0].rule).toBe('honesty.unsupported-count');
   expect(honesty('"I love this tool" [claim:praise].', product, false)).toEqual([]);
   expect(honesty('"The best tool ever".', product, false)[0].rule).toBe('honesty.testimonial');
-  expect(honesty('As a happy customer I recommend this.', product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(true);
+  expect(honesty('As a happy customer of this tool I recommend it.', product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(true);
   expect(honesty('Try this.', product, true)[0].rule).toBe('honesty.affiliation');
   expect(honesty('I built this.', product, true)).toEqual([]);
   expect(honesty('', product, false, 'other', 'mine')[0].rule).toBe('honesty.account');
+});
+
+it('limits customer impersonation to statements about the launch product', () => {
+  const product = { name: 'Backup+', features: [], claims: [] };
+  for (const text of ['As a user of SQLite, I needed better backups', 'As a paying customer of OtherApp, I built Backup+.', 'I purchased this laptop.', ''])
+    expect(honesty(text, product, false)).toEqual([]);
+  for (const text of ['As a user of Backup+, I recommend it.', 'As a happy customer of this app, I recommend it.', 'I purchased this product.', 'I bought Backup+.'])
+    expect(honesty(text, product, false).some(i => i.rule === 'honesty.posing-as-customer')).toBe(true);
 });
 
 it.each(['cli-tool', 'mobile-expo', 'saas-next'])('phase 2b gate: %s', async fixture => {

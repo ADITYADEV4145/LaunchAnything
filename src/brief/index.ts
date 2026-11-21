@@ -5,8 +5,8 @@ import { parse } from 'yaml';
 import { launchDir } from '../core/launch-dir.js';
 import { packageRoot } from '../core/package-root.js';
 import { validateFile } from '../core/schema.js';
+import type { Pains } from '../research/index.js';
 
-interface Pain { name: string; description: string; mentionCount: number; dateRange: { start: string; end: string }; quotes: { text: string; url: string }[]; currentSolutions: string[]; shortcomings: string }
 interface Product { name: string; oneLiner: string; audience: string; problem: string; proofPoints: string[]; features: { name: string; description: string; sources: { ref: string }[] }[] }
 const rules = parse(readFileSync(join(packageRoot(), 'rules/brief.yaml'), 'utf8')) as { version: number; faqMin: number; faqMax: number; sections: { title: string; words: number }[] };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
@@ -41,11 +41,10 @@ function inputs(cwd: string) {
     const checked = validateFile('pains', JSON.parse(painText));
     if (!checked.valid) throw new Error('Invalid pains[]: ' + checked.errors.join('; '));
   }
-  const pains = painText ? (JSON.parse(painText) as { pains: Pain[] }).pains : [];
+  const pains = painText ? (JSON.parse(painText) as Pains).pains : [];
   if (!Array.isArray(pains)) throw new Error('pains.json must contain pains[]');
   for (const pain of pains) {
-    if (!pain.name || !pain.description || !Array.isArray(pain.quotes) || pain.quotes.length < 3 || pain.quotes.length > 5 ||
-      pain.quotes.some(q => !q.text || words(q.text) > 25 || !url(q.url))) throw new Error('Invalid pain: expected name, description and 3–5 linked quotes of at most 25 words');
+    if (pain.quotes.some(q => words(q.text) > 25)) throw new Error(`${pain.name}: quote exceeds 25 words`);
   }
   const hash = createHash('sha256').update(JSON.stringify([rules.version, productText, painText, plan])).digest('hex');
   return { root, product, pains, plan, hash };
@@ -58,7 +57,7 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
     features: ctx.product.features.map(feature => ({ ...feature, name: inline(feature.name), description: inline(feature.description) })) };
   const pains = ctx.pains.map(pain => ({ ...pain, name: inline(pain.name), description: inline(pain.description),
     quotes: pain.quotes.map(quote => ({ ...quote, text: collapseWhitespace(quote.text) })) }));
-  const top = pains.map((pain, index) => ({ pain, index })).sort((a, b) => b.pain.mentionCount - a.pain.mentionCount).slice(0, 3);
+  const top = pains.map((pain, index) => ({ pain, index })).sort((a, b) => b.pain.mentions - a.pain.mentions || b.pain.intensity - a.pain.intensity).slice(0, 3);
   const cite = (text: string) => text.split('\n').map(line => {
     if (/^#{1,2} |^<!--/.test(line)) return line;
     p.features.forEach((f, i) => { if (mentionsName(line, f.name) && !line.includes(`[feature:${i}](`)) line += ` [feature:${i}](product.json#/features/${i})`; });

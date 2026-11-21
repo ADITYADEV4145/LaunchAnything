@@ -1,31 +1,155 @@
 {
+  "idea": "Launch planning",
   "pains": [
     {
-      "name": "Complex setup",
-      "description": "People want a simpler first run.",
-      "mentionCount": 12,
-      "dateRange": {
+      "name": "Manual scheduling",
+      "description": "Teams struggle with manual scheduling.",
+      "mentions": 3,
+      "intensity": 4,
+      "date_range": {
         "start": "2026-01-01",
-        "end": "2026-01-31"
+        "end": "2026-01-01"
       },
       "quotes": [
         {
-          "text": "I wish setup took fewer steps.",
-          "url": "https://example.com/research/1"
+          "text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=11"
         },
         {
-          "text": "The configuration is difficult to understand.",
-          "url": "https://example.com/research/2"
+          "text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=12"
         },
         {
-          "text": "I need a clearer starting point.",
-          "url": "https://example.com/research/3"
+          "text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=13"
         }
       ],
-      "currentSolutions": [
-        "Manual checklists"
+      "current_tools": [
+        "Spreadsheets"
       ],
-      "shortcomings": "Setup guidance is scattered."
+      "shortcomings": "Manual coordination",
+      "solution_feature": "Scheduling"
+    },
+    {
+      "name": "Lost drafts",
+      "description": "Teams struggle with lost drafts.",
+      "mentions": 3,
+      "intensity": 4,
+      "date_range": {
+        "start": "2026-01-01",
+        "end": "2026-01-01"
+      },
+      "quotes": [
+        {
+          "text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=21"
+        },
+        {
+          "text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=22"
+        },
+        {
+          "text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=23"
+        }
+      ],
+      "current_tools": [
+        "Spreadsheets"
+      ],
+      "shortcomings": "Manual coordination"
+    },
+    {
+      "name": "Unclear approvals",
+      "description": "Teams struggle with unclear approvals.",
+      "mentions": 3,
+      "intensity": 4,
+      "date_range": {
+        "start": "2026-01-01",
+        "end": "2026-01-01"
+      },
+      "quotes": [
+        {
+          "text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=31"
+        },
+        {
+          "text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=32"
+        },
+        {
+          "text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=33"
+        }
+      ],
+      "current_tools": [
+        "Spreadsheets"
+      ],
+      "shortcomings": "Manual coordination"
+    },
+    {
+      "name": "Scattered feedback",
+      "description": "Teams struggle with scattered feedback.",
+      "mentions": 3,
+      "intensity": 4,
+      "date_range": {
+        "start": "2026-01-01",
+        "end": "2026-01-01"
+      },
+      "quotes": [
+        {
+          "text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=41"
+        },
+        {
+          "text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=42"
+        },
+        {
+          "text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=43"
+        }
+      ],
+      "current_tools": [
+        "Spreadsheets"
+      ],
+      "shortcomings": "Manual coordination"
+    },
+    {
+      "name": "Missing evidence",
+      "description": "Teams struggle with missing evidence.",
+      "mentions": 3,
+      "intensity": 4,
+      "date_range": {
+        "start": "2026-01-01",
+        "end": "2026-01-01"
+      },
+      "quotes": [
+        {
+          "text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=51"
+        },
+        {
+          "text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=52"
+        },
+        {
+          "text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+          "url": "https://news.ycombinator.com/item?id=53"
+        }
+      ],
+      "current_tools": [
+        "Spreadsheets"
+      ],
+      "shortcomings": "Manual coordination"
+    }
+  ],
+  "competitors": [
+    {
+      "name": "Spreadsheets",
+      "what_they_do": "Track tasks",
+      "complaints": [
+        "Manual coordination"
+      ]
     }
   ]
 }

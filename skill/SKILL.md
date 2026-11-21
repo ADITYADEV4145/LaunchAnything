@@ -18,7 +18,7 @@ The agent is the model; the CLI never calls an LLM API. All commands support
 
 ## Run order
 
-doctor → init → confirm profile → scan → agent writes product.json → validate → plan → brief.
+doctor → research → init → confirm profile → scan → agent writes product.json → validate → plan → brief.
 Phase 1 product understanding and planning and phase 5 review/local staging are
 implemented. Phases 2–4 and 6 remain stubs; never claim they created assets.
 

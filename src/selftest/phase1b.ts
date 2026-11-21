@@ -5,7 +5,7 @@ import type { Check } from './types.js';
 export const checks: Check[] = [{ name: 'brief grounding, printable export, stale detection and negative validation', run({ cwd }) {
   const root = join(cwd, '.launch');
   mkdirSync(join(root, 'research'), { recursive: true });
-  copyFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), join(root, 'research/pains.json'));
+  if (!existsSync(join(root, 'research/pains.json'))) copyFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), join(root, 'research/pains.json'));
   const result = brief(cwd);
   if (!validateBrief(cwd).valid || !existsSync(result.html)) throw new Error('Brief or HTML missing or invalid');
   const productPath = join(root, 'product.json');

@@ -6,6 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { brief, validateBrief } from '../src/brief/index.js';
 import { checks } from '../src/selftest/phase1b.js';
 import { packageRoot } from '../src/core/package-root.js';
+import { checks as researchChecks } from '../src/selftest/phase0.js';
+import { checkResearch } from '../src/research/index.js';
 
 let cwd: string;
 beforeEach(() => { cwd = mkdtempSync(join(tmpdir(), 'liftoff-brief-test-')); });
@@ -21,6 +23,37 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('consumes Phase 0 output without replacing its verified pain evidence', async () => {
+    setup();
+    await researchChecks[0].run({ cwd, fixture: 'cli-tool' });
+    const path = join(cwd, '.launch/research/pains.json');
+    const original = readFileSync(path, 'utf8');
+    expect(JSON.parse(original)).toEqual(JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8')));
+    await checks[0].run({ cwd, fixture: 'cli-tool' });
+    expect(readFileSync(path, 'utf8')).toBe(original);
+    expect(await checkResearch(cwd)).toMatchObject({ valid: true, errors: [] });
+    expect(validateBrief(cwd).valid).toBe(true);
+  });
+  it('ranks the shared pain shape by mentions then intensity and enforces quote constraints', () => {
+    setup();
+    const path = join(cwd, '.launch/research/pains.json');
+    const data = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
+    data.pains[1].mentions = 10;
+    data.pains[2].mentions = 10;
+    data.pains[2].intensity = 5;
+    writeFileSync(path, JSON.stringify(data));
+    const result = brief(cwd);
+    const section = readFileSync(result.path, 'utf8').split('## Target users and top pains\n')[1].split('\n## ')[0];
+    expect(section.indexOf('- Unclear approvals:')).toBeLessThan(section.indexOf('- Lost drafts:'));
+    expect(section.indexOf('- Lost drafts:')).toBeLessThan(section.indexOf('- Manual scheduling:'));
+    data.pains[0].quotes[0].text = 'word '.repeat(26);
+    writeFileSync(path, JSON.stringify(data));
+    expect(() => brief(cwd, true)).toThrow('quote exceeds 25 words');
+    data.pains[0].quotes[0].text = 'A short quote.';
+    data.pains[0].quotes[0].url = 'http://example.com/research';
+    writeFileSync(path, JSON.stringify(data));
+    expect(() => brief(cwd, true)).toThrow('Invalid pains[]');
+  });
   it('preserves literal list markers in direct quotes while collapsing whitespace only', () => {
     setup();
     const pains = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
@@ -34,7 +67,7 @@ describe('phase 1b Launch Brief', () => {
     expect(markdown).toContain('  - “* * * * * cron runs - keep literal markers” [quote]');
     expect(markdown).toContain('  - “1. First attempt + second attempt” [quote]');
     const section = markdown.split('## Target users and top pains\n')[1].split('\n## ')[0];
-    expect(section.match(/^- /gm)).toHaveLength(1);
+    expect(section.match(/^- /gm)).toHaveLength(3);
     expect(validateBrief(cwd).valid).toBe(true);
     expect(readFileSync(painPath, 'utf8')).toBe(source);
   });
@@ -217,16 +250,17 @@ describe('phase 1b Launch Brief', () => {
     expect(html).toContain('@media print');
     expect(html).not.toContain('<script');
   });
-  it('warns for absent or empty pains and preserves agent edits on rerun', () => {
+  it('warns for absent research, preserves edits, and rejects empty Phase 0 research', () => {
     setup();
     expect(brief(cwd).warnings.join()).toContain('Pain research unavailable');
     edit(s => s.replace('Pending agent wording', 'Reviewed wording'));
     const before = readFileSync(join(cwd, '.launch/brief.md'), 'utf8');
     brief(cwd);
     expect(readFileSync(join(cwd, '.launch/brief.md'), 'utf8')).toBe(before);
-    writeFileSync(join(cwd, '.launch/research/pains.json'), '{"pains":[]}');
-    expect(validateBrief(cwd).warnings.join()).toContain('stale-brief');
-    expect(brief(cwd, true).warnings.join()).toContain('Pain research unavailable');
+    writeFileSync(join(cwd, '.launch/research/pains.json'), '{"idea":"Launch planning","pains":[],"competitors":[]}');
+    expect(() => validateBrief(cwd)).toThrow('Invalid pains[]');
+    expect(() => brief(cwd, true)).toThrow('Invalid pains[]');
+    expect(readFileSync(join(cwd, '.launch/brief.md'), 'utf8')).toBe(before);
   });
   it('rejects missing inputs, malformed JSON and malformed research', () => {
     expect(() => brief(cwd)).toThrow();

@@ -26,8 +26,9 @@ inspect the result because a README's first URL is not necessarily a landing pag
 
 Next app routes come only from page.* and route.* files, with route groups and
 parallel slot names removed and private _folders excluded. Pages routes omit API
-handlers and framework pages (_app, _document, _error). Expo dependencies select
+handlers and framework pages (_app, _document, _error). An expo-router dependency selects
 Expo file-based routing instead, including index and named screens but not layouts.
+Expo/React Native apps without expo-router do not infer URL routes from app/ files.
 
 GitHub stars are fetched only with --github or LIFTOFF_ALLOW_NETWORK=1, from a standard
 GitHub origin remote. No tokens are sent. Only a public repo response contributes a

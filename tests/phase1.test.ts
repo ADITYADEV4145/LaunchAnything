@@ -124,12 +124,23 @@ describe('scan', () => {
   });
   it('retains Expo file-based routes without mistaking them for Next pages', async () => {
     await fixture('mobile-expo');
+    const pkg = await json(join(cwd, 'package.json'));
+    pkg.dependencies['expo-router'] = '^5.0.0';
+    await writeFile(join(cwd, 'package.json'), JSON.stringify(pkg));
     await mkdir(join(cwd, 'app/(tabs)'), { recursive: true });
     await writeFile(join(cwd, 'app/(tabs)/index.tsx'), 'export default function Home() {}');
     await writeFile(join(cwd, 'app/(tabs)/settings.tsx'), 'export default function Settings() {}');
     await writeFile(join(cwd, 'app/_layout.tsx'), 'export default function Layout() {}');
     expect((await scan(cwd)).scan.routes).toEqual(['/', '/settings']);
     expect(routesFromFiles(['app/index.tsx', 'app/settings.tsx', 'app/_layout.tsx'], 'expo')).toEqual(['/', '/settings']);
+  });
+  it('does not infer URL routes from an Expo app without expo-router', async () => {
+    await fixture('mobile-expo');
+    await mkdir(join(cwd, 'app'), { recursive: true });
+    await writeFile(join(cwd, 'app/index.tsx'), 'export default function Home() {}');
+    await writeFile(join(cwd, 'app/page.tsx'), 'export default function Page() {}');
+    await writeFile(join(cwd, 'app/profile.tsx'), 'export default function Profile() {}');
+    expect((await scan(cwd)).scan.routes).toEqual([]);
   });
   it('falls back to README URLs and all commits before a tag, then scans only commits since tag', async () => {
     await writeFile(join(cwd, 'README.md'), '# Example\nSee [site](https://example.test/launch).\n');

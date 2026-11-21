@@ -28,10 +28,11 @@ export async function repositoryFiles(cwd: string): Promise<string[]> {
   await walk(cwd);
   return files.sort();
 }
-export function routesFromFiles(files: string[], router: 'next' | 'expo' = 'next'): string[] {
+export function routesFromFiles(files: string[], router: 'next' | 'expo' | 'none' = 'next'): string[] {
   const routes = new Set<string>();
   for (const path of files) {
     if (/^(?:bin|commands|src\/commands)\//.test(path)) { routes.add(path); continue; }
+    if (router === 'none') continue;
     const app = /^(?:src\/)?app\/(.+)\.[jt]sx?$/.exec(path);
     if (app) {
       const segments = app[1].split('/');
@@ -68,7 +69,7 @@ export async function scan(cwd: string, options: { github?: boolean } = {}) {
   const pkgText = await optionalText(join(cwd, 'package.json'));
   const pkg = pkgText ? JSON.parse(pkgText) as Record<string, unknown> : {};
   const dependencies = { ...pkg.dependencies as Record<string, unknown>, ...pkg.devDependencies as Record<string, unknown> };
-  const router = dependencies.expo || dependencies['expo-router'] || dependencies['react-native'] ? 'expo' : 'next';
+  const router = dependencies['expo-router'] ? 'expo' : dependencies.expo || dependencies['react-native'] ? 'none' : 'next';
   const readme = await optionalText(join(cwd, 'README.md')) || await optionalText(join(cwd, 'readme.md'));
   const license = await optionalText(join(cwd, 'LICENSE')) || await optionalText(join(cwd, 'LICENSE.md'));
   const files = await repositoryFiles(cwd);

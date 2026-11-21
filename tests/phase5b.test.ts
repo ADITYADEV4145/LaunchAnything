@@ -5,7 +5,7 @@ import { afterEach, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import { phase5bGate } from '../src/selftest/phase5b.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
-import { connect, connections } from '../src/connect/registry.js';
+import { connect, connections, removeConnection } from '../src/connect/registry.js';
 import { MockBrowser } from '../src/connect/browser.js';
 import { fillForm, forms } from '../src/connect/forms.js';
 import { assistedReminder, instagramPayload, productHuntPayload } from '../src/connect/payloads.js';
@@ -94,6 +94,45 @@ it('validates route and token without persisting invalid connections', async () 
   await expect(connect({ platform: 'devto', route: 'api', account: 'me' }, '', keys, home)).rejects.toThrow('Token required');
   await expect(connect({ platform: 'reddit', route: 'browser', account: 'me' }, undefined, keys, home)).rejects.toThrow('--profile');
   expect(await connections(home)).toEqual([]);
+});
+it('serializes concurrent connects and removes across keychain waits', async () => {
+  const home = await workspace();
+  const keys = new MemoryKeychain();
+  const input = (account: string) => ({ platform: 'x', route: 'buffer' as const, account });
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const set = keys.set.bind(keys);
+  keys.set = async (account, token) => {
+    if (account === 'x:first') { entered.resolve(); await release.promise; }
+    await set(account, token);
+  };
+  const first = connect(input('first'), 'one', keys, home);
+  await entered.promise;
+  const second = connect(input('second'), 'two', keys, home);
+  release.resolve();
+  await Promise.all([first, second]);
+  expect((await connections(home)).map(r => r.account).sort()).toEqual(['first', 'second']);
+  const deleting = Promise.withResolvers<void>();
+  const finishDelete = Promise.withResolvers<void>();
+  const remove = keys.delete.bind(keys);
+  keys.delete = async account => { deleting.resolve(); await finishDelete.promise; await remove(account); };
+  const removal = removeConnection('x', 'first', keys, home);
+  await deleting.promise;
+  const third = connect(input('third'), 'three', keys, home);
+  finishDelete.resolve();
+  await Promise.all([removal, third]);
+  expect((await connections(home)).map(r => r.account).sort()).toEqual(['second', 'third']);
+  expect(await keys.get('x:first')).toBeUndefined();
+  expect(await keys.get('x:third')).toBe('three');
+});
+it('releases the registry lock without saving after a keychain error', async () => {
+  const home = await workspace();
+  const keys = new MemoryKeychain();
+  const input = { platform: 'x', route: 'buffer' as const, account: 'owner' };
+  await expect(connect(input, 'token', { ...keys, get: async () => undefined, delete: async () => {}, set: async () => { throw new Error('Keychain denied'); } }, home)).rejects.toThrow('Keychain denied');
+  expect(await connections(home)).toEqual([]);
+  await connect(input, 'token', keys, home);
+  expect(await connections(home)).toHaveLength(1);
 });
 it.each(['reddit', 'product-hunt'] as const)('fills %s without any submit operation', async channel => {
   const browser = new MockBrowser(channel === 'reddit' ? 'https://www.reddit.com/r/test/comments/abc/title/' : 'https://www.producthunt.com/posts/my-product');

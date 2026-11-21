@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { mock } from 'node:test';
+import http from 'node:http';
+import https from 'node:https';
+import { Socket } from 'node:net';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
@@ -39,6 +43,24 @@ export async function phase5bGate(cwd: string) {
   assert.equal(browser.actions.length, count);
   await reserveCap(paths.root, 'reddit', 'owner');
   await assert.rejects(reserveCap(paths.root, 'reddit', 'other'), /one subreddit/);
+  await writeFile(join(paths.posts, 'x.md'), '---\ntitle: Own account\nmedia: []\nclaims: []\n---\nLocal launch.\n');
+  const { posts } = await loadReview(workspace);
+  await writeFile(paths.approvals, JSON.stringify({ approvals: posts.map(p => ({ channel: p.channel, hash: p.hash, name: 'Owner', time: new Date().toISOString() })) }));
+  const network = () => { throw new Error('Unexpected network call'); };
+  const hooks = [mock.method(globalThis, 'fetch', network), mock.method(http, 'request', network),
+    mock.method(http, 'get', network), mock.method(https, 'request', network), mock.method(https, 'get', network),
+    mock.method(Socket.prototype, 'connect', network)];
+  try {
+    await assert.rejects(assistedPublish(workspace, { ...options, channel: 'x' }), /connect your own account/);
+    await connect({ platform: 'x', route: 'buffer', account: 'owner' }, token, keychain, home);
+    const staged = await assistedPublish(workspace, { ...options, channel: 'x' });
+    assert.equal(staged.posts[0].status, 'manual');
+    assert.match(staged.posts[0].id, /^buffer:x:/);
+    assert.equal(await readFile(new URL(staged.posts[0].url!), 'utf8'), 'Own account\n\nLocal launch.\n');
+    assert.equal(JSON.parse(await readFile(paths.published, 'utf8')).posts.length, 2);
+    assert.equal(browser.actions.length, count);
+    for (const hook of hooks) assert.equal(hook.mock.callCount(), 0);
+  } finally { for (const hook of hooks) hook.mock.restore(); }
   async function scan(dir: string): Promise<void> {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);

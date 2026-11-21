@@ -1,7 +1,8 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
+import { stringify } from 'yaml';
 import { phase5bGate } from '../src/selftest/phase5b.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
 import { connect, connections } from '../src/connect/registry.js';
@@ -9,10 +10,68 @@ import { MockBrowser } from '../src/connect/browser.js';
 import { fillForm, forms } from '../src/connect/forms.js';
 import { assistedReminder, instagramPayload, productHuntPayload } from '../src/connect/payloads.js';
 import type { ReviewPost } from '../src/review/posts.js';
+import { loadReview } from '../src/review/posts.js';
+import { assistedPublish } from '../src/connect/publish.js';
+import { dailyCaps } from '../src/connect/caps.js';
+import { launchDir } from '../src/core/launch-dir.js';
+import type { Route } from '../src/connect/registry.js';
 
 const temp: string[] = [];
 async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-5b-')); temp.push(path); return path; }
 afterEach(async () => { await Promise.all(temp.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
+
+async function approvedPost(channel: string, media: string[] = [], extra = {}) {
+  const cwd = await workspace();
+  const paths = launchDir(cwd);
+  const home = join(cwd, 'connections');
+  await mkdir(paths.posts, { recursive: true });
+  await mkdir(paths.media, { recursive: true });
+  await writeFile(paths.config, JSON.stringify({ profile: 'devtool', channels: [channel], launchType: 'new-product', launchDate: '2026-07-14', timezone: 'UTC', profileConfirmed: true }));
+  for (const name of media) await writeFile(join(paths.media, name), 'fixture media');
+  const source = '---\n' + stringify({ title: 'Launch', media: media.map(name => ({ path: 'media/' + name, slot: 'attachment' })), claims: [], ...extra }) + '---\nCaption.\n';
+  await writeFile(join(paths.posts, channel + '.md'), source);
+  const { posts: [post] } = await loadReview(cwd);
+  await writeFile(paths.approvals, JSON.stringify({ approvals: [{ channel, hash: post.hash, name: 'Owner', time: new Date().toISOString() }] }));
+  return { cwd, paths, home };
+}
+
+it.each([['x', 'postiz', 'postiz'], ['x', 'buffer', 'buffer'], ['devto', 'api', 'devto'], ['github-release', 'api', 'github-release']] as const)('stages connected %s through %s without opening a browser', async (channel, route, adapter) => {
+  const { cwd, paths, home } = await approvedPost(channel);
+  const browser = async () => { throw new Error('Unexpected browser'); };
+  await expect(assistedPublish(cwd, { home, browser })).rejects.toThrow('connect your own account');
+  await connect({ platform: channel, route: route as Route, account: 'owner' }, 'token', new MemoryKeychain(), home);
+  const result = await assistedPublish(cwd, { home, browser });
+  expect(result.posts[0]).toMatchObject({ channel, status: 'manual' });
+  expect(result.posts[0].id).toMatch(new RegExp('^' + adapter + ':'));
+  expect(await readFile(new URL(result.posts[0].url!), 'utf8')).toBe('Launch\n\nCaption.\n');
+  await assistedPublish(cwd, { home, browser });
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toEqual(result.posts);
+  for (let count = 2; count < (dailyCaps[channel] ?? 2); count++) await assistedPublish(cwd, { home, browser });
+  await expect(assistedPublish(cwd, { home, browser })).rejects.toThrow('daily cap');
+});
+
+it.each([undefined, 3])('stages Instagram gallery, 9:16 reel, caption and first comment (cover %s)', async coverFrame => {
+  const { cwd, home } = await approvedPost('instagram', ['gallery.png', 'short-9x16.mp4', 'wide-16x9.mp4'], { hashtags: ['build', '#local'], ...(coverFrame === undefined ? {} : { coverFrame }) });
+  await connect({ platform: 'instagram', route: 'buffer', account: 'owner' }, 'token', new MemoryKeychain(), home);
+  const { posts: [receipt] } = await assistedPublish(cwd, { home });
+  expect(JSON.parse(await readFile(new URL('instagram-payload.json', receipt.url), 'utf8'))).toEqual({
+    carousel: { images: ['media/gallery.png'] }, reel: { video: 'media/short-9x16.mp4', aspectRatio: '9:16', coverFrame: coverFrame ?? 0 }, caption: 'Caption.', firstComment: '#build #local',
+  });
+});
+
+it.each([
+  { media: [], extra: {}, error: 'Instagram requires' },
+  { media: ['short-9x16.mp4'], extra: {}, error: 'Instagram requires' },
+  { media: ['gallery.png', 'wide-16x9.mp4'], extra: {}, error: 'Instagram requires' },
+  { media: ['gallery.png', 'short-9x16.mp4'], extra: { hashtags: 'wrong' }, error: 'hashtags must be a list' },
+  { media: ['gallery.png', 'short-9x16.mp4'], extra: { coverFrame: -1 }, error: 'Instagram requires' },
+])('refuses invalid Instagram assets or metadata: $error', async ({ media, extra, error }) => {
+  const { cwd, paths, home } = await approvedPost('instagram', media, extra);
+  await connect({ platform: 'instagram', route: 'postiz', account: 'owner' }, 'token', new MemoryKeychain(), home);
+  await expect(assistedPublish(cwd, { home })).rejects.toThrow(error);
+  await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(readFile(join(paths.root, 'publish-caps.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
 
 it('runs the mock-only gate including approvals, secret isolation and cap refusal', async () => {
   await phase5bGate(await workspace());

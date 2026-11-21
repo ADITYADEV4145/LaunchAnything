@@ -12,9 +12,12 @@ the form. Review it and press Submit yourself. Liftoff watches for the resulting
 post URL and records it. It has no click/submit operation. Browser form selectors
 may need maintenance when platforms change their UI.
 
-The default publish command remains an offline paste kit. API/MCP connections are
-recorded but live API/MCP dispatch is not yet configured; assisted publishing
-refuses these routes rather than pretending to publish.
+The default publish command remains an offline paste kit. Assisted publishing for
+Postiz, Buffer and API connections uses the matching offline adapter to stage
+paste files and manual receipts; it never calls a live API or MCP server.
+Instagram staging also writes `instagram-payload.json` with gallery images, the
+9:16 video (identified by its path or slot), caption, hashtags and cover frame.
+Use front matter `hashtags` (a string list) and optional `coverFrame` (default 0).
 
 Caps use UTC days and count attempts conservatively, including browser failures:
 HN, Reddit and Product Hunt allow one per day; X five; others two. Reddit is

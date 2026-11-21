@@ -148,6 +148,9 @@ it('includes a tracked GitHub release with only stars but does not list untracke
   const svg = await readFile(image.path, 'utf8');
   expect(svg).toContain('>GitHub release</text>');
   expect(svg).not.toContain('None recorded');
+  await rm(paths.published);
+  image = await receipt(cwd);
+  expect(await readFile(image.path, 'utf8')).not.toContain('>GitHub release</text>');
 });
 
 it('returns one structured CLI result and exits nonzero on bad input', async () => {

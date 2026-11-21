@@ -58,8 +58,9 @@ export async function receipt(cwd: string, footer = true) {
   const product = await readJson(paths.product, true);
   const name = product === undefined ? 'Launch' : checked<{ name: string }>('product', product).name;
   const published = await readJson(paths.published, true);
-  const trackedRelease = published === undefined || checked<{ posts: PublishedPost[] }>('published', published).posts.some(
-    post => post.channel === 'github-release' && post.status !== 'failed' && post.status !== 'cancelled');
+  const tracked = published === undefined ? [] : checked<{ posts: PublishedPost[] }>('published', published).posts;
+  const trackedRelease = tracked.some(post => post.channel === 'github-release' &&
+    post.status !== 'failed' && post.status !== 'cancelled');
   const path = join(paths.root, 'receipt.svg');
   await writeLocal(path, renderReceipt(results, name, footer, trackedRelease));
   return { path };

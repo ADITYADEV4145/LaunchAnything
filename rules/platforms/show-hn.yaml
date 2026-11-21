@@ -1,0 +1,44 @@
+kind: platform
+id: show-hn
+name: Show HN
+version: 2
+lastVerified: 2026-11-21
+verified: false
+verifiedFields:
+  - tryableNow
+verificationNotes:
+  - Source confirms titles begin Show HN and projects must be ready to try. Exact colon prefix, link
+    field, banned-word list and numeric budgets are local enforcement choices.
+sources:
+  - https://news.ycombinator.com/showhn.html
+title:
+  required: true
+  maxLength: 80
+  prefix: "Show HN: "
+body:
+  minLength: 1
+  maxLength: 10000
+maxLinks: 2
+requiredLink: true
+bannedWords:
+  - revolutionary
+  - game-changing
+  - best ever
+  - ultimate
+  - supercharge
+  - groundbreaking
+  - disruptive
+  - world-class
+  - cutting-edge
+  - unparalleled
+  - unmatched
+  - industry-leading
+  - next-generation
+  - must-have
+  - life-changing
+  - best-in-class
+  - seamless
+  - effortless
+guidance:
+  - Share a project people can try now, not a signup page.
+tryableNow: true

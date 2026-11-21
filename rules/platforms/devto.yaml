@@ -1,0 +1,23 @@
+kind: platform
+id: devto
+name: DEV Community
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source fetched but did not state the numeric copy limits. All numeric budgets are unverified
+    local editorial limits, not platform guarantees.
+sources:
+  - https://dev.to/terms
+title:
+  required: true
+  maxLength: 128
+body:
+  minLength: 1
+  maxLength: 30000
+maxLinks: 10
+requiredLink: false
+bannedWords: []
+guidance:
+  - Use a technical walkthrough and disclose affiliation.

@@ -1,0 +1,25 @@
+kind: platform
+id: linkedin
+name: LinkedIn
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Source fetch returned no content. 210-character hook and first-comment link option are editorial
+    choices, not verified platform requirements.
+sources:
+  - https://www.linkedin.com/help/linkedin/answer/a522351
+title:
+  required: true
+  maxLength: 150
+body:
+  minLength: 1
+  maxLength: 3000
+maxLinks: 3
+requiredLink: false
+bannedWords: []
+hookMax: 210
+guidance:
+  - First paragraph is the hook; optionally put external links in first comment.
+linkFirstComment: true

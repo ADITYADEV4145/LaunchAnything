@@ -1,0 +1,35 @@
+{
+  "name": "Tasklight",
+  "oneLiner": "A local checklist CLI that keeps tasks in a portable JSON file.",
+  "audience": "Developers who prefer local terminal tools",
+  "problem": "Keep a small daily workflow understandable without complex setup.",
+  "proofPoints": [
+    "Includes a focused working interface",
+    "Source is available in the repository",
+    "Setup instructions are included in the README"
+  ],
+  "features": [
+    {
+      "name": "Local task list",
+      "description": "A local checklist CLI that keeps tasks in a portable JSON file.",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "bin/tasklight.js"
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "interface",
+      "text": "The CLI adds and lists tasks in a local JSON file.",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "bin/tasklight.js"
+        }
+      ]
+    }
+  ]
+}

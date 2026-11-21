@@ -3,8 +3,8 @@
 Repo in, launch kit out — with grounded claims and human approval.
 TypeScript CLI and agent skill for Node.js 22+. No server, database or LLM API calls.
 
-**Foundation only:** doctor and the phase-1 fixture smoke gate work. Pipeline commands
-are explicit stubs (exit 2); real phase-1 init/scan/validate/plan is next.
+**Implemented:** phase-1 init/scan/validate/plan and phase-5 review/local staging,
+plus doctor and fixture checks. Phases 2–4 and 6 remain explicit stubs (exit 2).
 
 ## Install
 
@@ -22,14 +22,14 @@ All commands accept `--json` and `--cwd <repository>`. JSON is one object:
 `{ok, command, data}` on success, `{ok, command, error}` on failure.
 Selftest retains its per-check report in data even when some checks fail.
 
-| Phase | Commands | Foundation status |
+| Phase | Commands | Status |
 | --- | --- | --- |
-| 1 | init, scan, validate, plan | Stubs |
-| Foundation | doctor, selftest --through N | Implemented; phase 1 smoke checks only |
+| 1 | init, scan, validate, plan | Implemented |
+| Foundation | doctor, selftest --through N | Implemented; phase 1 and 5 checks |
 | 2 | write, check | Stubs |
 | 3 | shots, images | Stubs |
 | 4 | video | Stub |
-| 5 | review, publish | Stubs |
+| 5 | review, publish | Local approval and staging; no external posting |
 | 6 | results, learn, receipt | Stubs |
 
 Doctor lists skill names, MCP server names (never configuration values), and executable
@@ -66,11 +66,14 @@ configured timezone, not researched performance promises. Phase 2 owns rules/pla
 
 The selftest registry runs phases 1..N on fresh temporary copies of all three fixtures.
 Each copy gets a deterministic Git baseline, tag v0.1.0 and later commit; copies are
-removed after the run. Phase 2–6 checks intentionally fail until implemented.
+removed after the run. Phases 2–4 and 6 intentionally fail until implemented,
+so cumulative gates above phase 1 still report those unimplemented phases.
 Fixtures ship in npm so installed selftest works without a source checkout.
 
 ## Safety
 
 Never publish without human approval of the exact post and media hash. Never auto-post
 to Hacker News or Reddit, and never auto-reply. Optional integrations need fallbacks.
-The foundation makes no network calls except package installation. MIT; author Aditya.
+Scan is offline by default; GitHub stars require --github or LIFTOFF_ALLOW_NETWORK=1.
+Publish is a no-network preview by default; --confirm stages local artifacts only.
+MIT; author Aditya.

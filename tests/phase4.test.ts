@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { totalDuration, validateScript, srt } from '../src/video/script.js';
+import { totalDuration, validateScript, srt, media, resolveShot } from '../src/video/script.js';
 import { check, checkProbe } from '../src/video/check.js';
 import { parseFormats, remotionCli, render, run } from '../src/video/render.js';
 import { record } from '../src/video/record.js';
@@ -74,6 +74,22 @@ describe('phase 4',() => {
     expect(script.scenes.every(s=>s.text.split(/\s+/).length<=8 && !/phase four|placeholder/i.test(s.text))).toBe(true);
     expect(JSON.parse(await readFile(join(cwd,'.launch/media/manifest.json'),'utf8')).capturedAt).toBeTruthy();
     await expect(validateScript(cwd,script)).resolves.toEqual(script);
+  });
+  it('prefers phase-3 captured shots, excludes generated cards, and resolves shot IDs',async () => {
+    const cwd=await mkdtemp(join(tmpdir(),'phase4-phase3-'));dirs.push(cwd);
+    await cp(join(packageRoot(),'fixtures/saas-next'),cwd,{recursive:true});
+    const root=join(cwd,'.launch/media');
+    await mkdir(join(root,'shots'),{recursive:true});
+    await mkdir(join(root,'images'),{recursive:true});
+    const footage=join(packageRoot(),'templates/video/footage/saas-next/home.png');
+    await cp(footage,join(root,'shots','phase3-home.png'));
+    await cp(footage,join(root,'images','card.png'));
+    await writeFile(join(cwd,'.launch/shots.yaml'),'shots:\n  - id: phase3-home\n    route: /\n    viewport: {width: 1280, height: 800}\n');
+    expect(await media(cwd)).toEqual(['shots/phase3-home.png']);
+    const script=await prepareFixtureVideo(cwd,'saas-next');
+    expect(script.scenes.every(s=>s.shot==='shots/phase3-home.png')).toBe(true);
+    await expect(validateScript(cwd,script)).resolves.toEqual(script);
+    await expect(resolveShot(cwd,'phase3-home')).resolves.toBe(join(root,'shots','phase3-home.png'));
   });
   it('validates schema, duration, real files, shot IDs and containment',async () => {
     const {cwd,script} = await setup();

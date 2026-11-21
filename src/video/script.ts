@@ -18,13 +18,17 @@ export async function shots(cwd: string): Promise<Shot[]> {
   } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; }
 }
 export async function media(cwd: string) {
-  try { return (await readdir(launchDir(cwd).media)).filter(f => /\.(png|jpe?g|webm|mp4)$/i.test(f)).sort(); }
-  catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; }
+  const captures:string[]=[];
+  for (const directory of ['', 'shots']) {
+    try { captures.push(...(await readdir(join(launchDir(cwd).media,directory))).filter(f => /\.(png|jpe?g|webm|mp4)$/i.test(f)).map(f=>directory?`${directory}/${f}`:f)); }
+    catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+  }
+  return captures.sort();
 }
 export async function resolveShot(cwd: string, shot: string): Promise<string> {
   const root = await realpath(launchDir(cwd).media);
   const ids = await shots(cwd);
-  const candidates = [shot.replace(/^\.launch\/media\//, ''), ...(ids.some(s => s.id === shot) ? ['webm','mp4','png','jpg','jpeg'].map(ext => `${shot}.${ext}`) : [])];
+  const candidates = [shot.replace(/^\.launch\/media\//, ''), ...(ids.some(s => s.id === shot) ? ['webm','mp4','png','jpg','jpeg'].flatMap(ext => [`${shot}.${ext}`,`shots/${shot}.${ext}`]) : [])];
   for (const candidate of candidates) {
     if (!/\.(png|jpe?g|webm|mp4)$/i.test(candidate)) continue;
     try {

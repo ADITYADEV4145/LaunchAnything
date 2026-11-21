@@ -66,9 +66,12 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     const dimensions = await Promise.all(paths.map(async path => JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','json',path])).stdout).streams[0] as {width:number;height:number}));
     let terminal = false;
     try { terminal = JSON.parse(await readFile(join(launchDir(cwd).media,'manifest.json'),'utf8')).frame === 'terminal'; } catch { /* Ordinary captures use browser or phone framing. */ }
+    let shotManifest:{kind:string;files:string[]}[]=[];
+    try { shotManifest=JSON.parse(await readFile(join(launchDir(cwd).media,'shots','manifest.json'),'utf8')); } catch { /* Phase-3 captures are optional. */ }
+    const terminals=paths.map(path=>terminal || shotManifest.some(shot=>shot.kind==='terminal' && shot.files.some(file=>join(launchDir(cwd).media,'shots',file)===path)));
     const focused=await Promise.all(paths.map(async (path,i)=>{
       const {width,height}=dimensions[i];
-      if (terminal || height/width>1.5 || selected.every(f=>formats[f].width>formats[f].height)) return;
+      if (terminals[i] || height/width>1.5 || selected.every(f=>formats[f].width>formats[f].height)) return;
       const crop=await detectContent(path,width,height);
       if (!crop) return;
       const video=/\.(mp4|webm)$/i.test(path),target=join(work,`focus-${i}.${video?'webm':'png'}`);
@@ -87,7 +90,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
       assets[format] = [];
       for (const [i,scene] of script.scenes.entries()) {
         const focus=width<=height?focused[i]:undefined;
-        const frame=frameLayout(width,height,dimensions[i].width,dimensions[i].height,terminal,focus?.crop);
+        const frame=frameLayout(width,height,dimensions[i].width,dimensions[i].height,terminals[i],focus?.crop);
         const source=await sceneAssets(work,`${format}-${i}`,width,height,frame,brand,scene.text,i,script.scenes.length);
         assets[format].push({plate:await png(source.platePath),caption:await png(source.captionPath),source:focus?.path??paths[i],frame});
       }

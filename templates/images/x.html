@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}body{margin:0;background:{{background}};color:{{foreground}};font-family:"{{bodyFont}}",sans-serif;padding:6vh 6vw;height:100vh;overflow:hidden;display:flex;flex-direction:column;gap:3vh}
+header{display:flex;align-items:center;gap:15px;font-size:22px;letter-spacing:2px;color:{{accent}}}header img{max-height:32px}header img[src=""]{display:none}
+h1{font-family:"{{headingFont}}",sans-serif;font-size:clamp(30px,3.5vw,54px);line-height:1.12;margin:0;max-width:94%;background:{{background}}}
+.stage{flex:1;min-height:0;display:flex;justify-content:center;align-items:center;background:linear-gradient(140deg,{{accent}}22,transparent);border-radius:24px;padding:20px}
+.device{background:#e5e7eb;border:8px solid #334155;border-radius:16px;box-shadow:0 20px 40px #0006;width:92%;height:100%;overflow:hidden;display:flex;flex-direction:column}
+.bar{height:24px;background:#334155;color:#cbd5e1;font:12px monospace;padding:0 8px;flex-shrink:0}.device img{width:100%;height:calc(100% - 24px);object-fit:cover;object-position:top}.device img[src=""]{visibility:hidden}
+.phone{width:auto;aspect-ratio:9/19;border-radius:30px;border-width:12px}.phone .bar{height:15px}.phone img{height:calc(100% - 15px)}
+</style></head><body><header><img src="{{logo}}" alt="">{{title}}</header><h1 data-headline>{{headline}}</h1><div class="stage"><div class="device {{frame}}"><div class="bar">● ● ●</div><img src="{{screenshot}}" alt=""></div></div></body></html>

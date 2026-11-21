@@ -14,7 +14,8 @@ import { register as publish } from './publish.js';
 import { register as results } from './results.js';
 import { register as learn } from './learn.js';
 import { register as receipt } from './receipt.js';
+import { register as prelaunch } from './prelaunch.js';
 import type { Command } from 'commander';
 export function registerCommands(program: Command) {
-  for (const register of [init, scan, validate, plan, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt]) register(program);
+  for (const register of [init, scan, validate, plan, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
 }

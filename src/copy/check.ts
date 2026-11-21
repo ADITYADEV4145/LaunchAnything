@@ -7,6 +7,7 @@ import { validateFile } from '../core/schema.js';
 import { context, type Product } from './context.js';
 import { channels, loadPlatform } from './platforms.js';
 import { assertSafePath, atomicWrite } from './safe-path.js';
+import { extractLinks } from './links.js';
 
 export interface Post {
   channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
@@ -63,15 +64,6 @@ export function similarity(a: string, b: string) {
   const x = shingles(leftWords), y = shingles(rightWords);
   if (!x.size || !y.size) return 0;
   return [...x].filter(s => y.has(s)).length / new Set([...x, ...y]).size;
-}
-function extractLinks(text: string) {
-  const links: string[] = [];
-  const bare = text.replace(/!?\[[^\]\r\n]*\]\(\s*<?(https?:\/\/[^\s<>)]+)>?(?:\s+["'][^"']*["'])?\s*\)/gi, (_match, target: string) => {
-    links.push(target);
-    return ' ';
-  });
-  links.push(...(bare.match(/https?:\/\/[^\s<>()\[\]]+/gi) ?? []));
-  return links.map(url => url.replace(/[.,;:!?'"’”*_)\]}>]+$/u, ''));
 }
 export function inspectPost(post: Post, channel: string, product: Product): Issue[] {
   const rules = loadPlatform(channel), issues: Issue[] = [];

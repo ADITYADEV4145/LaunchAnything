@@ -11,6 +11,7 @@ import { channels, loadPlatform } from '../src/copy/platforms.js';
 import { parsePost, inspectPost, similarity, checkPosts, type Post } from '../src/copy/check.js';
 import { writeBriefs } from '../src/copy/write.js';
 import { assertSafePath, atomicWrite } from '../src/copy/safe-path.js';
+import { extractLinks } from '../src/copy/links.js';
 
 const root = packageRoot();
 it('refuses symlinked output directories and files without touching external targets', () => {
@@ -118,6 +119,22 @@ it('extracts adjacent Markdown targets and deduplicates decorated bare links', (
     link: 'https://a.test'
   })).not.toContain('links.count');
   expect(rules({ body: '**https://a.test** [b](https://b.test)[c](https://c.test)' })).toContain('links.count');
+});
+it('preserves balanced parentheses and brackets across every URL source', () => {
+  const wiki = 'https://en.wikipedia.org/wiki/Foo_(bar)';
+  const query = 'https://example.test/?filter[key]=[value]';
+  expect(extractLinks('[wiki](' + wiki + ')')).toEqual([wiki]);
+  expect(extractLinks('[nested](https://example.test/a_(b_(c)))')).toEqual(['https://example.test/a_(b_(c))']);
+  expect(extractLinks('[query](<' + query + '> "Title")')).toEqual([query]);
+  expect(extractLinks('(' + wiki + '). **' + query + '**')).toEqual([wiki, query]);
+  expect(extractLinks('[escaped](https://example.test/a_\\(b\\))')).toEqual(['https://example.test/a_(b)']);
+  expect(extractLinks('No links.')).toEqual([]);
+  expect(extractLinks('[broken](https://example.test/a_(b')).toEqual(['https://example.test/a_(b']);
+  expect(rules({
+    body: '[wiki](' + wiki + ')[query](' + query + ') **' + wiki + '**',
+    link: query
+  })).not.toContain('links.count');
+  expect(rules({ body: '[wiki](' + wiki + ')[query](' + query + ') https://third.test' })).toContain('links.count');
 });
 it('requires an HTTP(S) URL for tryable Show HN links', () => {
   for (const link of [undefined, 'mailto:maker@example.test', 'ftp://example.test/demo', 'javascript:alert(0)', 'https://'])

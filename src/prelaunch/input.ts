@@ -35,7 +35,7 @@ const schema = {
     },
   },
 } as const;
-const validate = new Ajv2020({ allErrors: true, allowUnionTypes: true }).compile(schema);
+let validate: ReturnType<Ajv2020['compile']> | undefined;
 
 type Check = { passed: boolean; notes: string };
 export interface Input {
@@ -102,6 +102,7 @@ export function readInput(cwd: string): Input | undefined {
   const raw = readText(cwd, inputPath(cwd));
   if (raw === undefined) return;
   const data: unknown = JSON.parse(raw);
+  validate ??= new Ajv2020({ allErrors: true, allowUnionTypes: true }).compile(schema);
   if (!validate(data)) throw new Error('prelaunch.json: ' + validate.errors?.map(error =>
     `${error.instancePath || '/'} ${error.message}`).join('; '));
   const input = data as Input;

@@ -1,0 +1,9 @@
+kind: channel
+id: press-release
+name: Press Release
+profiles: ["enterprise"]
+bestPostingTimes: ["09:00", "14:00"]
+bestPostingDays: [tue, wed, thu]
+leadTimeDays: 5
+version: "0.1.0"
+lastVerified: "2026-11-21"

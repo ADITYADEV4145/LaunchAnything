@@ -1,0 +1,4 @@
+kind: profile
+id: enterprise
+defaultChannels: ["linkedin","blog","press-release","email","x"]
+tone: Precise, brand-aligned, review-ready

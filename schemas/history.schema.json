@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://launch-liftoff.dev/schemas/history.schema.json",
+  "type": "object",
+  "properties": {
+    "profiles": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "devtool",
+          "indie-saas",
+          "b2b-saas",
+          "consumer-mobile",
+          "enterprise"
+        ]
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "channel": {
+              "enum": [
+                "show-hn",
+                "product-hunt",
+                "x",
+                "linkedin",
+                "reddit",
+                "devto",
+                "indie-hackers",
+                "github-release",
+                "tiktok",
+                "reels",
+                "shorts",
+                "instagram",
+                "email",
+                "blog",
+                "press-release"
+              ]
+            },
+            "lesson": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bestHour": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            }
+          },
+          "required": [
+            "time",
+            "channel",
+            "lesson"
+          ],
+          "additionalProperties": false
+        },
+        "minItems": 0
+      }
+    }
+  },
+  "required": [
+    "profiles"
+  ],
+  "additionalProperties": false
+}

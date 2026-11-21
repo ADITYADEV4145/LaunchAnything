@@ -1,0 +1,10 @@
+{
+  "profile": "indie-saas",
+  "allowedChannels": [
+    "product-hunt",
+    "x",
+    "indie-hackers",
+    "reddit",
+    "linkedin"
+  ]
+}

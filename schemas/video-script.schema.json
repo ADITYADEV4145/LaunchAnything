@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://launch-liftoff.dev/schemas/video-script.schema.json",
+  "type": "object",
+  "properties": {
+    "scenes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "shot": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+(?:\\s+\\S+){0,7}$"
+          },
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "voiceover": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "shot",
+          "text",
+          "duration"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 6,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "scenes"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,10 @@
+{
+  "profile": "devtool",
+  "allowedChannels": [
+    "show-hn",
+    "reddit",
+    "x",
+    "devto",
+    "github-release"
+  ]
+}

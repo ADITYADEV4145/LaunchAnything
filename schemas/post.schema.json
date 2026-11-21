@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://launch-liftoff.dev/schemas/post.schema.json",
+  "type": "object",
+  "properties": {
+    "channel": {
+      "enum": [
+        "show-hn",
+        "product-hunt",
+        "x",
+        "linkedin",
+        "reddit",
+        "devto",
+        "indie-hackers",
+        "github-release",
+        "tiktok",
+        "reels",
+        "shorts",
+        "instagram",
+        "email",
+        "blog",
+        "press-release"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1
+    },
+    "media": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "slot"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "link": {
+      "type": "string",
+      "format": "uri"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "title",
+    "body",
+    "media",
+    "claims"
+  ],
+  "additionalProperties": false
+}

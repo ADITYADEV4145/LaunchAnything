@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://launch-liftoff.dev/schemas/scan.schema.json",
+  "type": "object",
+  "properties": {
+    "readmeSections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "heading": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "package": {
+      "type": "object"
+    },
+    "license": {
+      "type": "string"
+    },
+    "commits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sha": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "sha",
+          "subject"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "landingUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "screenshots": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "stars": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "readmeSections",
+    "package",
+    "commits",
+    "routes",
+    "screenshots"
+  ],
+  "additionalProperties": false
+}

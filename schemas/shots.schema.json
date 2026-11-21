@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://launch-liftoff.dev/schemas/shots.schema.json",
+  "type": "object",
+  "properties": {
+    "shots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "route": {
+            "type": "string",
+            "minLength": 1
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": [
+                    "click",
+                    "type",
+                    "wait"
+                  ]
+                },
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "selector"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0
+          },
+          "waitFor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "theme": {
+            "enum": [
+              "light",
+              "dark"
+            ]
+          },
+          "record": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "route",
+          "viewport"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "shots"
+  ],
+  "additionalProperties": false
+}

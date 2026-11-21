@@ -36,7 +36,8 @@ export function routesFromFiles(files: string[], router: 'next' | 'expo' | 'none
     const app = /^(?:src\/)?app\/(.+)\.[jt]sx?$/.exec(path);
     if (app) {
       const segments = app[1].split('/');
-      const name = segments.pop()!;
+      const entrypoint = segments.pop()!;
+      const name = router === 'expo' ? entrypoint.replace(/\.(?:ios|android|web|native)$/, '') : entrypoint;
       if (segments.some(segment => segment.startsWith('_'))) continue;
       if (router === 'next' && name !== 'page' && name !== 'route') continue;
       if (router === 'expo') {

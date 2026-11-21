@@ -148,6 +148,14 @@ describe('scan', () => {
     expect(routesFromFiles(['src/pages/api.jsx', 'pages/api/index.ts', 'pages/api/v1/users.ts']))
       .toEqual(['/api']);
   });
+  it('strips Expo platform suffixes and deduplicates the resulting routes', () => {
+    expect(routesFromFiles([
+      'app/profile.ios.tsx', 'app/profile.android.tsx', 'app/profile.web.tsx',
+      'app/profile.native.tsx', 'app/profile.tsx', 'app/index.ios.tsx',
+      'app/_layout.native.tsx', 'app/(tabs)/settings.web.jsx',
+    ], 'expo')).toEqual(['/profile', '/', '/settings']);
+    expect(routesFromFiles(['app/profile.ios.tsx'])).toEqual([]);
+  });
   it('falls back to README URLs and all commits before a tag, then scans only commits since tag', async () => {
     await writeFile(join(cwd, 'README.md'), '# Example\nSee [site](https://example.test/launch).\n');
     git('init', '--initial-branch=main');

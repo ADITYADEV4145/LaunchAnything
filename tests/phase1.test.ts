@@ -156,6 +156,15 @@ describe('scan', () => {
     ], 'expo')).toEqual(['/profile', '/', '/settings']);
     expect(routesFromFiles(['app/profile.ios.tsx'])).toEqual([]);
   });
+  it('strips Next intercepting prefixes and deduplicates matching routes', () => {
+    expect(routesFromFiles([
+      'app/(.)photo/page.tsx', 'app/(..)photo/page.tsx', 'app/(..)(..)photo/page.tsx',
+      'app/(...)photo/page.tsx', 'app/photo/page.tsx',
+      'src/app/(group)/@modal/(.)photo/[id]/page.tsx',
+      'app/(group)/photo/[id]/page.tsx',
+    ])).toEqual(['/photo', '/photo/[id]']);
+    expect(routesFromFiles(['app/(.)photo/component.tsx'])).toEqual([]);
+  });
   it('falls back to README URLs and all commits before a tag, then scans only commits since tag', async () => {
     await writeFile(join(cwd, 'README.md'), '# Example\nSee [site](https://example.test/launch).\n');
     git('init', '--initial-branch=main');

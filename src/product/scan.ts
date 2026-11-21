@@ -44,7 +44,9 @@ export function routesFromFiles(files: string[], router: 'next' | 'expo' | 'none
         if (name.startsWith('_') || name.startsWith('+')) continue;
         if (name !== 'index') segments.push(name);
       }
-      const visible = segments.filter(segment => !/^\([^)]*\)$/.test(segment) && !segment.startsWith('@'));
+      const visible = segments
+        .map(segment => router === 'next' ? segment.replace(/^(?:\(\.{1,3}\))+/, '') : segment)
+        .filter(segment => segment && !/^\([^)]*\)$/.test(segment) && !segment.startsWith('@'));
       routes.add('/' + visible.join('/'));
       continue;
     }

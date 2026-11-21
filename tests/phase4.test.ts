@@ -11,6 +11,7 @@ import { prepareFixtureVideo } from '../src/selftest/phase4.js';
 import { cp, readFile } from 'node:fs/promises';
 import { packageRoot } from '../src/core/package-root.js';
 import { contentBounds, detectContent } from '../src/video/crop.js';
+import { checks as phase3Checks } from '../src/selftest/phase3.js';
 
 const dirs: string[] = [];
 async function setup() {
@@ -91,6 +92,29 @@ describe('phase 4',() => {
     await expect(validateScript(cwd,script)).resolves.toEqual(script);
     await expect(resolveShot(cwd,'phase3-home')).resolves.toBe(join(root,'shots','phase3-home.png'));
   });
+  it('uses actual phase-3 SaaS captures with safe browser framing at every ratio',async () => {
+    const cwd=await mkdtemp(join(tmpdir(),'phase4-captured-'));dirs.push(cwd);
+    await cp(join(packageRoot(),'fixtures/saas-next'),cwd,{recursive:true});
+    for(const check of phase3Checks) await check.run({cwd,fixture:'saas-next'});
+    const script=await prepareFixtureVideo(cwd,'saas-next');
+    expect([...new Set(script.scenes.map(s=>s.shot))]).toEqual(['shots/phase3-home.png','shots/phase3-pricing.png']);
+    const manifest=JSON.parse(await readFile(join(cwd,'.launch/media/shots/manifest.json'),'utf8'));
+    for(const shot of manifest) {
+      expect(shot.kind).toBe('web');
+      expect(shot.secretsFound).toBe(0);
+      const source=await resolveShot(cwd,shot.id);
+      const crop=await detectContent(source,shot.width,shot.height);
+      for(const [width,height] of [[1280,720],[720,1280],[720,720]]) {
+        const frame=frameLayout(width,height,shot.width,shot.height,false,width<=height?crop:undefined);
+        expect(frame.kind).toBe('browser');
+        expect(frame.detail).toBeUndefined();
+        expect(frame.x).toBeGreaterThan(0);
+        expect(frame.x+frame.width).toBeLessThan(width);
+        expect(frame.y+frame.height).toBeLessThan(height*.73);
+      }
+    }
+    await expect(validateScript(cwd,script)).resolves.toEqual(script);
+  },120000);
   it('validates schema, duration, real files, shot IDs and containment',async () => {
     const {cwd,script} = await setup();
     await expect(validateScript(cwd,script)).resolves.toEqual(script);

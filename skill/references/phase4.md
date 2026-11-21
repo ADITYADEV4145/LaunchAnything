@@ -15,6 +15,12 @@ a shots.yaml id with captured media of that name. Never use generated images as
 demo footage. Provenance is the agent's responsibility: files alone cannot prove
 that footage came from the real product. Run `video script` again to validate.
 
+Phase-3 captures in `.launch/media/shots/` are discovered alongside root media;
+reference them as `shots/<id>.png` or by their shots.yaml ID. Generated promotional
+cards in `.launch/media/images/` are not discovered as demo footage. Phase-3
+terminal manifests retain terminal framing instead of gaining browser chrome.
+Privacy redactions already present in a capture remain intact in the video.
+
 To record, mark shots.yaml entries `record: true`; keep the existing route,
 viewport, actions and optional waitFor. Install Playwright and Chromium locally,
 then `liftoff video record --url http://localhost:3000 --json`. Recording performs

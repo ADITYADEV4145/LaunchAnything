@@ -1,0 +1,54 @@
+{
+  "fixture": "saas-next",
+  "capturedAt": "2026-11-21T21:24:27.934Z",
+  "author": "Aditya",
+  "method": "Unmodified fixture copied to /home/ubuntu/phase4-capture/saas-next; npm install; npm run dev -- --hostname 127.0.0.1 --port 3144; Playwright using installed Chrome. No injected CSS or fabricated UI.",
+  "viewport": {
+    "width": 1280,
+    "height": 800,
+    "deviceScaleFactor": 2
+  },
+  "files": [
+    {
+      "file": "home.png",
+      "route": "/"
+    },
+    {
+      "file": "pricing.png",
+      "route": "/pricing"
+    },
+    {
+      "file": "home-focus.png",
+      "route": "/",
+      "clip": {
+        "x": 0,
+        "y": 0,
+        "width": 520,
+        "height": 250
+      }
+    },
+    {
+      "file": "pricing-focus.png",
+      "route": "/pricing",
+      "clip": {
+        "x": 0,
+        "y": 0,
+        "width": 520,
+        "height": 250
+      }
+    },
+    {
+      "file": "navigation.webm",
+      "route": "/ → click link \"Simple pricing\" → /pricing",
+      "command": "Playwright recordVideo 1280x800; ffmpeg crop=520:250:0:0 -t 4.5 -c:v libvpx-vp9 -crf 38 (focus crop only)"
+    }
+  ],
+  "sceneFiles": [
+    "home-focus.png",
+    "navigation.webm",
+    "pricing-focus.png",
+    "home-focus.png",
+    "pricing-focus.png",
+    "home-focus.png"
+  ]
+}

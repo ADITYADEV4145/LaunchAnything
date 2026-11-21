@@ -294,7 +294,7 @@ describe('planning', () => {
     const weekend = createPlan(config, { date: '2026-02-14' });
     expect(weekend.channels[0]).toMatchObject({ date: '2026-02-17', time: '09:00' });
     const stored = await json(launchDir(cwd).config);
-    const written = await plan(cwd, { date: '2026-02-14' });
+    const written = await plan(cwd, { date: '2026-02-14', lessons: [] });
     expect(await readFile(written.path, 'utf8')).toBe(weekend.markdown);
     expect(await json(launchDir(cwd).config)).toEqual(stored);
     for (let day = -7; day <= 3; day++) expect(written.markdown).toContain(`T${day >= 0 ? '+' : ''}${day}:`);

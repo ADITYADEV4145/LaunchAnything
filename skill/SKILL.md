@@ -75,8 +75,10 @@ matching human approval.
 
 ## results, learn and receipt — phase 6
 
-Future: collect metrics, save observations for the next plan and create a receipt.
-Never claim causation from launch metrics alone.
+Run `liftoff results --replies` at T+1, T+3 and T+7 to collect the current checkpoint.
+Review the report and local reply drafts with the human; never auto-reply.
+Run `liftoff learn` to inform future plans and `liftoff receipt` for a shareable image.
+See [phase6.md](references/phase6.md) for data gaps and observation guidelines.
 
 ## Hard safety rules
 

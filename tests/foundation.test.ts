@@ -63,14 +63,6 @@ it('validates every rules YAML', () => {
     for (const file of readdirSync(join(root, 'rules', group)).filter(f => f.endsWith('.yaml')))
       expect(loadRule(group, file.replace('.yaml', '')).id).toBe(file.replace('.yaml', ''));
 });
-it('all command stubs exit 2 with JSON', () => {
-  const groups = [[], [], [], [], [], ['results','learn','receipt']];
-  groups.forEach((names, i) => names.forEach(name => {
-    const run = cli(name, '--json');
-    expect(run.status, run.stderr).toBe(2);
-    expect(JSON.parse(run.stdout)).toEqual({ ok: false, command: name, error: `not implemented yet (phase ${i + 1})` });
-  }));
-}, 30000);
 it('doctor handles missing extras and malformed config without leaking values', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'liftoff-doctor-'));
   try {
@@ -88,19 +80,13 @@ it('doctor handles missing extras and malformed config without leaking values', 
   expect(run.status).toBe(0);
   expect(JSON.parse(run.stdout).ok).toBe(true);
 });
-it('selftest phase 1 passes and later phases fail explicitly', async () => {
+it('selftest passes all six phases and rejects invalid phase arguments', async () => {
   const report = await selftest(1);
   expect(report.results).toHaveLength(6);
   expect(report.results.every(r => r.ok)).toBe(true);
   const later = await selftest(6);
-  for (const phase of [6])
-    expect(later.results.filter(r => r.phase === phase && !r.ok)).toHaveLength(3);
-  expect(later.results.filter(r => r.phase === 4)).toHaveLength(3);
-  expect(later.results.filter(r => r.phase === 4).every(r => r.ok)).toBe(true);
-  expect(later.results.filter(r => r.phase === 3)).toHaveLength(3);
-  expect(later.results.filter(r => r.phase === 3).every(r => r.ok)).toBe(true);
-  expect(later.results.filter(r => r.phase === 5)).toHaveLength(9);
-  expect(later.results.filter(r => r.phase === 5).every(r => r.ok)).toBe(true);
+  expect(later.results.filter(r => !r.ok)).toEqual([]);
+  expect(later.results.filter(r => r.phase === 6)).toHaveLength(3);
   await expect(selftest(0)).rejects.toThrow('--through');
   const run = cli('selftest', '--through', '1', '--json');
   expect(run.status, run.stderr).toBe(0);

@@ -1,0 +1,13 @@
+{
+  "posts": [
+    {
+      "channel": "x", "id": "fixture-x", "owned": true,
+      "metrics": { "views": 2600, "likes": 32, "comments": 2, "clicks": 0 },
+      "hook": "Record a trip on your phone",
+      "comments": [
+        { "id": "open", "author": "Fixture reader", "body": "Is there a dark theme?", "answered": false, "likes": 1 },
+        { "id": "closed", "author": "Fixture maintainer", "body": "Answered fixture comment", "answered": true }
+      ]
+    }
+  ]
+}

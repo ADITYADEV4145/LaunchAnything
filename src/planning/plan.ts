@@ -3,9 +3,10 @@ import { launchDir } from '../core/launch-dir.js';
 import { loadRule } from '../core/rules.js';
 import { readJson } from '../product/files.js';
 import { validateConfig, type Config } from '../product/init.js';
+import { loadPlanLessons } from '../results/history.js';
 
 export interface PlanLesson { channel: string; time: string; observation: string }
-export interface PlanOptions { date?: string; lessons?: PlanLesson[] }
+export interface PlanOptions { date?: string; lessons?: PlanLesson[]; historyPath?: string }
 export interface PlannedChannel { id: string; date: string; time: string; reason: string; leadTimeDays: number }
 interface ChannelRule {
   name: string; profiles: string[]; bestPostingTimes: string[];
@@ -49,7 +50,7 @@ export function createPlan(config: Config, options: PlanOptions = {}) {
     const lesson = options.lessons?.find(l => l.channel === id);
     if (lesson && !/^([01]\d|2[0-3]):[0-5]\d$/.test(lesson.time)) throw new Error('Invalid history lesson time for ' + id);
     const time = lesson?.time ?? rule.bestPostingTimes[0];
-    if (lesson) usedLessons.push(lesson);
+    if (lesson && time !== rule.bestPostingTimes[0]) usedLessons.push(lesson);
     selected.push({ id, date: date.toISOString().slice(0, 10), time,
       reason: `${reasons[id] ?? rule.name}; ${config.launchType === 'changelog' ? 'keep the version update concise' : config.launchType === 'feature' ? 'focus on the specific improvement' : config.launchType === 'relaunch' ? 'explain what changed since the previous launch' : 'introduce the product with grounded proof'}`,
       leadTimeDays: rule.leadTimeDays });
@@ -82,7 +83,7 @@ export function createPlan(config: Config, options: PlanOptions = {}) {
     '- [ ] T+3: Record metrics and lessons without claiming causation.',
     '', '## History observations',
     ...(usedLessons.length ? usedLessons.map(l => `- ${l.channel}: time changed to ${l.time} based on observation: ${line(l.observation).slice(0, 240)}`) :
-      ['- No history supplied; using bundled channel scheduling defaults.']), '',
+      ['- No history observation changed a time slot; using bundled channel scheduling defaults.']), '',
   ];
   if (lines.length >= 120) throw new Error('Plan exceeds line limit');
   return { markdown: lines.join('\n'), channels: selected, launchDate, timezone: config.timezone };
@@ -91,7 +92,9 @@ export function createPlan(config: Config, options: PlanOptions = {}) {
 export async function plan(cwd: string, options: PlanOptions = {}) {
   const paths = launchDir(cwd);
   const config = await readJson<Config>(paths.config);
-  const result = createPlan(config, options);
+  validateConfig({ ...config, launchDate: options.date ?? config.launchDate });
+  const lessons = options.lessons ?? await loadPlanLessons(config.profile, options.historyPath);
+  const result = createPlan(config, { ...options, lessons });
   await mkdir(paths.root, { recursive: true });
   await writeFile(paths.plan, result.markdown);
   return { path: paths.plan, ...result };

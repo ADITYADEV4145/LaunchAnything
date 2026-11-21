@@ -45,8 +45,8 @@ guidance, not a claim that past preparation has already happened. --date overrid
 the plan's date without changing config.json. The T checklist is relative to the
 launch date; some channel slots may land later on an allowed weekday.
 
-Phase 6 hook: src/planning/plan.ts exports createPlan(config, {date?, lessons?})
-and plan(cwd, options). Supply lessons as {channel, time: HH:mm, observation}[]
-after loading history externally. Only selected channels are affected; the plan
-explicitly records each changed time and observation. Phase 1 never reads home
-history implicitly. Keep observations factual and do not imply causation.
+The CLI reads local lessons for the current profile from `~/.liftoff/history.json`
+by default. Set `--history <file>` to choose a different file. Only selected
+channels are affected; the plan names the observation behind each changed slot.
+The synchronous `createPlan` API still uses only explicitly supplied lessons.
+See [phase6.md](phase6.md) for collecting and learning from results.

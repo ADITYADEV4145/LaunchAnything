@@ -1,0 +1,13 @@
+{
+  "posts": [
+    {
+      "channel": "x", "id": "fixture-x", "owned": true,
+      "metrics": { "views": 1800, "likes": 27, "comments": 2, "clicks": 44, "signups": 3 },
+      "hook": "Follow a project from a single dashboard",
+      "comments": [
+        { "id": "open", "author": "Fixture reader", "body": "Is there a walkthrough?", "answered": false, "likes": 4 },
+        { "id": "closed", "author": "Fixture maintainer", "body": "Answered fixture comment", "answered": true }
+      ]
+    }
+  ]
+}

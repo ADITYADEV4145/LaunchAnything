@@ -18,8 +18,11 @@ export const formality = (text: string) => {
 };
 export function splitSamples(source: string): string[] {
   const raw = source.replace(/^\s*window\.YTD\.tweets\.part\d+\s*=\s*/, '').trim().replace(/;$/, '');
+  let data;
   if (raw.startsWith('[') || raw.startsWith('{')) {
-    const data = JSON.parse(raw);
+    try { data = JSON.parse(raw); } catch { /* Non-JSON Markdown remains text. */ }
+  }
+  if (data !== undefined) {
     const entries = Array.isArray(data) ? data : data.tweets ?? data.data;
     if (!Array.isArray(entries)) throw new Error('Expected an X archive array or tweets/data array');
     return entries.map(entry => entry.tweet ?? entry).sort((a, b) =>

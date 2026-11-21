@@ -24,7 +24,7 @@ it('learns bounded owned samples, validates stored profiles, rejects empty and m
   try {
     expect(() => learnVoice(cwd, [])).toThrow('20');
     expect(() => learnVoice(cwd, ['missing.md'])).toThrow('No samples');
-    expect(() => splitSamples('[invalid')).toThrow();
+    expect(splitSamples('[invalid')).toEqual([]);
     const source = readFileSync(join(packageRoot(), 'fixtures/cli-tool/.liftoff-fixture/phase2b/samples.md'), 'utf8');
     writeFileSync(join(cwd, 'samples.md'), source);
     const voice = learnVoice(cwd, ['*.md']);
@@ -37,6 +37,19 @@ it('learns bounded owned samples, validates stored profiles, rejects empty and m
     writeFileSync(join(cwd, '.launch/voice.json'), '{}');
     expect(() => loadVoice(cwd)).toThrow('voice:');
     expect(splitSamples('window.YTD.tweets.part0 = [{"tweet":{"full_text":"I made this local tool."}}];')).toEqual(['I made this local tool.']);
+  } finally { rmSync(cwd, { recursive: true, force: true }); }
+});
+
+it('learns Markdown beginning with links while preserving structured archive validation', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'voice-markdown-'));
+  try {
+    const samples = Array.from({ length: 20 }, (_, i) => `[My launch](https://example.test) I built this local tool for task ${i}.`);
+    writeFileSync(join(cwd, 'samples.md'), samples.join('\n\n'));
+    expect(splitSamples(samples[0])).toEqual([samples[0]]);
+    expect(learnVoice(cwd, ['samples.md']).samples).toHaveLength(20);
+    expect(splitSamples('')).toEqual([]);
+    expect(splitSamples('[{"text":"My actual exported post"}]')).toEqual(['My actual exported post']);
+    expect(() => splitSamples('{"tweets":false}')).toThrow('Expected an X archive');
   } finally { rmSync(cwd, { recursive: true, force: true }); }
 });
 

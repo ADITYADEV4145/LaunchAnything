@@ -21,6 +21,20 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('preserves edited Markdown and HTML when forced regeneration fails', () => {
+    setup();
+    const result = brief(cwd);
+    edit(s => s.replace('Targets pending', 'Human-reviewed targets pending'));
+    const before = readFileSync(result.path, 'utf8');
+    const html = readFileSync(result.html, 'utf8');
+    const path = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(path, 'utf8'));
+    product.features[0].name = 'Unreasonably verbose name '.repeat(700);
+    writeFileSync(path, JSON.stringify(product));
+    expect(() => brief(cwd, true)).toThrow();
+    expect(readFileSync(result.path, 'utf8')).toBe(before);
+    expect(readFileSync(result.html, 'utf8')).toBe(html);
+  });
   it.each(['cli-tool', 'saas-next', 'mobile-expo'])('passes positive and negative gate for %s', async fixture => {
     setup(fixture);
     await checks[0].run({ cwd, fixture });

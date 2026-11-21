@@ -63,7 +63,9 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
 export function validateBrief(cwd: string, file?: string) {
   const ctx = inputs(cwd);
   const path = file ? resolve(cwd, file) : join(ctx.root, 'brief.md');
-  const text = readFileSync(path, 'utf8');
+  return validateText(ctx, path, readFileSync(path, 'utf8'));
+}
+function validateText(ctx: ReturnType<typeof inputs>, path: string, text: string) {
   const errors: string[] = [], warnings: string[] = [];
   if (!text.includes(`inputs:${ctx.hash} -->`)) warnings.push('stale-brief: inputs changed or fingerprint missing; review and regenerate with brief --force');
   if (!ctx.pains.length) warnings.push('Pain research unavailable: pains.json missing or empty');
@@ -103,11 +105,12 @@ export function brief(cwd: string, force = false) {
   const ctx = inputs(cwd);
   const path = join(ctx.root, 'brief.md');
   const previous = existsSync(path) ? validateBrief(cwd).warnings : [];
-  if (!existsSync(path) || force) writeFileSync(path, scaffold(ctx));
-  const result = validateBrief(cwd);
+  const regenerate = !existsSync(path) || force;
+  const markdown = regenerate ? scaffold(ctx) : readFileSync(path, 'utf8');
+  const result = validateText(ctx, path, markdown);
   if (!result.valid) throw new Error(result.errors.join('; '));
+  if (regenerate) writeFileSync(path, markdown);
   const html = join(ctx.root, 'brief.html');
-  const markdown = readFileSync(path, 'utf8');
   const body = markdown.split('\n').filter(l => !l.startsWith('<!--')).map(l => {
     const heading = /^(#{1,3}) (.*)/.exec(l);
     const content = escape(heading ? heading[2] : l).replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => /^(https?:|product\.json|research\/pains\.json)/.test(href) ? `<a href="${href}">${label}</a>` : label);

@@ -1,0 +1,21 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { packageRoot } from '../core/package-root.js';
+import { adapters, fetchResearch, researchPaths, checkResearch, renderReport, loadPains } from '../research/index.js';
+import type { Check } from './types.js';
+export const checks: Check[] = [{ name: 'recorded pain evidence, report and zero-network cache rerun', async run({ cwd }) {
+  const fixture = JSON.parse(await readFile(join(packageRoot(), 'fixtures/cli-tool/.liftoff-fixture/phase0-recording.json'), 'utf8'));
+  let calls = 0;
+  const network: typeof fetch = async () => { calls++; return new Response(JSON.stringify(fixture.hn)); };
+  const options = { fetch: network, adapters: [adapters({})[0]] };
+  await fetchResearch(cwd, ['launch planning'], options);
+  if (calls !== 1) throw new Error('Expected one recorded fetch');
+  await writeFile(researchPaths(cwd).pains, JSON.stringify(fixture.pains));
+  if ((await loadPains(cwd)).pains.length < 5) throw new Error('Need five pain clusters');
+  const checked = await checkResearch(cwd);
+  if (!checked.valid) throw new Error(checked.errors.join('; '));
+  const report = await renderReport(cwd);
+  if (!report.markdown.includes('not solved yet')) throw new Error('Missing unsolved pains');
+  await fetchResearch(cwd, ['launch planning'], options);
+  if (calls !== 1) throw new Error('Cache rerun made network calls');
+} }];

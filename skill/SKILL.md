@@ -22,6 +22,13 @@ doctor → init → confirm profile → scan → agent writes product.json → v
 Phase 1 product understanding and planning and phase 5 review/local staging are
 implemented. Phases 2–4 and 6 remain stubs; never claim they created assets.
 
+## research — phase 0
+
+Before product planning, derive 8–15 queries from the idea: problem words,
+competitors, "I wish", "alternative to", and "why is X so". Run research fetch,
+cluster cached evidence, write pains.json, check, then report. Never invent quotes.
+See [phase0.md](references/phase0.md) for credentials and the evidence contract.
+
 ## doctor
 
 Run `liftoff doctor --json` before starting. Prefer relevant installed skills or MCP

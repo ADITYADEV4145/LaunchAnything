@@ -1,0 +1,281 @@
+{
+  "hn": {
+    "hits": [
+      {
+        "objectID": "11",
+        "author": "fixture_person_0_0",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "12",
+        "author": "fixture_person_0_1",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "13",
+        "author": "fixture_person_0_2",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "21",
+        "author": "fixture_person_1_0",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "22",
+        "author": "fixture_person_1_1",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "23",
+        "author": "fixture_person_1_2",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "31",
+        "author": "fixture_person_2_0",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "32",
+        "author": "fixture_person_2_1",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "33",
+        "author": "fixture_person_2_2",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "41",
+        "author": "fixture_person_3_0",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "42",
+        "author": "fixture_person_3_1",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "43",
+        "author": "fixture_person_3_2",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "51",
+        "author": "fixture_person_4_0",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "52",
+        "author": "fixture_person_4_1",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      },
+      {
+        "objectID": "53",
+        "author": "fixture_person_4_2",
+        "created_at": "2026-01-01T00:00:00Z",
+        "comment_text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+        "points": 3,
+        "num_comments": 1
+      }
+    ]
+  },
+  "pains": {
+    "idea": "Launch planning",
+    "pains": [
+      {
+        "name": "Manual scheduling",
+        "description": "Teams struggle with manual scheduling.",
+        "mentions": 3,
+        "intensity": 4,
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-01-01"
+        },
+        "quotes": [
+          {
+            "text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=11"
+          },
+          {
+            "text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=12"
+          },
+          {
+            "text": "Manual scheduling wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=13"
+          }
+        ],
+        "current_tools": [
+          "Spreadsheets"
+        ],
+        "shortcomings": "Manual coordination",
+        "solution_feature": "Scheduling"
+      },
+      {
+        "name": "Lost drafts",
+        "description": "Teams struggle with lost drafts.",
+        "mentions": 3,
+        "intensity": 4,
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-01-01"
+        },
+        "quotes": [
+          {
+            "text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=21"
+          },
+          {
+            "text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=22"
+          },
+          {
+            "text": "Lost drafts wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=23"
+          }
+        ],
+        "current_tools": [
+          "Spreadsheets"
+        ],
+        "shortcomings": "Manual coordination"
+      },
+      {
+        "name": "Unclear approvals",
+        "description": "Teams struggle with unclear approvals.",
+        "mentions": 3,
+        "intensity": 4,
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-01-01"
+        },
+        "quotes": [
+          {
+            "text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=31"
+          },
+          {
+            "text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=32"
+          },
+          {
+            "text": "Unclear approvals wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=33"
+          }
+        ],
+        "current_tools": [
+          "Spreadsheets"
+        ],
+        "shortcomings": "Manual coordination"
+      },
+      {
+        "name": "Scattered feedback",
+        "description": "Teams struggle with scattered feedback.",
+        "mentions": 3,
+        "intensity": 4,
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-01-01"
+        },
+        "quotes": [
+          {
+            "text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=41"
+          },
+          {
+            "text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=42"
+          },
+          {
+            "text": "Scattered feedback wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=43"
+          }
+        ],
+        "current_tools": [
+          "Spreadsheets"
+        ],
+        "shortcomings": "Manual coordination"
+      },
+      {
+        "name": "Missing evidence",
+        "description": "Teams struggle with missing evidence.",
+        "mentions": 3,
+        "intensity": 4,
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-01-01"
+        },
+        "quotes": [
+          {
+            "text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=51"
+          },
+          {
+            "text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=52"
+          },
+          {
+            "text": "Missing evidence wastes hours every launch and makes our team frustrated.",
+            "url": "https://news.ycombinator.com/item?id=53"
+          }
+        ],
+        "current_tools": [
+          "Spreadsheets"
+        ],
+        "shortcomings": "Manual coordination"
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Spreadsheets",
+        "what_they_do": "Track tasks",
+        "complaints": [
+          "Manual coordination"
+        ]
+      }
+    ]
+  }
+}

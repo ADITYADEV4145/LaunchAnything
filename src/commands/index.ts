@@ -17,7 +17,8 @@ import { register as receipt } from './receipt.js';
 import { register as prelaunch } from './prelaunch.js';
 import type { Command } from 'commander';
 import { register as voice } from './voice.js';
+import { register as research } from './research.js';
 export function registerCommands(program: Command) {
   voice(program);
-  for (const register of [init, scan, validate, plan, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
+  for (const register of [research, init, scan, validate, plan, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
 }

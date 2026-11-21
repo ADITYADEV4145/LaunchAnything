@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -22,17 +22,22 @@ export async function selftest(through: number) {
     const cwd = await mkdtemp(join(tmpdir(), 'liftoff-'));
     try {
       await cp(join(fixtureRoot, fixture), cwd, { recursive: true });
-      const env = { ...process.env, GIT_AUTHOR_NAME: 'Liftoff Fixture', GIT_AUTHOR_EMAIL: 'fixture@example.test',
+      const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_')));
+      const env = { ...inherited, GIT_AUTHOR_NAME: 'Liftoff Fixture', GIT_AUTHOR_EMAIL: 'fixture@example.test',
         GIT_COMMITTER_NAME: 'Liftoff Fixture', GIT_COMMITTER_EMAIL: 'fixture@example.test',
         GIT_AUTHOR_DATE: '2026-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2026-01-01T00:00:00Z' };
-      const git = (...args: string[]) => execFileSync('git', args, { cwd, env, stdio: 'pipe' });
+      const hooks = join(cwd, '.liftoff-fixture', '.empty-hooks');
+      await mkdir(hooks, { recursive: true });
+      const git = (...args: string[]) => execFileSync('git',
+        ['-c', `core.hooksPath=${hooks}`, '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args],
+        { cwd, env, stdio: 'pipe' });
       git('init', '--initial-branch=main');
       git('add', '--all');
-      git('-c', 'commit.gpgsign=false', 'commit', '-m', 'Fixture baseline');
+      git('commit', '-m', 'Fixture baseline');
       git('tag', 'v0.1.0');
       await writeFile(join(cwd, 'CHANGELOG.md'), '# Changes\n\nImprove launch documentation.\n');
       git('add', 'CHANGELOG.md');
-      git('-c', 'commit.gpgsign=false', 'commit', '-m', 'Improve launch documentation');
+      git('commit', '-m', 'Improve launch documentation');
       for (const phase of phases.filter(p => p.phase <= through)) {
         for (const check of phase.checks) {
           try { await check.run({ cwd, fixture }); results.push({ phase: phase.phase, fixture, check: check.name, ok: true }); }

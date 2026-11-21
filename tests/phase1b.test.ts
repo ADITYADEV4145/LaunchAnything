@@ -21,6 +21,24 @@ function edit(transform: (text: string) => string) {
   writeFileSync(path, transform(readFileSync(path, 'utf8')));
 }
 describe('phase 1b Launch Brief', () => {
+  it('requires citations in FAQ questions and adds them to generated questions', () => {
+    setup();
+    const productPath = join(cwd, '.launch/product.json');
+    const product = JSON.parse(readFileSync(productPath, 'utf8'));
+    product.features[0].name = 'evidence';
+    writeFileSync(productPath, JSON.stringify(product));
+    const pains = JSON.parse(readFileSync(join(cwd, '.liftoff-fixture/phase1b-pains.json'), 'utf8'));
+    pains.pains[0].name = 'problem';
+    writeFileSync(join(cwd, '.launch/research/pains.json'), JSON.stringify(pains));
+    const result = brief(cwd);
+    const original = readFileSync(result.path, 'utf8');
+    expect(original).toContain('### 4. Where is the evidence? [feature:0]');
+    expect(original).toContain('### 2. What problem does it address? [pain:0]');
+    for (const marker of ['feature', 'pain']) {
+      writeFileSync(result.path, original.replace(/^(### .*?) \[(feature|pain):0\]\([^\n]+\)/gm, (line, question, group) => group === marker ? question : line));
+      expect(validateBrief(cwd).errors.join()).toContain(`requires an indexed ${marker} citation`);
+    }
+  });
   it('budgets verbose feature descriptions, proof points, audience, problem and plan', () => {
     setup();
     const path = join(cwd, '.launch/product.json');

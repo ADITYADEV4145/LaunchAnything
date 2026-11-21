@@ -60,7 +60,7 @@ function scaffold(ctx: ReturnType<typeof inputs>) {
   ];
   const markdown = `<!-- liftoff-brief-v${rules.version} inputs:${hash} -->\n# Launch Brief: ${p.name}\n\n` + rules.sections.map((s, i) => `## ${s.title}\n\n${contents[i]}\n`).join('\n');
   return markdown.split('\n').map(line => {
-    if (/^#|^<!--/.test(line)) return line;
+    if (/^#{1,2} |^<!--/.test(line)) return line;
     p.features.forEach((f, i) => { if (line.toLowerCase().includes(f.name.toLowerCase()) && !line.includes(`[feature:${i}](`)) line += ` [feature:${i}](product.json#/features/${i})`; });
     pains.forEach((pain, i) => { if (line.toLowerCase().includes(pain.name.toLowerCase()) && !line.includes(`[pain:${i}](`)) line += ` [pain:${i}](research/pains.json#/pains/${i})`; });
     return line;
@@ -97,7 +97,7 @@ function validateText(ctx: ReturnType<typeof inputs>, path: string, text: string
   ] as const) {
     for (const match of text.matchAll(pattern)) if (match[1] !== match[2] || !values[Number(match[1])]) errors.push(`Unknown ${group} citation: ${match[0]}`);
     for (const [index, value] of values.entries()) for (const line of text.split('\n')) {
-      if (line.startsWith('#')) continue;
+      if (/^#{1,2} /.test(line)) continue;
       if (line.toLowerCase().includes(value.name.toLowerCase()) && !line.includes(`[${group}:${index}](`)) errors.push(`${group} ${value.name} requires an indexed ${group} citation on the same line`);
     }
   }

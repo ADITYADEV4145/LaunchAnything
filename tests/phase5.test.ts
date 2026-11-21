@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,6 +59,53 @@ it('builds a review page and defaults the CLI to an approval-gated dry run', asy
     scheduledAt: '2026-07-15T18:30:00.000Z',
   }] });
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it('shows only matching platform check verdicts, with failing rules and the fix-list path', async () => {
+  const { cwd, paths, markdown } = await project();
+  const reddit = '---\nchannel: reddit\ntitle: Project notes\nsubreddit: r/SideProject\nflair: Showcase\n' +
+    'media: []\nclaims: []\n---\nI built a tool to help with local launches.\n';
+  await writeFile(paths.plan, await readFile(paths.plan, 'utf8') + '| reddit | 2026-07-15 | 15:00 | Demo | 1 day(s) |\n');
+  await writeFile(join(paths.posts, 'reddit.md'), reddit);
+  const present = async () => readFile((await buildReview(cwd)).path, 'utf8');
+  expect(await present()).toContain('Not checked — run <code>liftoff check</code>');
+
+  const sourceHash = (source: string) => createHash('sha256').update(source).digest('hex');
+  await writeFile(join(paths.posts, 'fix-list.md'), '# Fix list\n');
+  await writeFile(join(paths.posts, 'check-results.json'), JSON.stringify({ posts: [
+    { channel: 'show-hn', sourceHash: sourceHash(markdown), issues: [{ rule: 'title.prefix', message: 'Missing <prefix>' }] },
+    { channel: 'reddit', sourceHash: sourceHash(reddit), issues: [] },
+  ] }));
+  const html = await present();
+  const showHnCard = html.split('<article data-channel="show-hn">')[1].split('</article>')[0];
+  const redditCard = html.split('<article data-channel="reddit">')[1].split('</article>')[0];
+  expect(showHnCard).toContain('Last platform check</dt><dd>Fail');
+  expect(showHnCard).toContain('<code>title.prefix</code>: Missing &lt;prefix&gt;');
+  expect(showHnCard).toContain('Fix list: <code>.launch/posts/fix-list.md</code>');
+  expect(redditCard).toContain('Last platform check</dt><dd>Pass');
+
+  await writeFile(join(paths.posts, 'show-hn.md'), markdown.replace('local launch', 'edited launch'));
+  const stale = await present();
+  expect(stale).not.toContain('title.prefix');
+  expect(stale).toContain('Not checked — run <code>liftoff check</code>');
+});
+
+it.each(['missing', 'unreadable'])('shows a null-hash failure even when the only post is %s', async condition => {
+  const { cwd, paths } = await project();
+  const source = join(paths.posts, 'show-hn.md');
+  await rm(source);
+  if (condition === 'unreadable') await mkdir(source);
+  await writeFile(join(paths.posts, 'check-results.json'), JSON.stringify({ posts: [
+    { channel: 'show-hn', sourceHash: null, issues: [{ rule: 'post.missing', message: 'Could not read planned post' }] },
+  ] }));
+  const { path, posts } = await buildReview(cwd);
+  const html = await readFile(path, 'utf8');
+  expect(posts).toEqual([]);
+  expect(html).toContain('show-hn · Post unavailable');
+  expect(html).toContain('Last platform check</dt><dd>Fail');
+  expect(html).toContain('<code>post.missing</code>: Could not read planned post');
+  expect(html).not.toContain('data-action="approve"');
+  await expect(publish(cwd, true)).rejects.toThrow();
 });
 
 it('shows stale approvals with the previous approver after copy or attachment bytes change', async () => {

@@ -24,8 +24,12 @@ export async function doctor(cwd: string, home = homedir()) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') warnings.push(`Cannot read MCP config: ${path}`);
     }
   }
-  const tools = Object.fromEntries(['git', 'ffmpeg', 'playwright', 'remotion'].map(name => {
-    const result = spawnSync(name, ['--version'], { cwd, encoding: 'utf8', timeout: 5000, stdio: 'ignore' });
+  const probes: [string, string[]][] = [
+    ['git', ['--version']], ['ffmpeg', ['-version']],
+    ['playwright', ['--version']], ['remotion', ['versions']],
+  ];
+  const tools = Object.fromEntries(probes.map(([name, args]) => {
+    const result = spawnSync(name, args, { cwd, encoding: 'utf8', timeout: 5000, stdio: 'ignore' });
     return [name, { available: !result.error && result.status === 0 }];
   }));
   return { skills, mcpServers, tools, warnings };

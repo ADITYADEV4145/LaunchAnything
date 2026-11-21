@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import fs from 'node:fs';
 import { cpSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, symlinkSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,7 +10,7 @@ import { packageRoot } from '../src/core/package-root.js';
 import { channels, loadPlatform } from '../src/copy/platforms.js';
 import { parsePost, inspectPost, similarity, checkPosts, type Post } from '../src/copy/check.js';
 import { writeBriefs } from '../src/copy/write.js';
-import { assertSafePath } from '../src/copy/safe-path.js';
+import { assertSafePath, atomicWrite } from '../src/copy/safe-path.js';
 
 const root = packageRoot();
 it('refuses symlinked output directories and files without touching external targets', () => {
@@ -250,13 +251,42 @@ it('records cross-channel issues for each affected channel and clears them on re
   expect(updated.posts.find((entry: {channel: string}) => entry.channel === 'x').issues).toEqual([]);
   expect(updated.posts.find((entry: {channel: string}) => entry.channel === 'reddit')).toEqual(report.posts[0]);
 }));
-it('refuses malformed prior check results without overwriting them', () => isolated(cwd => {
+it('recovers malformed prior results and rewrite state with output warnings', () => isolated(cwd => {
   checks[0].run({ cwd, fixture: 'cli-tool' });
   const path = join(cwd, '.launch/posts/check-results.json');
   for (const invalid of ['{', '{"posts":{}}', '{"posts":[{"channel":"x","sourceHash":"bad","issues":[]}]}']) {
     writeFileSync(path, invalid);
-    expect(() => checkPosts(cwd, ['x'])).toThrow();
-    expect(readFileSync(path, 'utf8')).toBe(invalid);
+    writeFileSync(join(cwd, '.launch/posts/check-state.json'), invalid);
+    const result = checkPosts(cwd, ['x']);
+    expect(result.warnings).toEqual([
+      'Malformed check-results.json ignored; previous entries were discarded.',
+      'Malformed check-state.json ignored; rewrite attempts were reset.'
+    ]);
+    expect(result.attempts).toBe(1);
+    expect(JSON.parse(readFileSync(path, 'utf8')).posts).toMatchObject([{channel: 'x', sourceHash: null}]);
+  }
+}));
+it('preserves check artifacts on partial writes and rename failures', () => isolated(cwd => {
+  checks[0].run({ cwd, fixture: 'cli-tool' });
+  for (const name of ['check-results.json','check-state.json','fix-list.md']) {
+    const path = join(cwd, '.launch/posts', name);
+    const original = name.endsWith('.json') ? '{"preserve":true}' : 'Original fix list';
+    writeFileSync(path, original);
+    const write = fs.writeFileSync;
+    const failingWrite = vi.spyOn(fs, 'writeFileSync').mockImplementation((file) => {
+      write(file, 'partial');
+      throw new Error('Write failed');
+    });
+    try { expect(() => atomicWrite(cwd, path, 'replacement')).toThrow('Write failed'); }
+    finally { failingWrite.mockRestore(); }
+    expect(readFileSync(path, 'utf8')).toBe(original);
+    const failingRename = vi.spyOn(fs, 'renameSync').mockImplementation(() => { throw new Error('Rename failed'); });
+    try { expect(() => atomicWrite(cwd, path, 'replacement')).toThrow('Rename failed'); }
+    finally { failingRename.mockRestore(); }
+    expect(readFileSync(path, 'utf8')).toBe(original);
+    expect(fs.readdirSync(join(cwd, '.launch/posts')).filter(name => name.endsWith('.tmp'))).toEqual([]);
+    atomicWrite(cwd, path, 'replacement');
+    expect(readFileSync(path, 'utf8')).toBe('replacement');
   }
 }));
 it('loads brand voice, detects local copywriting and rejects invalid inputs', () => isolated(cwd => {

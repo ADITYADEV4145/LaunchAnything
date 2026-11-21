@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { parse } from 'yaml';
@@ -6,7 +6,7 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import { validateFile } from '../core/schema.js';
 import { context, type Product } from './context.js';
 import { channels, loadPlatform } from './platforms.js';
-import { assertSafePath } from './safe-path.js';
+import { assertSafePath, atomicWrite } from './safe-path.js';
 
 export interface Post {
   channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
@@ -149,8 +149,18 @@ export function checkPosts(cwd: string, selected?: string[]) {
   assertSafePath(cwd, join(ctx.paths.posts, 'fix-list.md'));
   const resultsPath = join(ctx.paths.posts, 'check-results.json');
   assertSafePath(cwd, resultsPath);
-  const previous: unknown = existsSync(resultsPath) ? JSON.parse(readFileSync(resultsPath, 'utf8')) : { posts: [] };
-  if (!resultsValidator(previous)) throw new Error('Invalid check-results.json: ' + JSON.stringify(resultsValidator.errors));
+  const warnings: string[] = [];
+  let previous: unknown = { posts: [] };
+  if (existsSync(resultsPath)) {
+    const source = readFileSync(resultsPath, 'utf8');
+    try {
+      previous = JSON.parse(source);
+      if (!resultsValidator(previous)) throw new Error('Invalid report');
+    } catch {
+      previous = { posts: [] };
+      warnings.push('Malformed check-results.json ignored; previous entries were discarded.');
+    }
+  }
   const results = new Map((previous as { posts: CheckResult[] }).posts.map(entry => [entry.channel, entry]));
   const hashes = new Map<string, string | null>(ctx.channels.map(channel => [channel, null]));
   for (const channel of ctx.channels) {
@@ -174,19 +184,22 @@ export function checkPosts(cwd: string, selected?: string[]) {
     channel, sourceHash: hashes.get(channel) ?? null,
     issues: issues.filter(issue => issue.channel === channel).map(({ rule, message }) => ({ rule, message }))
   });
-  writeFileSync(resultsPath, JSON.stringify({ posts: [...results.values()].sort((a, b) =>
+  atomicWrite(cwd, resultsPath, JSON.stringify({ posts: [...results.values()].sort((a, b) =>
     a.channel < b.channel ? -1 : a.channel > b.channel ? 1 : 0) }, null, 2) + '\n');
   const statePath = join(ctx.paths.posts, 'check-state.json');
   let attempts = 0;
   if (existsSync(statePath)) {
-    const state = JSON.parse(readFileSync(statePath, 'utf8'));
-    if (!Number.isInteger(state.attempts) || state.attempts < 0) throw new Error('Invalid check-state attempts');
-    attempts = state.attempts;
+    const source = readFileSync(statePath, 'utf8');
+    try {
+      const state = JSON.parse(source);
+      if (!Number.isInteger(state?.attempts) || state.attempts < 0) throw new Error('Invalid check-state attempts');
+      attempts = state.attempts;
+    } catch { warnings.push('Malformed check-state.json ignored; rewrite attempts were reset.'); }
   }
   attempts = issues.length ? attempts + 1 : 0;
-  writeFileSync(statePath, JSON.stringify({ attempts }, null, 2) + '\n');
+  atomicWrite(cwd, statePath, JSON.stringify({ attempts }, null, 2) + '\n');
   const fixPath = join(ctx.paths.posts, 'fix-list.md');
-  if (issues.length) writeFileSync(fixPath, '# Fix list\n\n' + issues.map(i => '## ' + i.channel + ' — ' + i.rule + '\n' + i.message + '\n\nSuggested fix: ' + i.fix).join('\n\n') + (attempts >= 3 ? '\n\nSTOP: Three failed loops reached. Ask the user before rewriting again.\n' : '\n'));
+  if (issues.length) atomicWrite(cwd, fixPath, '# Fix list\n\n' + issues.map(i => '## ' + i.channel + ' — ' + i.rule + '\n' + i.message + '\n\nSuggested fix: ' + i.fix).join('\n\n') + (attempts >= 3 ? '\n\nSTOP: Three failed loops reached. Ask the user before rewriting again.\n' : '\n'));
   else rmSync(fixPath, { force: true });
-  return { passed: !issues.length, issues, attempts, askUser: attempts >= 3 };
+  return { passed: !issues.length, issues, attempts, askUser: attempts >= 3, warnings };
 }

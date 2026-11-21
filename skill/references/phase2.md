@@ -33,7 +33,11 @@ channel passed that check, not that an old hash still matches the current file.
 Results merge by channel: checked entries replace old entries; unchecked entries
 remain unchanged (including stale hashes/issues), also when using --channel.
 Consumers must compare sourceHash with the current file before trusting a pass.
-Malformed prior results and symlinked output paths are rejected rather than overwritten.
+Reports, rewrite state and fix lists are replaced atomically via a same-directory
+temporary file and rename under the symlink guard. A failed write leaves the old
+artifact intact. Malformed prior results are treated as empty; malformed state
+resets rewrite attempts. Both recoveries appear in the check output's warnings.
+Symlinked output paths are still rejected.
 After at most three failed loops, stop and ask the user; check-state.json tracks
 consecutive failures and resets on a pass. A pass removes the stale fix list.
 Never fabricate tryable URLs: Show HN needs a working demo or runnable repository.

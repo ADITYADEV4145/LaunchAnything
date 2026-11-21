@@ -8,10 +8,14 @@ program.name('liftoff').description('Grounded, human-approved launch kits')
   .version('0.1.0').option('--json', 'Print one JSON result')
   .option('--cwd <directory>', 'Repository working directory');
 registerCommands(program);
-program.configureOutput({
-  writeErr: text => { if (!process.argv.includes('--json')) process.stderr.write(text); },
-});
-program.exitOverride();
+function configureErrors(command: Command) {
+  command.configureOutput({
+    writeErr: text => { if (!process.argv.includes('--json')) process.stderr.write(text); },
+  });
+  command.exitOverride();
+  for (const child of command.commands) configureErrors(child);
+}
+configureErrors(program);
 try {
   await program.parseAsync();
 } catch (error) {

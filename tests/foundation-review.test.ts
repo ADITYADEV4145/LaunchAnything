@@ -9,6 +9,18 @@ import { selftest } from '../src/selftest/index.js';
 const cli = (...args: string[]) => spawnSync(process.execPath,
   ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args], { encoding: 'utf8' });
 
+it.each([
+  ['selftest', '--through', '--json'],
+  ['selftest', '--unknown', '--json'],
+  ['--json', 'selftest', '--through'],
+])('returns one JSON envelope for subcommand usage errors: %j', (...args) => {
+  const run = cli(...args);
+  expect(run.status).not.toBe(0);
+  expect(JSON.parse(run.stdout)).toMatchObject({ ok: false, command: 'selftest' });
+  expect(JSON.parse(run.stdout).error).toMatch(/argument missing|unknown option/);
+  expect(run.stderr).toBe('');
+});
+
 it('doctor fails with one JSON error for a nonexistent working directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'liftoff-review-'));
   try {

@@ -1,0 +1,33 @@
+kind: platform
+id: product-hunt
+name: Product Hunt
+version: 2
+lastVerified: null
+verified: false
+verifiedFields: []
+verificationNotes:
+  - Launch guide fetched but did not state tagline or gallery numbers. Tagline 60, gallery 1270x760
+    and two images are unverified local budgets; maker comment heading is a local format
+    requirement.
+sources:
+  - https://www.producthunt.com/launch
+title:
+  required: true
+  maxLength: 60
+body:
+  minLength: 1
+  maxLength: 2000
+maxLinks: 3
+requiredLink: false
+bannedWords: []
+guidance:
+  - Title is a tagline (60 characters). Body is the maker comment.
+  - "Gallery: at least 2 images recommended, 1270 × 760 pixels; check assets manually."
+taglineMax: 60
+makerComment:
+  heading: "## Maker comment"
+  required: true
+gallery:
+  minImages: 2
+  width: 1270
+  height: 760

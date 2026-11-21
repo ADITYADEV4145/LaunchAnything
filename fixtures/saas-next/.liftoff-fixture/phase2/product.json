@@ -1,0 +1,35 @@
+{
+  "name": "Teamnest",
+  "oneLiner": "A shared workspace for small teams to organize their weekly work.",
+  "audience": "Small teams planning weekly work",
+  "problem": "Keep a small daily workflow understandable without complex setup.",
+  "proofPoints": [
+    "Includes a focused working interface",
+    "Source is available in the repository",
+    "Setup instructions are included in the README"
+  ],
+  "features": [
+    {
+      "name": "Weekly board landing page",
+      "description": "A shared workspace for small teams to organize their weekly work.",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "app/page.tsx"
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "interface",
+      "text": "The landing page introduces a shared weekly board and links to pricing.",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "app/page.tsx"
+        }
+      ]
+    }
+  ]
+}

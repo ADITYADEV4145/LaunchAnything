@@ -17,7 +17,8 @@ export async function publish(cwd?: string, confirm = false, env = process.env) 
   }));
   const plan = queue.map(({ post, adapter }) => ({
     channel: post.channel, adapter: adapter.name, submitUrl: destination(post.channel), scheduledAt: post.scheduledAt,
-    hash: post.hash, title: post.title, body: post.body, link: post.link,
+    hash: post.hash, title: post.title, body: post.body,
+    ...(post.linkFirstComment ? { firstComment: post.link } : { link: post.link }),
     media: post.media.map(({ path, slot }) => ({ path, slot })),
   }));
   if (!confirm) return { mode: 'dry-run' as const, posts: plan, skipped };

@@ -37,7 +37,7 @@ function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyV
   <header><strong>${escape(post.label)}</strong><span class="state">${escape(state)}</span></header>
   <h2>${escape(post.title)}</h2>
   <div class="body">${escape(post.body)}</div>
-  ${post.link ? `<p>${safeLink(post.link) ? `<a href="${escape(post.link)}" target="_blank" rel="noopener noreferrer">${escape(post.link)}</a>`
+  ${post.link ? `<p>${post.linkFirstComment ? 'First comment: ' : ''}${safeLink(post.link) ? `<a href="${escape(post.link)}" target="_blank" rel="noopener noreferrer">${escape(post.link)}</a>`
     : escape(post.link)}</p>` : ''}
   ${media}
   <dl>

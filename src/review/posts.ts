@@ -19,6 +19,7 @@ interface Post {
   body: string;
   media: { slot: string; path?: string }[];
   link?: string;
+  linkFirstComment?: boolean;
   claims: string[];
 }
 interface Media { slot: string; path: string; bytes: Buffer }
@@ -74,7 +75,9 @@ function parsePost(source: string, channel: string) {
   if (post.channel && post.channel !== channel) throw new Error(`${channel}: post channel does not match filename`);
   if (match[2].trim() && 'body' in front && match[2].trim() !== post.body.trim())
     throw new Error(`${channel}: Markdown and front matter bodies disagree`);
-  return post;
+  if (linkFirstComment !== undefined && typeof linkFirstComment !== 'boolean')
+    throw new Error(`${channel}: linkFirstComment must be a boolean`);
+  return { ...post, linkFirstComment };
 }
 
 function wallTime(date: string, time: string, timezone: string) {

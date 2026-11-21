@@ -61,6 +61,34 @@ it('builds a review page and defaults the CLI to an approval-gated dry run', asy
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
+it('stages a LinkedIn first-comment link separately from the main post', async () => {
+  const { cwd, paths } = await project();
+  const link = 'https://example.test/launch';
+  await rm(join(paths.posts, 'show-hn.md'));
+  await writeFile(paths.plan, (await readFile(paths.plan, 'utf8')).replace('show-hn', 'linkedin'));
+  await writeFile(join(paths.posts, 'linkedin.md'), `---
+channel: linkedin
+title: Launch notes
+media: []
+claims: []
+link: ${link}
+linkFirstComment: true
+---
+Here is what I built.
+`);
+  const { path, posts: [{ channel, hash }] } = await buildReview(cwd);
+  await writeFile(paths.approvals, JSON.stringify({ approvals: [
+    { channel, hash, name: 'Reviewer', time: '2026-07-13T09:00:00Z' },
+  ] }));
+  const staged = await publish(cwd, true, {});
+  if (staged.mode !== 'offline-staging') throw new Error('Expected offline staging');
+  const main = new URL(staged.posts[0].url!);
+  expect(await readFile(main, 'utf8')).toBe('Launch notes\n\nHere is what I built.\n');
+  expect(await readFile(new URL('first-comment.txt', main), 'utf8')).toBe(link + '\n');
+  expect((await publish(cwd, false, {})).posts[0]).toMatchObject({ firstComment: link });
+  expect(await readFile(path, 'utf8')).toContain('First comment: ');
+});
+
 it('shows only matching platform check verdicts, with failing rules and the fix-list path', async () => {
   const { cwd, paths, markdown } = await project();
   const reddit = '---\nchannel: reddit\ntitle: Project notes\nsubreddit: r/SideProject\nflair: Showcase\n' +

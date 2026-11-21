@@ -2,15 +2,15 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { fileHash, formats, type Format, parseFormats, run } from './render.js';
-import { loadScript, srt } from './script.js';
+import { loadScript, srt, totalDuration } from './script.js';
 
 export function checkProbe(probe: {format: {duration: string}; streams: {codec_type: string; width?: number; height?: number}[]}, format: Format) {
   const duration = Number(probe.format.duration);
-  const max = format === '9x16' ? 60 : format === '16x9' ? 180 : 140;
-  if (!Number.isFinite(duration) || duration < 30 || duration > max + 0.15) throw new Error(`Duration ${duration}s invalid for ${format} (30–${max}s)`);
+  const platforms = Object.entries({'youtube-shorts':60, x:140, 'product-hunt':180}).map(([platform,maxSeconds]) => ({platform,maxSeconds,compliant:Number.isFinite(duration) && duration <= maxSeconds,required:platform === 'youtube-shorts' ? format === '9x16' : platform === 'x' ? format !== '9x16' : format === '16x9'}));
+  if (!Number.isFinite(duration) || duration < 30 || platforms.some(p => p.required && !p.compliant)) throw new Error(`Duration ${duration}s invalid for ${format}: ${JSON.stringify(platforms)}`);
   const video = probe.streams.find(s => s.codec_type === 'video');
   if (video?.width !== formats[format].width || video?.height !== formats[format].height) throw new Error(`Incorrect resolution for ${format}`);
-  return {duration, width:video.width, height:video.height, audio:probe.streams.some(s => s.codec_type === 'audio')};
+  return {duration, platforms, width:video.width, height:video.height, audio:probe.streams.some(s => s.codec_type === 'audio')};
 }
 export async function check(cwd: string, selected: Format[] = parseFormats()) {
   const dir = launchDir(cwd).video;
@@ -21,7 +21,7 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
     const path = join(dir,formats[format].file);
     const probe = JSON.parse((await run('ffprobe',['-v','error','-show_streams','-show_format','-of','json',path])).stdout);
     const info = checkProbe(probe, format);
-    const expected = script.scenes.reduce((n,s) => n+s.duration,0);
+    const expected = totalDuration(script);
     if (Math.abs(info.duration - expected) > 0.25) throw new Error(`Rendered duration differs from script: ${path}`);
     const receipt = JSON.parse(await readFile(`${path}.json`,'utf8'));
     if (receipt.sha256 !== await fileHash(path) || receipt.script !== JSON.stringify(script)) throw new Error(`Stale video caption receipt: ${path}`);

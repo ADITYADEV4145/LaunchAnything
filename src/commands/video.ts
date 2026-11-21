@@ -20,7 +20,7 @@ export function register(program: Command) {
   };
   action(video,'',async (cwd,opts) => { const selected = parseFormats(opts.format); const result = await render(cwd,opts.renderer,selected); return {...result,checks:await check(cwd,selected)}; });
   action(video.command('script').description('Print agent brief and validate an existing script'),'script',async cwd => {
-    const brief = {product:await productName(cwd), shots:await shots(cwd), media:await media(cwd), capabilities:await doctor(cwd), rules:'Agent: write .launch/video/script.json with 6–10 scenes, shot, text (1–8 words), duration in seconds, optional voiceover. Total 30–60 seconds. Use only captured media, never generated images. No LLM/TTS calls are made by the CLI. Optional TTS MCP audio goes in .launch/video/vo/<zero-based scene index>.wav or .mp3. Credit only Aditya.'};
+    const brief = {product:await productName(cwd), shots:await shots(cwd), media:await media(cwd), capabilities:await doctor(cwd), rules:'Agent: write .launch/video/script.json with 6–10 scenes, shot, text (1–8 words), duration in seconds, optional voiceover. Total 30–60 seconds including the automatic 3-second end card (27–57 seconds of scenes). Use only captured media, never generated images. No LLM/TTS calls are made by the CLI. Optional TTS MCP audio goes in .launch/video/vo/<zero-based scene index>.wav or .mp3. Credit only Aditya.'};
     try { await readFile(join(launchDir(cwd).video,'script.json')); }
     catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {brief,valid:null}; throw e; }
     try { return {brief,valid:true,script:await loadScript(cwd)}; }

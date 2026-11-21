@@ -6,6 +6,8 @@ import { validateFile } from '../core/schema.js';
 
 export interface Scene { shot: string; text: string; duration: number; voiceover?: string }
 export interface Script { scenes: Scene[] }
+export const endCardSeconds = 3;
+export function totalDuration(script: Script) { return script.scenes.reduce((n, s) => n + s.duration, 0) + endCardSeconds; }
 export interface Shot { id: string; route: string; viewport: {width: number; height: number}; record?: boolean; theme?: 'light' | 'dark'; waitFor?: string; actions?: {type: string; selector: string; text?: string}[] }
 export async function shots(cwd: string): Promise<Shot[]> {
   try {
@@ -36,8 +38,8 @@ export async function validateScript(cwd: string, data: unknown): Promise<Script
   const result = validateFile('video-script', data);
   if (!result.valid) throw new Error(result.errors.join('; '));
   const script = data as Script;
-  const duration = script.scenes.reduce((n, s) => n + s.duration, 0);
-  if (duration < 30 || duration > 60) throw new Error('Total duration must be 30–60 seconds');
+  const duration = totalDuration(script);
+  if (duration < 30 || duration > 60) throw new Error('Total duration including the 3-second end card must be 30–60 seconds');
   for (const scene of script.scenes) await resolveShot(cwd, scene.shot);
   return script;
 }

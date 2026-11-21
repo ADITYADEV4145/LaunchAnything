@@ -8,7 +8,8 @@ a TTS API. You, the agent, author `.launch/video/script.json`:
 {"scenes":[{"shot":"dashboard.png","text":"See the whole workflow","duration":5,"voiceover":"See the whole workflow in one place."}]}
 ```
 
-Expand to 6–10 scenes, 30–60 seconds total, with 1–8 words of on-screen text per
+Expand to 6–10 scenes, 27–57 seconds of scenes (30–60 seconds including the automatic
+3-second end card), with 1–8 words of on-screen text per
 scene. Every shot must be an existing PNG/JPG/WebM/MP4 under `.launch/media`, or
 a shots.yaml id with captured media of that name. Never use generated images as
 demo footage. Provenance is the agent's responsibility: files alone cannot prove
@@ -31,8 +32,9 @@ the target. Credit only **Aditya** in metadata.
 demo, vertical short and square video plus captions.srt. Auto uses a local or
 doctor-detected Remotion CLI if available, otherwise ffmpeg. Explicit
 `--renderer ffmpeg` works without Remotion installed. Requires ffmpeg/ffprobe
-with libx264 and drawtext. Captions are burned in; the last scene doubles as an
-end card, so reserve it for the product name and call to action.
+with libx264 and drawtext. Captions are burned in. Both renderers append a dedicated
+3-second dark end card with the product name and optional `.launch/media/logo.*`
+(PNG/JPG/JPEG/WebP/SVG), with no screenshot. SRT covers only the footage scenes.
 
 The independent project is bundled at `templates/video/remotion/`. Install its
 dependencies in your working repository to use it (Remotion is not a CLI runtime
@@ -48,3 +50,6 @@ when audio exists. The receipt is evidence of the renderer's caption operation,
 not an OCR check. Watch the final video before publishing. Bare `liftoff video`
 renders and checks; nothing is posted. Every command supports `--json` and fails
 non-zero for validation/tool failures.
+
+Checks report duration compliance for every platform, but enforce only the mapped
+targets: 9x16 → YouTube Shorts, 1x1 → X, 16x9 → X and Product Hunt.

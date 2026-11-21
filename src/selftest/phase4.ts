@@ -6,7 +6,7 @@ import { loadScript, media, validateScript } from '../video/script.js';
 import { render, run } from '../video/render.js';
 import { check } from '../video/check.js';
 
-export const checks: Check[] = [{ name: 'phase 4 ffmpeg fallback, captured references and video checks', async run({cwd,fixture}) {
+export const checks: Check[] = [{ name: 'phase 4 auto/fallback rendering, captured references and video checks', async run({cwd,fixture}) {
   const start = Date.now();
   const paths = launchDir(cwd);
   await mkdir(paths.video,{recursive:true});
@@ -24,10 +24,10 @@ export const checks: Check[] = [{ name: 'phase 4 ffmpeg fallback, captured refer
   try { await validateScript(cwd,{scenes:script.scenes.map(s => ({...s,shot:'phase4-missing.png'}))}); } catch { rejected = true; }
   if (!rejected) throw new Error('Missing captured shot was accepted');
   const selected = fixture === 'saas-next' ? ['16x9','9x16','1x1'] as const : ['1x1'] as const;
-  await render(cwd,'ffmpeg',[...selected]);
+  const result = await render(cwd,fixture === 'saas-next' ? 'auto' : 'ffmpeg',[...selected]);
   await check(cwd,[...selected]);
   const elapsed = Date.now()-start;
   await mkdir(join(cwd,'.liftoff-fixture'),{recursive:true});
-  await writeFile(join(cwd,'.liftoff-fixture','phase4-timing.json'),JSON.stringify({elapsedMs:elapsed,formats:selected}));
+  await writeFile(join(cwd,'.liftoff-fixture','phase4-timing.json'),JSON.stringify({elapsedMs:elapsed,formats:selected,renderer:result.renderer}));
   if (elapsed > 300000) throw new Error(`Phase 4 exceeded five minutes: ${elapsed}ms`);
 } }];

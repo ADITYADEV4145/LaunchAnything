@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validateScript, srt } from '../src/video/script.js';
+import { totalDuration, validateScript, srt } from '../src/video/script.js';
 import { check, checkProbe } from '../src/video/check.js';
-import { parseFormats, render, run } from '../src/video/render.js';
+import { parseFormats, remotionCli, render, run } from '../src/video/render.js';
 import { record } from '../src/video/record.js';
 
 const dirs: string[] = [];
@@ -25,6 +25,9 @@ describe('phase 4',() => {
     await expect(validateScript(cwd,{scenes:[]})).rejects.toThrow();
     await expect(validateScript(cwd,{scenes:script.scenes.map(s => ({...s,text:'This has far too many words for one caption now'}))})).rejects.toThrow();
     await expect(validateScript(cwd,{scenes:script.scenes.map(s => ({...s,duration:1}))})).rejects.toThrow('30–60');
+    const longest = {scenes:script.scenes.map(s => ({...s,duration:9.5}))};
+    expect(totalDuration(await validateScript(cwd,longest))).toBe(60);
+    await expect(validateScript(cwd,{scenes:script.scenes.map(s => ({...s,duration:10}))})).rejects.toThrow('end card');
     await expect(validateScript(cwd,{scenes:script.scenes.map(s => ({...s,shot:'missing.png'}))})).rejects.toThrow('captured media');
     await writeFile(join(cwd,'.launch/shots.yaml'),'shots:\n  - id: real\n    route: /\n    viewport: {width: 320, height: 180}\n');
     await expect(validateScript(cwd,{scenes:script.scenes.map(s => ({...s,shot:'real'}))})).resolves.toBeDefined();
@@ -44,6 +47,15 @@ describe('phase 4',() => {
     expect(() => parseFormats('bad')).toThrow();
     expect(() => parseFormats('')).toThrow();
     expect(() => checkProbe({...probe,format:{duration:'NaN'}},'9x16')).toThrow('Duration');
+    const landscape = {...probe,format:{duration:'100'},streams:[{codec_type:'video',width:1280,height:720}]};
+    expect(checkProbe(landscape,'16x9').platforms).toEqual([
+      {platform:'youtube-shorts',maxSeconds:60,compliant:false,required:false},
+      {platform:'x',maxSeconds:140,compliant:true,required:true},
+      {platform:'product-hunt',maxSeconds:180,compliant:true,required:true},
+    ]);
+    expect(() => checkProbe({...landscape,format:{duration:'141'}},'16x9')).toThrow('Duration');
+    const square = {...landscape,streams:[{codec_type:'video',width:720,height:720}]};
+    expect(checkProbe(square,'1x1').platforms.filter(p => p.required).map(p => p.platform)).toEqual(['x']);
   });
   it('handles absent recording requests and clearly reports missing optional Playwright',async () => {
     const {cwd} = await setup();
@@ -53,12 +65,22 @@ describe('phase 4',() => {
     await expect(record(cwd,'http://localhost:3000')).rejects.toThrow('Playwright is not installed');
     await expect(render(cwd,'invalid',['1x1'])).rejects.toThrow('Renderer');
     await expect(render(cwd,'remotion',['1x1'])).rejects.toThrow('Remotion is not installed');
+    const bin = join(cwd,'bin');
+    await mkdir(bin);
+    const target = join(cwd,'remotion-cli.js');
+    await writeFile(target,'');
+    await symlink(target,join(bin,'remotion'));
+    const previous = process.env.PATH;
+    try {
+      process.env.PATH = bin;
+      await expect(remotionCli(cwd)).resolves.toBe(target);
+    } finally { process.env.PATH = previous; }
   });
   it('renders ffmpeg without Remotion, checks silent captions, and rejects stale captions',async () => {
     const {cwd} = await setup();
     const result = await render(cwd,'ffmpeg',['1x1']);
     expect(result.renderer).toBe('ffmpeg');
-    expect(await check(cwd,['1x1'])).toMatchObject([{captions:true,audio:false,width:720,height:720}]);
+    expect(await check(cwd,['1x1'])).toMatchObject([{captions:true,audio:false,width:720,height:720,duration:33}]);
     await writeFile(join(cwd,'.launch/video/captions.srt'),'');
     await expect(check(cwd,['1x1'])).rejects.toThrow('Captions');
   },120000);
@@ -66,6 +88,7 @@ describe('phase 4',() => {
     const {cwd} = await setup();
     const vo = join(cwd,'.launch/video/vo');
     await mkdir(vo);
+    await run('ffmpeg',['-y','-v','error','-f','lavfi','-i','color=c=orange:s=160x100','-frames:v','1','-threads','1',join(cwd,'.launch/media/logo.png')]);
     for (let i = 0; i < 6; i++) await run('ffmpeg',['-y','-v','error','-f','lavfi','-i','sine=frequency=440:duration=5',join(vo,`${i}.wav`)]);
     await render(cwd,'ffmpeg',['1x1']);
     const result = await check(cwd,['1x1']);

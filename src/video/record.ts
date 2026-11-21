@@ -24,6 +24,7 @@ export async function record(cwd: string, base: string) {
       const target = new URL(shot.route,url);
       if (target.origin !== url.origin) throw new Error('Shot routes must remain on the base URL origin');
       const context = await browser.newContext({viewport:shot.viewport, colorScheme:shot.theme, recordVideo:{dir, size:shot.viewport}});
+      let video: {path(): Promise<string>} | null = null;
       try {
         const page = await context.newPage();
         await page.goto(target.href);
@@ -34,12 +35,12 @@ export async function record(cwd: string, base: string) {
           else await page.locator(action.selector).waitFor();
         }
         await page.waitForTimeout(1000);
-        const video = page.video();
-        await context.close();
-        const output = join(dir,`${shot.id}.webm`);
-        await rename(await video.path(),output);
-        files.push(output);
+        video = page.video();
       } finally { await context.close(); }
+      if (!video) throw new Error(`No video was recorded for ${shot.id}`);
+      const output = join(dir,`${shot.id}.webm`);
+      await rename(await video.path(),output);
+      files.push(output);
     }
   } finally { await browser.close(); }
   return {files};

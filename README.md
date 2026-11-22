@@ -16,6 +16,13 @@ liftoff doctor --json
 For development: `npm ci`, `npm run dev -- doctor`. Build with `npm run build`;
 test with `npm test`; check types with `npm run typecheck`.
 
+## Proof: two repos, nothing posted
+
+- [GroundWork: from a symbol lookup to a launch kit](docs/case-studies/groundwork.md)
+- [Agent Linux: a launch kit without booting the Mac-only VM](docs/case-studies/agentlinux.md)
+
+See what Liftoff produced, what still took judgment, and where the approval gate stopped each dry run.
+
 ## Commands
 
 All commands accept `--json` and `--cwd <repository>`. JSON is one object:

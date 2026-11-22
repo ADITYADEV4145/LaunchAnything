@@ -38,6 +38,15 @@ async function project(enterprise = false) {
 const cli = (cwd: string, ...args: string[]) => spawnSync(process.execPath,
   ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args, '--cwd', cwd, '--json'], { encoding: 'utf8' });
 
+it('allows text-only review with an uncaptured storyboard and ignores old judge-only artifacts',async()=>{
+  const {cwd,paths}=await project();
+  await writeFile(paths.shots,JSON.stringify({shots:['hook','before','after','cta'].map(purpose=>({id:purpose,purpose,caption:'Catch missing exports',card:true,viewport:{width:1200,height:700},...(purpose==='after'?{moneyMoment:true}:{})}))}));
+  await mkdir(join(paths.media,'judge'),{recursive:true});
+  await writeFile(join(paths.media,'judge/contact-sheet.png'),'old cache');
+  expect((await buildReview(cwd)).posts).toHaveLength(1);
+  await expect(readFile(join(paths.media,'judge/report.json'))).rejects.toMatchObject({code:'ENOENT'});
+});
+
 it.each(['A sourced statement [claim:scan]', 'No citations here', '', '<script>bad</script> [claim:<img src=x onerror=bad>]'])
 ('renders review citations as escaped badges without changing approval inputs: %s', async body => {
   const { cwd, paths } = await project();

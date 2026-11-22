@@ -42,6 +42,11 @@ async function walk(root: string, excluded: string, workRoot: string): Promise<s
   }
   return files;
 }
+export async function hasJudgeMedia(cwd: string): Promise<boolean> {
+  const paths = launchDir(cwd); const excluded = join(paths.media, 'judge');
+  const files = (await Promise.all([walk(paths.media, excluded, paths.video), walk(paths.video, excluded, paths.video)])).flat();
+  return files.some(file => /\.(png|jpe?g|webp|svg|bmp|tiff?|avif|mp4|webm|mov|gif)$/i.test(file));
+}
 function quantile(values: number[], fraction: number) { return values.length ? values.sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * fraction))] : 0; }
 async function logoReference(app: Browser, logo: string): Promise<PNG | undefined> {
   if (!logo) return;

@@ -28,7 +28,8 @@ export function context(cwd: string, selected?: string[]) {
   const config = read('config') as {profile: string; channels: string[]; brandKit?: string};
   const product = read('product') as Product;
   const channels = [...new Set(selected?.length ? selected : plannedChannels(paths.plan, config.channels) ?? config.channels)];
-  channels.forEach(loadPlatform);
+  config.channels.forEach(id => loadPlatform(id, cwd));
+  channels.forEach(id => loadPlatform(id, cwd));
   const profile = loadRule('profiles', config.profile);
   const brandPath = config.brandKit ? resolve(cwd, config.brandKit) : undefined;
   const brand = brandPath && existsSync(brandPath) ? readFileSync(brandPath, 'utf8') : '';

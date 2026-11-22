@@ -18,7 +18,7 @@ export function writeBriefs(cwd: string, selected?: string[]) {
       'Write the post yourself; liftoff never generates or publishes copy.',
       '## Grounded product facts and claim IDs', JSON.stringify(ctx.product, null, 2),
       'Use only supported facts. Every sentence with a number or feature name needs [claim:id]. Declare all cited IDs in claims. Titles can carry citations too.',
-      '## Platform rules', JSON.stringify(loadPlatform(channel), null, 2),
+      '## Platform rules', JSON.stringify(loadPlatform(channel, cwd), null, 2),
       '## Founder voice', JSON.stringify(loadVoice(cwd) ?? 'Run liftoff voice learn with at least 20 owned samples.', null, 2),
       'Editorial limits are conservative local budgets, not guarantees of platform acceptance.',
       '## Tone', String(ctx.profile.tone), '## Brand voice', ctx.brand || 'No brand kit supplied.',

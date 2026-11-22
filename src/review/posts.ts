@@ -128,6 +128,7 @@ export function mediaType(path: string) {
 export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>) {
   const paths = launchDir(cwd);
   const config = validate<Config>('config', JSON.parse(await readFile(paths.config, 'utf8')));
+  for (const id of (config as Config & { channels: string[] }).channels) loadRule('channels', id, cwd);
   const names = (config.approvers ?? []).map(({ name }) => name);
   if (names.some(name => !name.trim()) || new Set(names).size !== names.length)
     throw new Error('Configured approvers must have distinct, nonblank names');
@@ -140,7 +141,7 @@ export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>
   const posts: ReviewPost[] = [];
   for (const filename of filenames) {
     const channel = filename.slice(0, -3);
-    const rule = loadRule('channels', channel);
+    const rule = loadRule('channels', channel, cwd);
     let raw: Buffer;
     try { raw = await readLocalFile(root, join(root, 'posts', filename)); }
     catch (error) {

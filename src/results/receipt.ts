@@ -1,3 +1,4 @@
+import { site } from '../core/registry.js';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { checked, readJson, writeLocal } from './files.js';
@@ -7,15 +8,10 @@ import { plain } from './report.js';
 const xml = (value: string) => value.replace(/[\uFFFE\uFFFF]/g, '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
 })[char]!);
-const labels: Record<string, string> = {
-  'show-hn': 'Show HN', 'product-hunt': 'Product Hunt', x: 'X', linkedin: 'LinkedIn', reddit: 'Reddit',
-  devto: 'DEV', 'indie-hackers': 'Indie Hackers', 'github-release': 'GitHub release', tiktok: 'TikTok',
-  reels: 'Reels', shorts: 'Shorts', instagram: 'Instagram', email: 'Email', blog: 'Blog', 'press-release': 'Press release',
-};
 const format = new Intl.NumberFormat('en-US');
 const signed = new Intl.NumberFormat('en-US', { signDisplay: 'exceptZero' });
 
-function renderReceipt(results: Results, name: string, footer: boolean, trackedRelease: boolean) {
+function renderReceipt(results: Results, name: string, footer: boolean, trackedRelease: boolean, cwd?: string) {
   const rows = results.channels.filter(row => row.views !== undefined);
   const views = rows.reduce((sum, row) => addMetric(sum, row.views!), 0);
   const stars = results.channels.filter(row => row.starsDelta !== undefined);
@@ -43,7 +39,7 @@ function renderReceipt(results: Results, name: string, footer: boolean, trackedR
     </g>`).join('\n    ')}
     <text x="64" y="405" fill="#97f0cf" font-weight="700" font-size="17" letter-spacing="3">TRACKED CHANNELS</text>
     ${channels.map(({ channel }, i) =>
-      `<text x="${64 + (i % 5) * 220}" y="${448 + Math.floor(i / 5) * 36}" fill="#f7f8fb" font-size="22">${xml(labels[channel] ?? channel)}</text>`).join('\n    ')}
+      `<text x="${64 + (i % 5) * 220}" y="${448 + Math.floor(i / 5) * 36}" fill="#f7f8fb" font-size="22">${xml(site(channel, cwd).label ?? site(channel, cwd).name)}</text>`).join('\n    ')}
     ${channels.length ? '' : '<text x="64" y="448" fill="#f7f8fb" font-size="22">None recorded</text>'}
     <path d="M64 551H1136" stroke="#52617e"/>
     <text x="64" y="590" fill="#bec9e0" font-size="16">Observed ${xml(results.observedAt.slice(0, 10))} · Views are not unique reach</text>
@@ -62,6 +58,6 @@ export async function receipt(cwd: string, footer = true) {
   const trackedRelease = tracked.some(post => post.channel === 'github-release' &&
     post.status !== 'failed' && post.status !== 'cancelled');
   const path = join(paths.root, 'receipt.svg');
-  await writeLocal(path, renderReceipt(results, name, footer, trackedRelease));
+  await writeLocal(path, renderReceipt(results, name, footer, trackedRelease, cwd));
   return { path };
 }

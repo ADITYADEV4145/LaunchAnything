@@ -14,7 +14,7 @@ export function register(program: Command) {
       const root = resolve(cwd ?? process.cwd());
       const result = await collect(root, {
         metricsPath: options.metrics, github: options.github, replies: options.replies,
-        readStatus: ({ channel, id }) => getAdapter(channel, id).status(channel, id, root),
+        readStatus: ({ channel, id }) => getAdapter(channel, id, root).status(channel, id, root),
       });
       output('results', result, json);
     });

@@ -1,3 +1,7 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { parse } from 'yaml';
+import { packageRoot } from '../core/package-root.js';
+import { site } from '../core/registry.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
@@ -24,34 +28,22 @@ export interface AdapterStatus {
 }
 export interface PublishAdapter {
   name: AdapterName;
-  validate(post: ReviewPost): void;
+  validate(post: ReviewPost, cwd?: string): void;
   schedule(post: ReviewPost, cwd?: string): Promise<PublishReceipt>;
   status(channel: string, id: string, cwd?: string): Promise<AdapterStatus | undefined>;
   cancel(channel: string, id: string, cwd?: string): Promise<AdapterStatus | undefined>;
 }
 
-const destinations: Record<string, string> = {
-  'show-hn': 'https://news.ycombinator.com/submit',
-  reddit: 'https://www.reddit.com/submit',
-  'product-hunt': 'https://www.producthunt.com/posts/new',
-  x: 'https://x.com/compose/post',
-  linkedin: 'https://www.linkedin.com/feed/',
-  devto: 'https://dev.to/new',
+interface Metadata { id: AdapterName; name: string; priority: number; channels: string[]; envKeys: string[]; mcpAliases: string[] }
+const metadata = readdirSync(join(packageRoot(), 'rules/adapters')).filter(f => f.endsWith('.yaml'))
+  .map(f => parse(readFileSync(join(packageRoot(), 'rules/adapters', f), 'utf8')) as Metadata)
+  .sort((a, b) => a.priority - b.priority);
+const integrations = metadata.filter(m => m.id !== 'manual').map(m => m.id);
+const accepts = (name: AdapterName, channel: string, cwd?: string) => {
+  const target = site(channel, cwd);
+  return name === 'manual' || target.route === 'integration' &&
+    (target.adapters ? target.adapters.includes(name) : metadata.find(m => m.id === name)!.channels.includes(channel));
 };
-const manualOnly = new Set(['show-hn', 'reddit', 'product-hunt']);
-const social = ['x', 'linkedin', 'tiktok', 'reels', 'shorts', 'instagram'];
-const supported: Record<AdapterName, string[]> = {
-  postiz: social, buffer: social, ayrshare: social,
-  'linkedin-api': ['linkedin'],
-  'github-release': ['github-release'], devto: ['devto'], email: ['email'], manual: [],
-};
-const envKeys: Partial<Record<AdapterName, string[]>> = {
-  postiz: ['POSTIZ_API_KEY'], buffer: ['BUFFER_ACCESS_TOKEN', 'BUFFER_API_KEY'],
-  ayrshare: ['AYRSHARE_API_KEY'], 'github-release': ['GH_TOKEN', 'GITHUB_TOKEN'],
-  devto: ['DEVTO_API_KEY'],
-};
-const integrations = ['postiz', 'buffer', 'ayrshare', 'github-release', 'devto'] as const;
-const accepts = (name: AdapterName, channel: string) => name === 'manual' || supported[name].includes(channel);
 
 async function mcpNames(cwd?: string) {
   const repo = resolve(cwd ?? process.cwd());
@@ -68,28 +60,33 @@ async function mcpNames(cwd?: string) {
   return groups;
 }
 
+export async function adapterSelection(channel: string, cwd?: string, env = process.env) {
+  const target = site(channel, cwd);
+  if (target.route === 'manual') return { adapter: getAdapter(channel, undefined, cwd), reason: 'manual' };
+  if (channel === 'email') return { adapter: adapters.email, reason: 'manual' };
+  const eligible = integrations.filter(name => accepts(name, channel, cwd));
+  for (const group of await mcpNames(cwd)) for (const name of eligible) {
+    const alias = metadata.find(m => m.id === name)!.mcpAliases.find(alias => group.has(alias));
+    if (alias) return { adapter: adapters[name], reason: 'mcp:' + alias };
+  }
+  for (const name of eligible) {
+    const key = metadata.find(m => m.id === name)!.envKeys.find(key => Boolean(env[key]));
+    if (key) return { adapter: adapters[name], reason: 'env:' + key };
+  }
+  return { adapter: getAdapter(channel, undefined, cwd), reason: 'manual' };
+}
 export async function selectAdapter(channel: string, cwd?: string, env = process.env) {
-  if (manualOnly.has(channel) || channel === 'email') return getAdapter(channel);
-  const eligible = integrations.filter(name => accepts(name, channel));
-  if (!eligible.length) return getAdapter(channel);
-  const groups = await mcpNames(cwd);
-  const selected = groups.map(mcp =>
-    eligible.find(name => [name, name + '-mcp', 'mcp-' + name].some(alias => mcp.has(alias)))).find(Boolean)
-    ?? eligible.find(name => envKeys[name]?.some(key => Boolean(env[key])));
-  return selected ? adapters[selected] : getAdapter(channel);
+  return (await adapterSelection(channel, cwd, env)).adapter;
 }
-
-export function destination(channel: string) {
-  return destinations[channel];
-}
+export function destination(channel: string, cwd?: string) { return site(channel, cwd).submitUrl; }
 
 export async function readReceipts(cwd?: string) {
   return validate<{ posts: PublishReceipt[] }>('published',
     JSON.parse(await readOptional(launchDir(cwd).published) ?? '{"posts":[]}'));
 }
 
-function reminder(id: string, post: ReviewPost, url: string) {
-  if (manualOnly.has(post.channel)) return assistedReminder(post.channel, post.scheduledAt);
+function reminder(id: string, post: ReviewPost, url: string, cwd?: string) {
+  if (!site(post.channel, cwd).custom && site(post.channel, cwd).route === 'manual') return assistedReminder(post.channel, post.scheduledAt);
   const icsDate = (date: string) => date.replaceAll(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Liftoff//Launch reminder//EN',
     'BEGIN:VEVENT', `UID:${id}@liftoff.local`, `DTSTAMP:${icsDate(new Date().toISOString())}`,
@@ -99,18 +96,18 @@ function reminder(id: string, post: ReviewPost, url: string) {
 }
 
 function offlineAdapter(name: AdapterName): PublishAdapter {
-  function validatePost(post: ReviewPost) {
-    if (!accepts(name, post.channel) || (manualOnly.has(post.channel) && name !== 'manual'))
+  function validatePost(post: ReviewPost, cwd?: string) {
+    if (!accepts(name, post.channel, cwd))
       throw new Error(`${name} cannot stage ${post.channel}`);
   }
-  function find(posts: PublishReceipt[], channel: string, id: string) {
-    if (getAdapter(channel, id).name === name) return posts.find(post => post.channel === channel && post.id === id);
+  function find(posts: PublishReceipt[], channel: string, id: string, cwd?: string) {
+    if (getAdapter(channel, id, cwd).name === name) return posts.find(post => post.channel === channel && post.id === id);
   }
   return {
     name,
     validate: validatePost,
     async schedule(post, cwd) {
-      validatePost(post);
+      validatePost(post, cwd);
       const id = `${name}:${post.channel}:${post.hash}`;
       const folder = join(launchDir(cwd).review, 'ready', post.channel, post.hash);
       await mkdir(folder, { recursive: true });
@@ -122,17 +119,17 @@ function offlineAdapter(name: AdapterName): PublishAdapter {
       for (const [index, media] of post.media.entries()) {
         await writeFile(join(folder, `attachment-${index + 1}${extname(media.path)}`), media.bytes);
       }
-      const url = destination(post.channel);
-      if (name === 'manual' && url) await writeFile(join(folder, 'reminder.ics'), reminder(id, post, url));
+      const url = destination(post.channel, cwd);
+      if (name === 'manual' && url) await writeFile(join(folder, 'reminder.ics'), reminder(id, post, url, cwd));
       return { channel: post.channel, id, url: pathToFileURL(file).href, scheduledAt: post.scheduledAt, status: 'manual' };
     },
     async status(channel, id, cwd) {
-      const post = find((await readReceipts(cwd)).posts, channel, id);
+      const post = find((await readReceipts(cwd)).posts, channel, id, cwd);
       return post && { status: post.status };
     },
     async cancel(channel, id, cwd) {
       const data = await readReceipts(cwd);
-      const post = find(data.posts, channel, id);
+      const post = find(data.posts, channel, id, cwd);
       if (!post) return;
       post.status = 'cancelled';
       await writeFile(launchDir(cwd).published, JSON.stringify(data, null, 2) + '\n');
@@ -141,13 +138,13 @@ function offlineAdapter(name: AdapterName): PublishAdapter {
   };
 }
 
-const adapters = Object.fromEntries([...integrations, 'email', 'manual', 'linkedin-api'].map(name =>
+const adapters = Object.fromEntries(metadata.map(({ id: name }) =>
   [name, offlineAdapter(name as AdapterName)])) as Record<AdapterName, PublishAdapter>;
 
-export function getAdapter(channel: string, id?: string): PublishAdapter {
-  if (manualOnly.has(channel)) return adapters.manual;
+export function getAdapter(channel: string, id?: string, cwd?: string): PublishAdapter {
+  if (site(channel, cwd).route === 'manual') return adapters.manual;
   if (channel === 'email') return adapters.email;
   const name = id?.split(':', 1)[0];
-  if (name && Object.hasOwn(adapters, name) && accepts(name as AdapterName, channel)) return adapters[name as AdapterName];
+  if (name && Object.hasOwn(adapters, name) && accepts(name as AdapterName, channel, cwd)) return adapters[name as AdapterName];
   return adapters.manual;
 }

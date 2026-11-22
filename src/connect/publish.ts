@@ -11,10 +11,13 @@ import { reserveCap } from './caps.js';
 import { assistedReminder, instagramPayload } from './payloads.js';
 import { HttpMcpClient, mcpDraft, type McpClient, type McpPlatform } from './mcp.js';
 import { osKeychain, type Keychain } from './keychain.js';
+import { site } from '../core/registry.js';
+import { adapterMetadata } from '../adapters/metadata.js';
 
 export interface AssistOptions { channel?: string; account?: string; home?: string; browser?: (profile: string) => Promise<BrowserDriver>; now?: Date; timeout?: number;
   keychain?: Keychain; mcp?: (platform: McpPlatform, token: string) => Promise<McpClient> }
 export async function assistedPublish(cwd: string | undefined, options: AssistOptions = {}) {
+  if (options.channel) site(options.channel, cwd);
   const { paths, config, posts } = await loadReview(cwd);
   const { approvals, skips } = await decisions(paths);
   const selected = posts.filter(p => (!options.channel || p.channel === options.channel) && skips[p.channel] !== p.hash);
@@ -27,13 +30,15 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
   });
   const queue = [];
   for (const post of selected) {
+    if (site(post.channel, cwd).custom)
+      throw new Error(post.channel + ': custom sites only support offline staging; use publish --confirm without --assist');
     requireApproval(post, approvals, config.approvers);
-    const connection = await requireConnection(post.channel, options.account, options.home);
-    const route = connection.route === 'api' ? post.channel === 'linkedin' ? 'linkedin-api' : post.channel : connection.route;
-    const adapter = ['browser', 'mcp'].includes(connection.route) ? undefined : getAdapter(post.channel, route + ':');
+    const connection = await requireConnection(post.channel, options.account, options.home, cwd);
+    const route = adapterMetadata.find(adapter => adapter.connectionRoute === connection.route && adapter.channels.includes(post.channel))?.id ?? connection.route;
+    const adapter = ['browser', 'mcp'].includes(connection.route) ? undefined : getAdapter(post.channel, route + ':', cwd);
     if (adapter) {
       if (adapter.name !== route) throw new Error(`${post.channel}: unsupported connected route ${connection.route}`);
-      adapter.validate(post);
+      adapter.validate(post, cwd);
       if (route === 'linkedin-api' && !/^urn:li:(person|organization):[A-Za-z0-9_-]+$/.test(connection.account))
         throw new Error('LinkedIn direct API requires your author urn:li:person:ID or urn:li:organization:ID');
     } else if (connection.route === 'mcp') {
@@ -66,7 +71,7 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
       } else if (adapter) {
         receipt = await adapter.schedule(post, cwd);
         if (adapter.name === 'linkedin-api') await writeFile(new URL('linkedin-api-request.json', receipt.url), JSON.stringify({
-          method: 'POST', url: 'https://api.linkedin.com/rest/posts',
+          method: 'POST', url: adapterMetadata.find(metadata => metadata.id === adapter.name)!.requestUrl,
           instruction: 'Offline request only. Use your OS-keychain token and a supported LinkedIn-Version header with the official API; never automate the website.',
           body: { author: connection.account, commentary: [post.title, post.body,
             !post.linkFirstComment && post.link && !post.body.includes(post.link) ? post.link : undefined].filter(Boolean).join('\n\n'), visibility: 'PUBLIC',
@@ -97,7 +102,7 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
       try { receipt = await dispatch(); break; }
       catch {
         if (attempt === 1) {
-          receipt = await getAdapter(post.channel).schedule(post, cwd);
+          receipt = await getAdapter(post.channel, undefined, cwd).schedule(post, cwd);
           const reason = connection.route === 'mcp' && post.channel === 'x'
             ? 'No verified official X post-create tool available. Discovery never authorizes an unfamiliar write tool.'
             : 'Assisted dispatch failed twice. Inspect the destination for an existing post before using the paste file.';

@@ -5,8 +5,8 @@ import { commandOptions, output } from '../core/output.js';
 import { collect } from '../results/collect.js';
 
 export function register(program: Command) {
-  program.command('results').description('Collect the current launch checkpoint and prepare a report')
-    .option('--metrics <file>', 'Import local per-post metrics and comments (default: .launch/metrics.json)')
+  program.command('results').description('Collect T+1, T+3, T+7 or T+30 observations and prepare local drafts')
+    .option('--metrics <file>', 'Import per-post metrics, UTM counts and comments (default: .launch/metrics.json)')
     .option('--github', 'Read a public GitHub repository star count to compare with the pre-launch scan')
     .option('--replies', 'Prepare local reply drafts for unanswered comments on owned posts')
     .action(async (options: { metrics?: string; github?: boolean; replies?: boolean }) => {
@@ -14,7 +14,7 @@ export function register(program: Command) {
       const root = resolve(cwd ?? process.cwd());
       const result = await collect(root, {
         metricsPath: options.metrics, github: options.github, replies: options.replies,
-        readStatus: ({ channel, id }) => getAdapter(channel, id).status(channel, id, root),
+        readStatus: ({ channel, id }) => getAdapter(channel, id, root).status(channel, id, root),
       });
       output('results', result, json);
     });

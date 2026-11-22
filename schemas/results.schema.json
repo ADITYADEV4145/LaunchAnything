@@ -13,23 +13,8 @@
         "type": "object",
         "properties": {
           "channel": {
-            "enum": [
-              "show-hn",
-              "product-hunt",
-              "x",
-              "linkedin",
-              "reddit",
-              "devto",
-              "indie-hackers",
-              "github-release",
-              "tiktok",
-              "reels",
-              "shorts",
-              "instagram",
-              "email",
-              "blog",
-              "press-release"
-            ]
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
           },
           "views": {
             "type": "integer",
@@ -51,6 +36,10 @@
             "type": "integer"
           },
           "signups": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waitlistConversions": {
             "type": "integer",
             "minimum": 0
           }

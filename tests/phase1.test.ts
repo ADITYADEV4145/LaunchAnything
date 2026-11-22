@@ -227,7 +227,7 @@ describe('product validation', () => {
   it('validates real sources and rejects absent sources, missing files, directories and long one-liners', async () => {
     await fixture();
     const good = await product();
-    expect(await validateProduct(cwd, good)).toEqual({ valid: true, errors: [], warnings: [] });
+    expect(await validateProduct(cwd, good)).toEqual({ valid: true, errors: [], warnings: ['/problem/pains is empty; run liftoff research'] });
     for (const mutate of [
       (p: typeof good) => { p.features[0].sources = []; },
       (p: typeof good) => { p.features[0].sources[0].ref = 'missing.tsx'; },
@@ -257,12 +257,12 @@ describe('product validation', () => {
     p.features[0].sources = [{ type: 'commit', ref: 'deadbeef' }];
     const warned = await validateProduct(cwd, p);
     expect(warned.valid).toBe(true);
-    expect(warned.warnings).toHaveLength(1);
+    expect(warned.warnings).toHaveLength(2);
     git('init', '--initial-branch=main');
     git('add', 'README.md');
     git('-c', 'commit.gpgsign=false', 'commit', '-m', 'Source');
     p.features[0].sources = [{ type: 'commit', ref: git('rev-parse', 'HEAD') }];
-    expect((await validateProduct(cwd, p)).warnings).toHaveLength(0);
+    expect((await validateProduct(cwd, p)).warnings).toEqual(['/problem/pains is empty; run liftoff research']);
     p.claims.push(structuredClone(p.claims[0]));
     expect((await validateProduct(cwd, p)).errors).toContain('/claims ids must be unique');
   });

@@ -13,12 +13,90 @@
       "maxLength": 80
     },
     "audience": {
-      "type": "string",
-      "minLength": 1
+      "type": "object",
+      "properties": {
+        "who": {
+          "type": "string",
+          "minLength": 1
+        },
+        "where": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "uses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "who"
+      ],
+      "additionalProperties": false
     },
     "problem": {
-      "type": "string",
-      "minLength": 1
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pains": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pain_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "quotes": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "url"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "name",
+              "pain_index",
+              "quotes"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "additionalProperties": false
     },
     "proofPoints": {
       "type": "array",
@@ -125,6 +203,99 @@
         "additionalProperties": false
       },
       "minItems": 1
+    },
+    "proof": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "anyOf": [{ "type": "number" }, { "type": "string" }]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_pointer": {
+            "type": "string",
+            "pattern": "^(?:/(?:[^~]|~[01])*)*$"
+          }
+        },
+        "required": [
+          "metric",
+          "value",
+          "unit",
+          "context",
+          "source_file",
+          "source_pointer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "money_moment": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "after": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "before",
+        "action",
+        "after"
+      ],
+      "additionalProperties": false
+    },
+    "competitors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "dislikes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "dislikes"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
@@ -134,7 +305,9 @@
     "problem",
     "proofPoints",
     "features",
-    "claims"
+    "claims",
+    "proof",
+    "money_moment"
   ],
   "additionalProperties": false
 }

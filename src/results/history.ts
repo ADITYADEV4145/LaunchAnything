@@ -2,15 +2,20 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { checkpointAt, checkpointPaths } from './collect.js';
+import { calibrate, calibrationInput } from './calibration.js';
 import { checked, readJson, withWriteLock, writeJson } from './files.js';
-import { normalizeObservation, type Metrics, type ResultConfig, type Results } from './metrics.js';
+import { normalizeObservation, record, type PostObservation, type ResultConfig, type Results } from './metrics.js';
 import { plain } from './report.js';
 
-interface Lesson { time: string; channel: string; lesson: string; bestHour?: number }
-interface History { profiles: Record<string, Lesson[]> }
+interface Lesson {
+  time: string; channel: string; lesson: string; bestHour?: number;
+  bestHook?: string; bestAngle?: string; zeroMeasuredClicks?: boolean;
+}
+type Calibration = NonNullable<ReturnType<typeof calibrate>> & { time: string };
+interface History { profiles: Record<string, Lesson[]>; judgeCalibrations?: Record<string, Calibration[]> }
 interface PlanLesson { channel: string; time: string; observation: string }
-interface Evidence { channel: string; metrics?: Metrics; hook?: string; scheduledAt?: string }
-const signals = ['views', 'clicks', 'signups', 'likes', 'comments'] as const;
+interface Evidence extends PostObservation { channel: string; id?: string; scheduledAt?: string }
+const signals = ['signups', 'waitlistConversions', 'clicks', 'views', 'likes', 'comments'] as const;
 export const defaultHistoryPath = () => join(homedir(), '.liftoff', 'history.json');
 
 async function readHistory(path: string): Promise<History> {
@@ -29,6 +34,12 @@ export async function loadPlanLessons(profile: string, historyPath = defaultHist
   return [...recommendations.values()];
 }
 
+export async function loadJudgeWeights(profile: string, rubricId: string, historyPath = defaultHistoryPath()) {
+  const entries = (await readHistory(historyPath)).judgeCalibrations?.[profile] ?? [];
+  return [...entries].sort((a, b) => Date.parse(b.time) - Date.parse(a.time))
+    .find(entry => entry.rubricId === rubricId && entry.suggestedWeights)?.suggestedWeights;
+}
+
 function observedEvidence(data: unknown, results: Results, config: ResultConfig): Evidence[] {
   if (!data || typeof data !== 'object' || !('posts' in data) || !Array.isArray(data.posts) ||
     !('observedAt' in data) || data.observedAt !== results.observedAt ||
@@ -36,10 +47,10 @@ function observedEvidence(data: unknown, results: Results, config: ResultConfig)
     throw new Error('Checkpoint details do not match results.json; run liftoff results again.');
   return data.posts.map((raw: Record<string, unknown>) => {
     if (typeof raw?.channel !== 'string' || !results.channels.some(row => row.channel === raw.channel) ||
+      (raw.id !== undefined && typeof raw.id !== 'string') ||
       (raw.scheduledAt !== undefined && (typeof raw.scheduledAt !== 'string' || !Number.isFinite(Date.parse(raw.scheduledAt)))))
       throw new Error('Invalid checkpoint evidence; run liftoff results again.');
-    const { metrics, hook } = normalizeObservation(raw, raw.channel);
-    return { channel: raw.channel, metrics, hook, scheduledAt: raw.scheduledAt };
+    return { ...normalizeObservation(raw, raw.channel), channel: raw.channel, id: raw.id, scheduledAt: raw.scheduledAt };
   });
 }
 
@@ -66,11 +77,16 @@ function learnObservations(results: Results, evidence: Evidence[], config: Resul
       parts.push(`${row.views} views recorded; no recommendation without a scheduled slot with positive counts.`);
     }
     const hook = best?.post.hook ? best : strongest(posts.filter(post => post.hook));
-    if (hook?.post.hook) parts.push(`Recorded hook: “${plain(hook.post.hook, 100)}” (${hook.count} ${hook.signal}).`);
+    const angle = best?.post.angle ? best : strongest(posts.filter(post => post.angle));
+    const bestHook = hook?.post.hook ? plain(hook.post.hook, 100) : undefined;
+    const bestAngle = angle?.post.angle ? plain(angle.post.angle, 100) : undefined;
+    if (bestHook && hook) parts.push(`Recorded hook: “${bestHook}” (${hook.count} ${hook.signal}).`);
+    if (bestAngle && angle) parts.push(`Recorded angle: “${bestAngle}” (${angle.count} ${angle.signal}).`);
     if (row.clicks === 0) parts.push('Zero clicks were measured where counts were available; revisit channel fit.');
     else if (row.clicks !== undefined) parts.push(`${row.clicks} clicks recorded.`);
     if (!parts.length) continue;
-    observations.push({ time: results.observedAt, channel: row.channel, lesson: parts.join(' '), bestHour });
+    observations.push({ time: results.observedAt, channel: row.channel, lesson: parts.join(' '), bestHour, bestHook,
+      bestAngle, ...(row.clicks !== undefined && { zeroMeasuredClicks: row.clicks === 0 }) });
   }
   return observations;
 }
@@ -81,13 +97,21 @@ export async function learn(cwd: string, historyPath = defaultHistoryPath()) {
   const results = checked<Results>('results', await readJson(paths.results));
   const checkpoint = checkpointAt(config, new Date(results.observedAt));
   const { details } = checkpointPaths(cwd, config.launchDate, checkpoint);
-  const observations = learnObservations(results, observedEvidence(await readJson(details), results, config), config);
+  const detail = record(await readJson(details));
+  const evidence = observedEvidence(detail, results, config);
+  const observations = learnObservations(results, evidence, config);
+  const calibration = calibrate(evidence, calibrationInput(detail.rubric));
   await withWriteLock(historyPath, async () => {
     const history = await readHistory(historyPath);
     const existing = history.profiles[config.profile] ?? [];
     const unchanged = existing.filter(item => !observations.some(next => item.channel === next.channel && item.time === next.time));
     history.profiles[config.profile] = [...unchanged, ...observations];
+    if (calibration || history.judgeCalibrations?.[config.profile]?.length) {
+      const grouped = history.judgeCalibrations ??= {};
+      const prior = (grouped[config.profile] ?? []).filter(item => item.time !== results.observedAt);
+      grouped[config.profile] = calibration ? [...prior, { ...calibration, time: results.observedAt }] : prior;
+    }
     await writeJson(historyPath, checked<History>('history', history));
   });
-  return { path: historyPath, profile: config.profile, observations };
+  return { path: historyPath, profile: config.profile, observations, calibration };
 }

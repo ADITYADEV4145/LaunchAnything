@@ -1,0 +1,23 @@
+{
+  "benchmark": "fixture",
+  "mode": "recorded",
+  "command": null,
+  "repo": null,
+  "ranAt": "2026-11-22T01:43:15.000Z",
+  "exitCode": 0,
+  "results_file": ".liftoff-fixture/benchmark.json",
+  "sha256": "a03d9a2a600b43e2b2347fb00529369870873c8536aa78ef74cdc99595d66f0a",
+  "results": {
+    "checks": 1
+  },
+  "metrics": [
+    {
+      "metric": "fixture benchmark checks",
+      "value": 1,
+      "unit": "checks",
+      "context": "Synthetic fixture benchmark, not a real product performance claim",
+      "source_file": ".launch/proof/fixture.json",
+      "source_pointer": "/results/checks"
+    }
+  ]
+}

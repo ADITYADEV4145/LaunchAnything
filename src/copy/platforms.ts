@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { parse } from 'yaml';
-import { Ajv2020 } from 'ajv/dist/2020.js';
 import { packageRoot } from '../core/package-root.js';
+import { site } from '../core/registry.js';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 
-export const channels = ['show-hn','product-hunt','x','linkedin','reddit','devto','indie-hackers','github-release','tiktok','reels','shorts','instagram','email','blog','press-release'] as const;
+export const channels = readdirSync(join(packageRoot(), 'rules/channels')).filter(f => f.endsWith('.yaml')).map(f => f.slice(0, -5));
 export interface Platform {
   style?: string[]; requiresAffiliationDisclosure?: boolean;
   kind: 'platform'; id: string; name: string; version: number; lastVerified: string | null; sources: string[];
@@ -25,7 +25,7 @@ const validate = new Ajv2020({ allErrors: true }).compile({
   properties: {
     style: { type: 'array', items: { type: 'string' } },
     requiresAffiliationDisclosure: { type: 'boolean' },
-    kind: { const: 'platform' }, id: { enum: channels }, name: { type: 'string', minLength: 1 },
+    kind: { const: 'platform' }, id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' }, name: { type: 'string', minLength: 1 },
     version: length, lastVerified: { anyOf: [{ type: 'null' }, { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }] },
     verified: { type: 'boolean' },
     verifiedFields: { type: 'array', items: { type: 'string' } },
@@ -52,11 +52,10 @@ const validate = new Ajv2020({ allErrors: true }).compile({
     guidance: { type: 'array', items: { type: 'string' } }
   }
 });
-export function loadPlatform(id: string): Platform {
-  if (!channels.includes(id as typeof channels[number])) throw new Error('Unknown channel: ' + id);
-  const data: unknown = parse(readFileSync(join(packageRoot(), 'rules/platforms', id + '.yaml'), 'utf8'));
+export function loadPlatform(id: string, cwd?: string): Platform {
+  const data = site(id, cwd).copy;
   if (!validate(data)) throw new Error('Invalid platform rule: ' + JSON.stringify(validate.errors));
-  const rule = data as Platform;
-  if (rule.id !== id || rule.body.minLength > rule.body.maxLength) throw new Error('Inconsistent platform rule: ' + id);
+  const rule = data as unknown as Platform;
+  if (rule.body.minLength > rule.body.maxLength) throw new Error('Inconsistent platform rule: ' + id);
   return rule;
 }

@@ -1,0 +1,42 @@
+{
+  "posts": [
+    {
+      "channel": "x", "id": "one", "utmContent": "fixture-a",
+      "metrics": { "views": 1200, "comments": 4, "signups": 99 },
+      "angle": "Local-first workflow", "hook": "Track changes without a server.",
+      "judge": { "score": 93, "dimensions": { "specificity": 55, "polish": 96 } },
+      "comments": [
+        { "id": "a1", "author": "fixture", "body": "Is there an offline mode? Which versions are supported?", "answered": false },
+        { "id": "a2", "author": "fixture", "body": "It crashes when I open an empty project.", "answered": false },
+        { "id": "a3", "author": "fixture", "body": "Please add CSV export.", "answered": true },
+        { "id": "a4", "author": "fixture", "body": "I am concerned about the privacy risk.", "answered": false }
+      ]
+    },
+    {
+      "channel": "x", "id": "two", "utmContent": "fixture-b",
+      "metrics": { "views": 500, "comments": 3 },
+      "angle": "Sample export", "hook": "See exactly what changed.",
+      "copy": "See exactly what changed. Open the changes view to see one example. The local report lists files touched.",
+      "judge": { "score": 72, "dimensions": { "specificity": 97, "polish": 40 } },
+      "comments": [
+        { "id": "b1", "author": "fixture", "body": "What files are included? How do I delete the report?", "answered": false },
+        { "id": "b2", "author": "fixture", "body": "Please add CSV export.", "answered": false },
+        { "id": "b3", "author": "fixture", "body": "Could you add dark mode?", "answered": false }
+      ]
+    },
+    {
+      "channel": "show-hn", "id": "hn", "utmContent": "fixture-hn",
+      "metrics": { "views": 4, "comments": 1 },
+      "judge": { "score": 54, "dimensions": { "specificity": 30, "polish": 85 } },
+      "comments": [{ "id": "hn1", "author": "fixture", "body": "Does it run on Linux?", "answered": true }]
+    }
+  ],
+  "attribution": [
+    { "utmContent": "fixture-a", "clicks": 9, "signups": 2, "waitlistConversions": 1 },
+    { "utmContent": "fixture-b", "clicks": 31, "signups": 16, "waitlistConversions": 8 },
+    { "utmContent": "fixture-hn", "clicks": 0, "signups": 0, "waitlistConversions": 0 },
+    { "utmContent": "unknown", "signups": 7 },
+    { "signups": 4 }
+  ],
+  "calibration": { "rubricId": "fixture-v1", "weights": { "specificity": 50, "polish": 50 } }
+}

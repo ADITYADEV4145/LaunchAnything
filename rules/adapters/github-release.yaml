@@ -1,0 +1,13 @@
+id: github-release
+name: GitHub Releases
+priority: 3
+channels:
+  - github-release
+envKeys:
+  - GH_TOKEN
+  - GITHUB_TOKEN
+mcpAliases:
+  - github-release
+  - github-release-mcp
+  - mcp-github-release
+connectionRoute: api

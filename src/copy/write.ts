@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { validateProduct } from '../product/validate.js';
 import { context } from './context.js';
 import { loadPlatform } from './platforms.js';
 import { assertSafePath } from './safe-path.js';
@@ -7,6 +8,8 @@ import { loadVoice } from '../voice/learn.js';
 
 export function writeBriefs(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected);
+  const checked = validateProduct(cwd, ctx.product);
+  if (!checked.valid) throw new Error(checked.errors.join('; '));
   const directory = join(ctx.paths.posts, 'briefs');
   assertSafePath(cwd, directory);
   for (const channel of ctx.channels) assertSafePath(cwd, join(directory, channel + '.md'));
@@ -18,7 +21,7 @@ export function writeBriefs(cwd: string, selected?: string[]) {
       'Write the post yourself; liftoff never generates or publishes copy.',
       '## Grounded product facts and claim IDs', JSON.stringify(ctx.product, null, 2),
       'Use only supported facts. Every sentence with a number or feature name needs [claim:id]. Declare all cited IDs in claims. Titles can carry citations too.',
-      '## Platform rules', JSON.stringify(loadPlatform(channel), null, 2),
+      '## Platform rules', JSON.stringify(loadPlatform(channel, cwd), null, 2),
       '## Founder voice', JSON.stringify(loadVoice(cwd) ?? 'Run liftoff voice learn with at least 20 owned samples.', null, 2),
       'Editorial limits are conservative local budgets, not guarantees of platform acceptance.',
       '## Tone', String(ctx.profile.tone), '## Brand voice', ctx.brand || 'No brand kit supplied.',

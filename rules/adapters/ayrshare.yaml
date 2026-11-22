@@ -1,0 +1,16 @@
+id: ayrshare
+name: Ayrshare
+priority: 2
+channels:
+  - x
+  - linkedin
+  - tiktok
+  - reels
+  - shorts
+  - instagram
+envKeys:
+  - AYRSHARE_API_KEY
+mcpAliases:
+  - ayrshare
+  - ayrshare-mcp
+  - mcp-ayrshare

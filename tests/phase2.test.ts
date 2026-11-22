@@ -36,6 +36,7 @@ it('refuses symlinked output directories and files without touching external tar
   }
   isolated(cwd => {
     expect(() => assertSafePath(cwd, join(cwd, '..', 'escaped'))).toThrow('outside repository');
+    rmSync(join(cwd, '.launch'), { recursive: true, force: true });
     symlinkSync(join(cwd, 'missing'), join(cwd, '.launch'));
     expect(() => assertSafePath(cwd, join(cwd, '.launch/posts/x.md'))).toThrow('Unsafe');
   });

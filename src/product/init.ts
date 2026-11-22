@@ -6,6 +6,7 @@ import { repositoryFiles } from './scan.js';
 
 export interface Config {
   releaseChannels?: string[];
+  proof?: import('../proof/run.js').ProofConfig;
   profile: string;
   launchType: string;
   channels: string[];
@@ -30,8 +31,9 @@ export async function detectProfile(cwd: string): Promise<string> {
   if ((dependencies.next || dependencies.react) && pricing) return 'indie-saas';
   return 'devtool';
 }
-export function validateConfig(config: Config) {
+export function validateConfig(config: Config, cwd?: string) {
   assertSchema('config', config);
+  config.channels.forEach(id => loadRule('channels', id, cwd));
   try { new Intl.DateTimeFormat('en', { timeZone: config.timezone }).format(); }
   catch { throw new Error(`Invalid timezone: ${config.timezone}`); }
 }
@@ -45,11 +47,11 @@ export async function init(cwd: string, options: InitOptions = {}) {
   try { if (!options.force) existing = await readJson<Config>(paths.config); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   if (existing && !options.force) {
-    validateConfig(existing);
+    validateConfig(existing, cwd);
     if (!existing.profileConfirmed && options.profile && options.yes) {
       const rule = loadRule('profiles', options.profile);
       const config = { ...existing, profile: options.profile, channels: rule.defaultChannels as string[], profileConfirmed: true };
-      validateConfig(config);
+      validateConfig(config, cwd);
       await writeJson(paths.config, config);
       return { config, path: paths.config, created: false, message: message(config) };
     }
@@ -64,7 +66,7 @@ export async function init(cwd: string, options: InitOptions = {}) {
     launchDate: options.date ?? new Date().toISOString().slice(0, 10),
     profileConfirmed: Boolean(options.yes || options.profile), approvers: [], redact: [],
   };
-  validateConfig(config);
+  validateConfig(config, cwd);
   await writeJson(paths.config, config, !options.force);
   return { config, path: paths.config, created: true, message: message(config) };
 }

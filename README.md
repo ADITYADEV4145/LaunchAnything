@@ -16,6 +16,22 @@ liftoff doctor --json
 For development: `npm ci`, `npm run dev -- doctor`. Build with `npm run build`;
 test with `npm test`; check types with `npm run typecheck`.
 
+## Every release is a small launch
+
+`liftoff release --draft` reads the new tag's commits since the previous tag and
+writes a review-only kit under `.launch/releases/<tag>/`: changelog, GitHub notes,
+scored selection, channel drafts, changed-screen captures and a relaunch plan.
+Use `--issues closed-issues.json` for offline issue evidence, `--no-shots` to list
+captures without taking them, and `releaseChannels` in config to select from x,
+linkedin, email and devto. No LLM or publish adapter is called.
+
+`liftoff progress [--since ISO-date] [--now ISO-date]` writes weekly X/LinkedIn
+drafts with one latest real screenshot, or explicitly reports that none exists.
+`liftoff release --install-action` installs the tag-push workflow. It runs
+`liftoff release --draft --open-pr --json`, pushes only the kit and release history
+and opens a review PR. GitHub Actions must be permitted to create PRs. Nothing
+publishes; approve and post manually. See [release rules](skill/references/launch-ops.md).
+
 ## Proof: two repos, nothing posted
 
 - [GroundWork: from a symbol lookup to a launch kit](docs/case-studies/groundwork.md)

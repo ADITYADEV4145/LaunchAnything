@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { chmod, cp, mkdir, readFile } from 'node:fs/promises';
+import { delimiter, join } from 'node:path';
+import { packageRoot } from '../core/package-root.js';
+import { launchDir } from '../core/launch-dir.js';
+import { writeJson, writeLocal } from '../results/files.js';
+
+export async function releaseGate(cwd: string) {
+  await mkdir(cwd, { recursive: true });
+  await cp(join(packageRoot(), 'fixtures/cli-tool'), cwd, { recursive: true });
+  const paths = launchDir(cwd);
+  const env = { ...process.env, GITHUB_TOKEN: '', GH_TOKEN: '', GIT_AUTHOR_NAME: 'Aditya', GIT_AUTHOR_EMAIL: 'adityapunjani9@gmail.com', GIT_COMMITTER_NAME: 'Aditya', GIT_COMMITTER_EMAIL: 'adityapunjani9@gmail.com' };
+  const git = (...args: string[]) => execFileSync('/usr/bin/git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  await writeJson(paths.config, { profile: 'devtool', launchType: 'feature', channels: ['x'], timezone: 'UTC', launchDate: '2026-01-01', profileConfirmed: true });
+  await cp(join(cwd, '.liftoff-fixture/product.json'), paths.product);
+  await writeLocal(paths.shots, `shots:\n  - id: changed\n    sources: [bin/tasklight.js]\n    commands: ['node bin/tasklight.js --help']\n    viewport: {width: 800, height: 500}\n  - id: unchanged\n    sources: [src/other.ts]\n    commands: ['node --version']\n    viewport: {width: 800, height: 500}\n`);
+  git('init', '--initial-branch=main'); git('add', '.'); git('commit', '-m', 'Baseline'); git('tag', 'v0.1.0');
+  const cli = join(cwd, 'bin/tasklight.js');
+  await writeLocal(cli, await readFile(cli, 'utf8') + '\n// Updated help output.\n');
+  git('add', 'bin/tasklight.js'); git('commit', '-m', 'feat: clearer command help', '-m', 'Closes #12'); git('tag', 'v0.2.0');
+  await writeJson(join(paths.media, 'shots/manifest.json'), [{ id: 'unchanged', files: ['unchanged.png'] }]);
+  const remote = join(cwd, '.git/remote.git'); git('init', '--bare', remote); git('remote', 'add', 'origin', remote);
+  const bin = join(cwd, '.git/stubs'); await mkdir(bin);
+  const log = join(cwd, '.git/gh-args.json');
+  await writeLocal(join(bin, 'gh'), `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));\n`);
+  await chmod(join(bin, 'gh'), 0o755);
+  const built = import.meta.url.endsWith('.js');
+  const args = [...(built ? [] : ['--import', 'tsx']), join(packageRoot(), built ? 'dist/cli.js' : 'src/cli.ts'), 'release', '--draft', '--open-pr', '--json', '--cwd', cwd];
+  const output = execFileSync(process.execPath, args, { cwd: packageRoot(), env: { ...env, PATH: bin + delimiter + process.env.PATH }, encoding: 'utf8', timeout: 120000 });
+  assert.equal(JSON.parse(output).ok, true, output);
+  const branch = 'liftoff/release-v0-2-0';
+  const files = git('--git-dir', remote, 'ls-tree', '-r', '--name-only', branch).split('\n');
+  const kit = '.launch/releases/v0-2-0/';
+  assert.ok(files.includes(kit + 'changelog.md'));
+  assert.deepEqual(files.filter(f => f.startsWith(kit + 'posts/')).sort(), ['devto', 'email', 'linkedin', 'x'].map(channel => kit + `posts/${channel}.md`));
+  assert.deepEqual(files.filter(f => f.startsWith(kit + 'media/') && /\.(png|gif)$/.test(f)).sort(), [kit + 'media/changed.gif', kit + 'media/changed.png']);
+  assert.ok(files.includes(kit + 'media/x-clip.mp4'));
+  const manifest = JSON.parse(await readFile(join(paths.media, 'shots/manifest.json'), 'utf8')) as { id: string }[];
+  assert.deepEqual(manifest.map(s => s.id).sort(), ['changed', 'unchanged']);
+  const gh = JSON.parse(await readFile(log, 'utf8')) as string[];
+  assert.deepEqual(gh.slice(0, 2), ['pr', 'create']);
+  assert.ok(gh.includes(branch));
+  assert.ok(gh.some(arg => arg.includes('Nothing has been published; approve and post manually')));
+  return { files, branch };
+}

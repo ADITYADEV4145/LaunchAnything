@@ -8,15 +8,17 @@ import { browser, runTerminal, start, escapeHtml } from './runtime.js';
 import { assertPrivate } from './privacy.js';
 import { guard, gif, ocrCheck } from './capture.js';
 interface Shot { id: string; route?: string; commands?: string[]; viewport: { width: number; height: number }; theme?: 'light' | 'dark'; record?: boolean; fullPage?: boolean; waitFor?: string; actions?: { type: string; selector: string; text?: string }[] }
-export async function takeShots(cwd: string, options: { url?: string; command?: string; only?: string } = {}) {
+export async function takeShots(cwd: string, options: { url?: string; command?: string; only?: string; ids?: Set<string> } = {}) {
   const paths = launchDir(cwd);
   const spec = parse(await readFile(paths.shots, 'utf8')) as { shots: Shot[]; baseUrl?: string; startCommand?: string; readyTimeoutMs?: number };
   const validation = validateFile('shots', spec); if (!validation.valid) throw new Error(validation.errors.join('; '));
-  const selected = spec.shots.filter(s => !options.only || s.id === options.only);
+  const selected = spec.shots.filter(s => (!options.only || s.id === options.only) && (!options.ids || options.ids.has(s.id)));
   if (!selected.length) throw new Error('No matching shots');
   if (new Set(spec.shots.map(s => s.id)).size !== spec.shots.length || spec.shots.some(s => !/^[\w-]+$/.test(s.id))) throw new Error('Shot IDs must be unique safe filenames');
   let config: { redact?: string[] } = {}; try { config = JSON.parse(await readFile(paths.config, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
-  const dir = join(paths.media, 'shots'); await mkdir(dir, { recursive: true }); await rm(join(dir, 'manifest.json'), { force: true });
+  const dir = join(paths.media, 'shots'); await mkdir(dir, { recursive: true });
+  let previous: { id: string }[] = [];
+  try { previous = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
   let stop = () => {}; let url = options.url ?? spec.baseUrl;
   const app = await browser(); const manifest = [];
   try {
@@ -74,6 +76,6 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
         manifest.push({ id: shot.id, kind: shot.commands ? 'terminal' : shot.viewport.width < 600 ? 'mobile' : 'web', files, width, height, redactedCount, secretsFound: 0, ocr });
       } finally { await page.close(); }
     }
-    await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2)); return manifest;
+    await writeFile(join(dir, 'manifest.json'), JSON.stringify([...previous.filter(s => !selected.some(next => next.id === s.id)), ...manifest], null, 2)); return manifest;
   } finally { stop(); await app.close(); }
 }

@@ -13,6 +13,8 @@ import { collect } from '../src/results/collect.js';
 import { readJson, writeJson, writeLocal } from '../src/results/files.js';
 import { parseTargets, retro } from '../src/results/retro.js';
 import { checks } from '../src/selftest/launch-ops.js';
+import { affected, judge, technical, relaunch, type Change } from '../src/launch-ops/release-kit.js';
+import { progress, isoWeek } from '../src/launch-ops/progress.js';
 
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -119,6 +121,58 @@ it('monthly release cadence clamps month ends and preserves the UTC time', () =>
   expect(releaseSince(new Date('2026-03-15T12:34:56Z'), 'monthly').toISOString()).toBe('2026-02-15T12:34:56.000Z');
   expect(releaseSince(new Date('2026-03-31T12:34:56Z'), 'weekly').toISOString()).toBe('2026-03-24T12:34:56.000Z');
 });
+it('scores user-noticeable changes, technical posts and relaunch substance deterministically', () => {
+  expect(judge('feat: command help', ['bin/tool.js'], [12]).score).toBe(7);
+  expect(judge('docs: typo', ['README.md']).score).toBe(0);
+  expect(judge('chore: dependency', ['package.json']).score).toBe(0);
+  expect(judge('fix: crash', []).score).toBe(4);
+  expect(technical('indie-saas', [{ title: 'Updated copy', files: ['README.md'] }])).toBe(false);
+  expect(technical('devtool', [])).toBe(true);
+  expect(technical('indie-saas', [{ title: 'perf: query', files: [] }])).toBe(true);
+  const change = { sha: 'abc', title: 'feat: help', body: '', files: ['bin/tool.js'], issues: [], ...judge('feat: help', ['bin/tool.js']) };
+  expect(relaunch([]).ph).toBe(false);
+  expect(relaunch(Array(5).fill(change)).ph).toBe(false);
+  expect(relaunch(Array(6).fill(change))).toMatchObject({ ph: true, hn: false });
+  expect(relaunch([...Array(5).fill(change), { ...change, title: 'perf: query 30% faster' }] as Change[]).hn).toBe(true);
+});
+it('maps routes, explicit sources, global files and terminal changes without reshooting other screens', () => {
+  expect(affected({ route: '/settings' }, ['src/app/settings/page.tsx'])).toBe(true);
+  expect(affected({ route: '/' }, ['pages/index.tsx'])).toBe(true);
+  expect(affected({ route: '/settings' }, ['pages/other.tsx'])).toBe(false);
+  expect(affected({ route: '/settings' }, ['src/app/layout.tsx'])).toBe(true);
+  expect(affected({ sources: ['src/settings/**'] }, ['src/settings/form.tsx'])).toBe(true);
+  expect(affected({ sources: ['src/settings/*'] }, ['src/other.ts'])).toBe(false);
+  expect(affected({ commands: ['node --version'] }, ['bin/tool.js'])).toBe(true);
+  expect(affected({ commands: ['node --version'] }, ['docs/tool.md'])).toBe(false);
+});
+it('writes weekly drafts with no invented screenshot, one latest real image, and deterministic date errors', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  const options = { now: '2026-01-03T00:00:00Z' };
+  const empty = await progress(cwd, options);
+  expect(empty.image).toBeUndefined();
+  expect(await readFile(join(empty.folder, 'progress.md'), 'utf8')).toContain('image skipped');
+  await writeLocal(join(paths.media, 'shots', 'real.png'), 'actual fixture capture');
+  const withImage = await progress(cwd, options);
+  expect(withImage.image).toBe('real.png');
+  expect(await readFile(join(withImage.folder, 'media/real.png'), 'utf8')).toBe('actual fixture capture');
+  expect((await progress(cwd, { now: '2027-01-01' })).commits).toBe(0);
+  expect(isoWeek(new Date('2027-01-01'))).toBe('2026-W53');
+  await expect(progress(cwd, { now: 'bad' })).rejects.toThrow('Invalid');
+});
+it('honors release channel overrides, no-shots and offline issue input with empty-post fallback', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  const config = await readJson(paths.config) as Record<string, unknown>;
+  await writeJson(paths.config, { ...config, releaseChannels: ['email'] });
+  const issues = join(cwd, 'issues.json'); await writeJson(issues, [{ number: 5, title: 'Fix command help', state: 'closed' }]);
+  const kit = await release(cwd, { issues, shots: false });
+  expect(kit.channels).toEqual(['email']);
+  expect(await readFile(join(kit.notes, '../github-release.md'), 'utf8')).toContain('Fix command help');
+  await writeJson(issues, {}); await expect(release(cwd, { issues })).rejects.toThrow('--issues');
+  await expect(release(cwd, { openPr: true })).rejects.toThrow('requires --draft');
+  await writeLocal(join(cwd, 'docs.md'), 'Internal docs'); git(cwd, 'add', 'docs.md'); git(cwd, 'commit', '-m', 'docs: internal notes');
+  const quiet = await release(cwd, { from: 'HEAD^' }); expect(quiet.channels).toEqual([]);
+  expect(await readFile(join(quiet.notes, '../selection.json'), 'utf8')).toContain('No posts recommended');
+});
 it('release uses the exact target tag rather than the requested ref label', async () => {
   const { cwd } = await workspace(); await repository(cwd);
   git(cwd, 'tag', 'v0.2.0');
@@ -139,4 +193,4 @@ it.each(['warroom', 'friends', 'followup', 'retro', 'release'])('%s emits struct
 it.each(['cli-tool', 'saas-next', 'mobile-expo'])('offline launch operations selftest for %s', async fixture => {
   const { cwd } = await workspace(fixture); await repository(cwd);
   for (const check of checks) await check.run({ cwd, fixture });
-});
+}, 120000);

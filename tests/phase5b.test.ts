@@ -228,6 +228,22 @@ it.each(['postiz', 'buffer', 'api'] as const)('allows LinkedIn official API rout
     expect(JSON.stringify(request)).not.toContain('secret');
   }
 });
+it.each([true, false])('stages LinkedIn API links consistently with first-comment placement %s', async linkFirstComment => {
+  const link = 'https://example.test/launch';
+  const { cwd, home } = await approvedPost('linkedin', [], { link, linkFirstComment });
+  await connect({ platform: 'linkedin', route: 'api', account: 'urn:li:person:owner' }, 'secret', new MemoryKeychain(), home);
+  const { posts: [receipt] } = await assistedPublish(cwd, { home });
+  const request = JSON.parse(await readFile(new URL('linkedin-api-request.json', receipt.url), 'utf8'));
+  const paste = await readFile(new URL(receipt.url!), 'utf8');
+  expect(request.body.commentary + '\n').toBe(paste);
+  if (linkFirstComment) {
+    expect(request.body.commentary).not.toContain(link);
+    expect(await readFile(new URL('first-comment.txt', receipt.url), 'utf8')).toBe(link + '\n');
+  } else {
+    expect(request.body.commentary).toContain(link);
+    await expect(readFile(new URL('first-comment.txt', receipt.url))).rejects.toMatchObject({ code: 'ENOENT' });
+  }
+});
 it.each([{ route: 'browser' }, { route: 'mcp' }, { route: 'buffer', server: 'https://website-driver.test/mcp' },
   { route: 'api', profile: '/chrome' }])('rejects LinkedIn website automation at connect and dispatch: %j', async input => {
   const { cwd, home } = await approvedPost('linkedin');

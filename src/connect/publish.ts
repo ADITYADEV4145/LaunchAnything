@@ -68,7 +68,8 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
         if (adapter.name === 'linkedin-api') await writeFile(new URL('linkedin-api-request.json', receipt.url), JSON.stringify({
           method: 'POST', url: 'https://api.linkedin.com/rest/posts',
           instruction: 'Offline request only. Use your OS-keychain token and a supported LinkedIn-Version header with the official API; never automate the website.',
-          body: { author: connection.account, commentary: [post.title, post.body, post.link].filter(Boolean).join('\n\n'), visibility: 'PUBLIC',
+          body: { author: connection.account, commentary: [post.title, post.body,
+            !post.linkFirstComment && post.link && !post.body.includes(post.link) ? post.link : undefined].filter(Boolean).join('\n\n'), visibility: 'PUBLIC',
             distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false },
         }, null, 2) + '\n');
         if (instagram) await writeFile(new URL('instagram-payload.json', receipt.url), JSON.stringify(instagram, null, 2) + '\n');

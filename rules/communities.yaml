@@ -3,6 +3,7 @@ forbidden:
   - 'no advertising'
   - 'no promotion'
 restricted:
+  - 'self[- ]?promo(?:tion)?\s+only\s+in\b'
   - 'self[- ]?promo(?:tion)?.*(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|weekend)'
   - '9:1'
   - '10%'

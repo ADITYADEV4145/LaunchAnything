@@ -46,7 +46,7 @@ describe('communities', () => {
   });
   it.each(['weekly_thread', 'megathread', 'self_promo', 'promo-thread', 'discussion'])('directs URL-only promotion restrictions to the cited %s thread', async slug => {
     const cwd = await setup(); const url = `https://reddit.com/r/builders/comments/abc/${slug}`;
-    const rules = [{ short_name: 'Promotions', description: `Self-promo only in ${url}` }];
+    const rules = [{ short_name: 'Promotions', description: 'Self-promotion is allowed' }, { short_name: 'Thread restriction', description: `Self-promo only in ${url}` }];
     expect(restrictions(rules, 'UTC')).toMatchObject({ megathread: true, threadUrl: url, manualReview: undefined });
     const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
     const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));

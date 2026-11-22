@@ -70,7 +70,8 @@ G1 no-black (blackdetect), G2 no-freeze (no hold longer than 3 seconds), G3 read
 (generated hooks target 3 seconds, extended only to their minimum reading time),
 (text ≥0.5s + words/3, voiceover ≤2.8 words/s, SRT scene cue map), G4 no-page-chrome
 (no counters or progress markers), G5 end-card (3s ±0.25), and G6 voice-stt (≥80%
-normalized script word coverage via local whisper or whisper-cli). STT is skipped
+normalized script word coverage via local whisper or whisper-cli on scene-aligned
+audio extracted from that format's exported video, never local voice takes). STT is skipped
 if audio or a transcriber is missing; loudness is skipped without audio (music-only
 beds retain their quieter-than -20 LUFS rule; voice targets -14 ±2 LUFS). Each gate
 has id, name, status and detail. Per-format reports are saved to

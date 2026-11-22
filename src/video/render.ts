@@ -75,7 +75,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
   }
   const paths = await Promise.all(script.scenes.map(s => resolveShot(cwd, s.shot)));
   const voices = await Promise.all(script.scenes.map(async (_, index) => {
-    for (const extension of ['wav','mp3']) { const file = join(dir, 'vo', `${index}.${extension}`); if (await exists(file)) return file; }
+    for (const extension of ['mp3','wav']) { const file = join(dir, 'vo', `${index}.${extension}`); if (await exists(file)) return file; }
     return undefined;
   }));
   try {

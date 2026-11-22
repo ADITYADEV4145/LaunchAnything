@@ -117,7 +117,8 @@ Selftest retains its per-check report in data even when some checks fail.
 checks, then reports G0 moves (clean decode and differing sampled frames), G1
 no-black, G2 no-freeze (>3 seconds), G3 readcheck (reading/voiceover pace and cue
 map), G4 no-page-chrome, G5 end-card (3 seconds ±0.25), G6 voice-stt (80% word
-coverage when voice audio and Whisper are available), and loudness (-14 ±2 LUFS
+coverage of scene-aligned audio extracted from the exported cut when narration
+and Whisper are available), and loudness (-14 ±2 LUFS
 with voice, music-only quieter than -20 LUFS).
 Per-format gates have `id`, `name`, `status` and `detail` and are saved to
 `.launch/video/check.json` before gate failures throw. Optional missing STT or

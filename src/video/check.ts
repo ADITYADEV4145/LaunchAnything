@@ -49,16 +49,9 @@ export function transcriptCoverage(script: string, transcript: string) {
   const expected = words(script), actual = new Set(words(transcript));
   return expected.length ? expected.filter(word => actual.has(word)).length / expected.length : 1;
 }
-export async function voiceGate(dir: string, script: Script): Promise<Gate> {
-  const voices: {path:string;text:string;index:number}[] = [];
-  for (const [index,scene] of script.scenes.entries()) {
-    for (const ext of ['wav','mp3']) {
-      const path = join(dir,'vo',`${index}.${ext}`);
-      try { await access(path); voices.push({path,text:scene.voiceover ?? '',index}); break; } catch { /* Optional audio. */ }
-    }
-  }
+export async function voiceGate(video: string, script: Script, narrated = true): Promise<Gate> {
   const skipped = (detail: string): Gate => ({id:'G6',name:'voice-stt',status:'skipped',detail});
-  if (!voices.length) return skipped('No voiceover audio files');
+  if (!narrated || !script.scenes.some(scene => scene.voiceover?.trim())) return skipped('No narration in rendered audio');
   let binary: string | undefined;
   for (const name of ['whisper','whisper-cli']) {
     for (const directory of (process.env.PATH ?? '').split(delimiter)) {
@@ -71,16 +64,19 @@ export async function voiceGate(dir: string, script: Script): Promise<Gate> {
   return gate('G6','voice-stt',async () => {
     const work = await mkdtemp(join(tmpdir(),'liftoff-stt-'));
     try {
-      for (const voice of voices) {
-        if (!words(voice.text).length) throw new Error(`Scene ${voice.index + 1}: audio has no voiceover script`);
-        const output = join(work,`${voice.index}`);
-        if (binary!.endsWith('whisper-cli')) await run(binary!,['-f',voice.path,'-otxt','-of',output]);
-        else await run(binary!,[voice.path,'--output_format','txt','--output_dir',work]);
+      let offset = 0;
+      for (const [index,scene] of script.scenes.entries()) {
+        const start = offset; offset += scene.duration;
+        if (!scene.voiceover?.trim()) continue;
+        const output = join(work,`${index}`), audio = `${output}.wav`;
+        await run('ffmpeg',['-y','-v','error','-ss',String(start),'-i',video,'-t',String(scene.duration),'-map','0:a:0','-vn','-ac','1','-ar','16000',audio]);
+        if (binary!.endsWith('whisper-cli')) await run(binary!,['-f',audio,'-otxt','-of',output]);
+        else await run(binary!,[audio,'--output_format','txt','--output_dir',work]);
         const transcript = await readFile(`${output}.txt`,'utf8');
-        const coverage = transcriptCoverage(voice.text,transcript);
-        if (coverage < .8) throw new Error(`Scene ${voice.index + 1}: transcript covers ${(coverage*100).toFixed(1)}% of script words; need 80%`);
+        const coverage = transcriptCoverage(scene.voiceover,transcript);
+        if (coverage < .8) throw new Error(`Scene ${index + 1}: rendered audio transcript covers ${(coverage*100).toFixed(1)}% of script words; need 80%`);
       }
-      return 'All voiceovers cover at least 80% of script words';
+      return 'Rendered audio covers at least 80% of each narrated scene in this cut';
     } finally { await rm(work,{recursive:true,force:true}); }
   });
 }
@@ -115,7 +111,7 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
     if (receipt.sha256 !== await fileHash(path) || receipt.script !== JSON.stringify(script)) throw new Error(`Stale video caption receipt: ${path}`);
     if (receipt.captions !== 'burned' && !probe.streams.some((s: {codec_type:string}) => s.codec_type === 'subtitle')) throw new Error(`Captions not present: ${path}`);
     let loudness: number | undefined;
-    const gates = [...await motionGates(path),readcheck(timedScript,timedCaptions),chromeLint(script),endCardGate(timedScript,info.duration),await voiceGate(dir,timedScript)];
+    const gates = [...await motionGates(path),readcheck(timedScript,timedCaptions),chromeLint(script),endCardGate(timedScript,info.duration),await voiceGate(path,timedScript,info.audio && receipt.audio?.mode !== 'music-only')];
     if (distinct) gates.push(distinct);
     if (info.audio) gates.push(await gate('loudness','loudness',async () => {
       const {stderr} = await run('ffmpeg',['-hide_banner','-i',path,'-af','ebur128','-f','null','-']);

@@ -11,6 +11,18 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['Singapore time: 9am', 'at 9am; timezone Singapore', 'at 9am; time zone is Singapore', 'at 9am; use Singapore for scheduling', 'at 9am ET Singapore'])('fails closed on rule-wide timezone context: %s', async description => {
+    const cwd = await setup(); const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
+    expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]);
+  });
+  it('does not mistake known calendar words, sentence starts, or references for unknown zones', () => {
+    const rules = [{ short_name: 'Self-Promo Sunday', description: 'Please post on Sundays at 9am ET in May; see r/Singapore and u/Someone. Read https://example.org/Singapore.' }];
+    expect(restrictions(rules, 'UTC').manualReview).toBeUndefined();
+    expect(restrictions([{ short_name: 'Promotions', description: 'Singapore has a 9:1 contribution ratio' }], 'UTC').manualReview).toBeUndefined();
+  });
   it.each(['any day except Friday', 'not on Friday', 'no posting on Friday', 'excluding Friday', 'any day other than Friday', 'any day except Friday and Saturday'])('excludes negated posting days: %s', async condition => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
     const rules = [{ short_name: 'Promotions', description: `Self-promotion allowed; ${condition}` }]; const limit = restrictions(rules, 'UTC');
@@ -40,7 +52,7 @@ describe('communities', () => {
   it.each(['24:00-24:00 UTC', '18:00-24:01 UTC', '18:00-25:00 UTC', '18:00-24:00pm UTC'])('does not accept invalid uses of the 24:00 boundary: %s', description => {
     expect(restrictions([{ short_name: 'Promotions', description }], 'UTC').manualReview).toBeDefined();
   });
-  it.each(['Please post on Sundays at 9am ET', 'Please post on Sundays at 9am', 'Post at 9am Sundays', 'at 9am ET Singapore', 'ET at 9am Sundays'])('limits place checks to attached context: %s', async description => {
+  it.each(['Please post on Sundays at 9am ET', 'Please post on Sundays at 9am', 'Post at 9am Sundays', 'ET at 9am Sundays'])('allows ordinary sentence starts and known timezones: %s', async description => {
     const cwd = await setup(); const rules = [{ short_name: 'Self-Promo Sunday', description }];
     expect(restrictions(rules, 'UTC').manualReview).toBeUndefined();
     const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
@@ -239,7 +251,7 @@ describe('communities', () => {
     report.plan.push({ subreddit: 'builders', date: '2026-01-04', time: '12:00', timezone: 'UTC', angle: 'lesson', variant: 'value-first', file: 'posts/builders.md' });
     expect((await checkCommunities(cwd, report)).errors).toContain('builders: rule timezone needs manual review');
   });
-  it.each(['9am Singapore', 'Singapore at 9am', 'at 9am in Singapore', 'Singapore time at 9am', 'at 9am (Singapore)', 'İstanbul says to post at 9am Singapore'])('never substitutes the config zone for an unknown place: %s', async description => {
+  it.each(['9am Singapore', 'Post in Singapore at 9am', 'at 9am in Singapore', 'Singapore time at 9am', 'at 9am (Singapore)', 'İstanbul says to post at 9am Singapore'])('never substitutes the config zone for an unknown place: %s', async description => {
     const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
     expect(limit.manualReview).toBe('Unrecognized rule timezone or place: Singapore'); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
     const cwd = await setup(); const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, file);

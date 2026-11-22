@@ -2,6 +2,18 @@ const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 const zones: Record<string, string> = { et: 'America/New_York', est: 'Etc/GMT+5', edt: 'Etc/GMT+4', pt: 'America/Los_Angeles', pst: 'Etc/GMT+8', pdt: 'Etc/GMT+7', ct: 'America/Chicago', cst: 'Etc/GMT+6', cdt: 'Etc/GMT+5', mt: 'America/Denver', mst: 'Etc/GMT+7', mdt: 'Etc/GMT+6', utc: 'UTC', gmt: 'UTC' };
 const unsupportedZones = ['cet', 'cest', 'eet', 'eest', 'ist', 'bst', 'jst', 'aest', 'aedt', 'acst', 'acdt', 'awst', 'nzst', 'nzdt', 'hkt', 'sgt', 'wet', 'west', 'ast', 'adt', 'hst', 'akst', 'akdt'];
 const zonePattern = `(?:(?:utc|gmt)[ \\t]*[+-][ \\t]*\\d+(?::\\d{2})?|[a-z_]+(?:/[a-z0-9_+-]+)+|${[...Object.keys(zones), ...unsupportedZones].join('|')})`;
+function unknownTimeContext(source: string) {
+  const phrase = /\b(\p{L}[\p{L}\p{M}-]*)\s+time\b/iu.exec(source);
+  if (phrase) return `Unrecognized rule timezone or place: ${phrase[1]}`;
+  if (/\btime\s*zone\b/i.test(source)) return 'Unresolved rule timezone context';
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const known = new RegExp(`^(?:${zonePattern}|(?:${weekdays.join('|')})s?|weekends?|weekdays?|${months.concat(months.map(month => month.slice(0, 3))).join('|')})$`, 'i');
+  for (const match of source.matchAll(/(?<![\p{L}\p{N}_])\p{L}[\p{L}\p{M}_/+\-]*/gu)) {
+    if (!/^\p{Lu}/u.test(match[0]) || known.test(match[0])) continue;
+    const prefix = source.slice(0, match.index).split(/[.!?\n]/).at(-1)!;
+    if (/[\p{L}\p{N}]/u.test(prefix)) return `Unrecognized rule timezone or place: ${match[0]}`;
+  }
+}
 export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
   const raw = rules.flatMap(r => [r.short_name, r.description]).join('\n\n');
   const urlPattern = /\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi;
@@ -54,16 +66,7 @@ export function restrictions(rules: { short_name: string; description: string }[
   const remainder = parsed ? text.slice(0, parsed.index) + ' ' + text.slice(parsed.index! + parsed[0].length) : text;
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
-  if (parsed) {
-    const before = source.slice(0, parsed.index).split('\n\n').at(-1)!;
-    const after = source.slice(parsed.index! + parsed[0].length).split('\n\n')[0]!;
-    const attachedZone = new RegExp(`^[ \\t]*[(\\[]?[ \\t]*(?:(?:in|at)[ \\t]+)?${zonePattern}(?![\\w/])`, 'i').test(after) || new RegExp(`\\b${zonePattern}[ \\t]*$`, 'i').test(before);
-    if (!attachedZone) {
-      const previous = /^(?:at|from|between)\b/i.test(parsed[0]) ? /(\p{Lu}[\p{L}\p{M}-]*)(?:[ \t]+time)?[ \t]+$/u.exec(before)?.[1] : /\b(?:in|at)[ \t]+(\p{Lu}[\p{L}\p{M}-]*)[ \t]+$/u.exec(before)?.[1];
-      const unknown = /^[ \t]*[(\[]?[ \t]*(?:(?:in|at)[ \t]+)?(\p{Lu}[\p{L}\p{M}-]*)/u.exec(after)?.[1] ?? previous;
-      if (unknown && !new RegExp(`^(?:(?:${weekdays.join('|')})s?|weekends?|at|from|between|to|and|in|on|only|post|posting|time)$`, 'i').test(unknown)) manualReview = `Unrecognized rule timezone or place: ${unknown}`;
-    }
-  }
+  if (parsed || unparsedTime) manualReview ??= unknownTimeContext(source);
   if (threadUrls.length && !threadUrl) manualReview = 'Unresolved thread destination; manual review required';
   return { days: [...new Set(days)], megathread: threadUrls.length > 0 || /mega[-_ ]?thread|weekly[-_ ]thread|(?:self[-_ ]promo|promo)[-_ ]thread/i.test(raw), threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview };
 }

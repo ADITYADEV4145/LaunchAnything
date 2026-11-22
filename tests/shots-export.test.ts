@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
@@ -85,6 +85,16 @@ describe('store screenshot pure gates',()=>{
 });
 
 describe('store receipts and CLI',()=>{
+  it('leaves a previous gallery untouched when rendering fails and removes staging directories',async()=>{
+    const {cwd,source}=await fixture(); await receipt(cwd,source);
+    const manifest=await readFile(join(cwd,'.launch/media/store/manifest.json'));
+    const image=await readFile(join(cwd,'.launch/media/store/og/01-work.png'));
+    vi.spyOn(runtime,'browser').mockRejectedValue(new Error('Render failed'));
+    await expect(exportStore(cwd,['og'])).rejects.toThrow('Render failed');
+    expect(await readFile(join(cwd,'.launch/media/store/manifest.json'))).toEqual(manifest);
+    expect(await readFile(join(cwd,'.launch/media/store/og/01-work.png'))).toEqual(image);
+    expect((await readdir(join(cwd,'.launch/media'))).filter(name=>name.startsWith('.store-'))).toEqual([]);
+  });
   it('persists pass/skipped gates without Chrome and fails stale source captures',async()=>{
     const {cwd,source}=await fixture(); await receipt(cwd,source);
     vi.spyOn(runtime,'exec').mockRejectedValue(new Error('not installed'));
@@ -168,4 +178,12 @@ it('exports all exact targets with money moment first and automatically checks r
   }
   const cli=await exec(process.execPath,['--import','tsx','src/cli.ts','--cwd',cwd,'--json','shots','check'],{timeout:30000});
   expect(JSON.parse(cli.stdout).ok).toBe(true);
+  const manifest=await readFile(join(cwd,'.launch/media/store/manifest.json'));
+  const images=await Promise.all(result.manifest.map(entry=>readFile(join(cwd,'.launch/media/store',entry.file))));
+  vi.spyOn(runtime,'exec').mockResolvedValue({stdout:'available',stderr:''} as never);
+  vi.spyOn(banned,'ocrWords').mockResolvedValue({text:'foo',words:[]});
+  await expect(exportStore(cwd,['og'])).rejects.toThrow('Banned content');
+  expect(await readFile(join(cwd,'.launch/media/store/manifest.json'))).toEqual(manifest);
+  for(const [index,entry] of result.manifest.entries()) expect(await readFile(join(cwd,'.launch/media/store',entry.file))).toEqual(images[index]);
+  expect((await readdir(join(cwd,'.launch/media'))).filter(name=>name.startsWith('.store-'))).toEqual([]);
 },120000);

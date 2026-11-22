@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, join, resolve, sep } from 'node:path';
 import { PNG } from 'pngjs';
 import { parse } from 'yaml';
@@ -106,8 +106,11 @@ async function sourcePath(cwd:string,capture:Capture,file:string) {
 }
 async function canOcr() { try { await exec('tesseract',['--version']); return true; } catch { return false; } }
 export async function checkStore(cwd:string) {
+  return checkStoreDirectory(cwd,join(launchDir(cwd).media,'store'));
+}
+async function checkStoreDirectory(cwd:string,dir:string) {
   const {paths,shots,captures,product}=await inputs(cwd);
-  const entries=JSON.parse(await readFile(join(paths.media,'store/manifest.json'),'utf8')) as StoreShot[];
+  const entries=JSON.parse(await readFile(join(dir,'manifest.json'),'utf8')) as StoreShot[];
   if(!Array.isArray(entries) || !entries.length) throw new Error('No store exports; run shots export');
   const ordered=[...shots].sort((a,b)=>Number(Boolean(b.moneyMoment))-Number(Boolean(a.moneyMoment)));
   const ocr=await canOcr(); const results=[];
@@ -122,7 +125,7 @@ export async function checkStore(cwd:string) {
     });
     await gate('file',async()=>{
       if(!Object.hasOwn(storeTargets,entry.target) || entry.file!==`${entry.target}/${String(entry.order).padStart(2,'0')}-${entry.sourceShot}.png` || !/^\w[\w-]*$/.test(entry.sourceShot)) throw new Error('Invalid export filename or target');
-      const root=await realpath(join(paths.media,'store')); const path=await realpath(resolve(root,entry.file));
+      const root=await realpath(dir); const path=await realpath(resolve(root,entry.file));
       if(!path.startsWith(root+sep)) throw new Error('Export escapes store directory');
       bytes=await readFile(path); if(hash(bytes)!==entry.sha256) throw new Error('Export changed since rendering'); return 'Export matches receipt';
     });
@@ -147,10 +150,24 @@ export async function checkStore(cwd:string) {
     else gates.push({id:'banned-content',name:'banned-content',status:'skipped',detail:ocr?'Output unavailable':'Tesseract is not available'});
     results.push({file:entry.file,gates});
   }
-  await writeFile(join(paths.media,'store/check.json'),JSON.stringify(results,null,2));
+  await writeFile(join(dir,'check.json'),JSON.stringify(results,null,2));
   const failed=results.flatMap(r=>r.gates.filter(g=>g.status==='fail').map(g=>`${r.file} ${g.id}: ${g.detail}`));
   if(failed.length) throw new Error(`Failed screenshot gates: ${failed.join('; ')}`);
   return results;
+}
+async function publishStore(candidate:string,destination:string,parent:string) {
+  const backupRoot=await mkdtemp(join(parent,'.store-previous-'));
+  const backup=join(backupRoot,'gallery'); let previous=false;
+  try {
+    try { await rename(destination,backup); previous=true; }
+    catch(error) { if((error as NodeJS.ErrnoException).code!=='ENOENT') throw error; }
+    await rename(candidate,destination);
+  } catch(error) {
+    if(previous) await rename(backup,destination);
+    await rm(backupRoot,{recursive:true,force:true});
+    throw error;
+  }
+  await rm(backupRoot,{recursive:true,force:true}).catch(()=>{});
 }
 export async function exportStore(cwd:string,targets:StoreTarget[]=parseStoreTargets(),styleId='midnight') {
   const {paths,shots,captures,product}=await inputs(cwd);
@@ -166,9 +183,11 @@ export async function exportStore(cwd:string,targets:StoreTarget[]=parseStoreTar
     const caption=groundedCaption(product,shot); assertClean(caption.caption,'store caption');
     return {shot,capture,file,png,...caption};
   }));
-  const dir=join(paths.media,'store'); await mkdir(dir,{recursive:true}); await rm(join(dir,'manifest.json'),{force:true});
-  const app=await browser(); const report:StoreShot[]=[];
+  await mkdir(paths.media,{recursive:true});
+  const dir=await mkdtemp(join(paths.media,'.store-'));
+  let app:Awaited<ReturnType<typeof browser>>|undefined; const report:StoreShot[]=[];
   try {
+    app=await browser();
     for(const target of targets) {
       if(!Object.hasOwn(storeTargets,target)) throw new Error('Unknown store target');
       const {width,height}=storeTargets[target], layout=storeLayout(width,height);
@@ -196,6 +215,8 @@ export async function exportStore(cwd:string,targets:StoreTarget[]=parseStoreTar
       }
     }
     await writeFile(join(dir,'manifest.json'),JSON.stringify(report,null,2));
-  } finally {await app.close();}
-  return {manifest:report,checks:await checkStore(cwd)};
+    const checks=await checkStoreDirectory(cwd,dir);
+    await publishStore(dir,join(paths.media,'store'),paths.media);
+    return {manifest:report,checks};
+  } finally {await app?.close();await rm(dir,{recursive:true,force:true});}
 }

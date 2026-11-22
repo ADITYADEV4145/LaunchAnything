@@ -1,0 +1,42 @@
+baseUrl: http://127.0.0.1:3037
+shots:
+  - id: problem
+    route: /brief.html
+    viewport: {width: 760, height: 540}
+    waitFor: h1
+  - id: sources
+    commands:
+      - "node dist/cli.js validate product | python3 -c 'import json,sys; r=json.load(sys.stdin); print(\"Sources valid:\",r[\"valid\"]); print(\"Errors:\",len(r[\"errors\"]))'"
+      - "python3 -c 'import json; c=json.load(open(\".launch/product.json\"))[\"claims\"][0]; print(c[\"id\"],\"->\",c[\"sources\"][0][\"ref\"])'"
+    viewport: {width: 760, height: 520}
+  - id: plan
+    commands:
+      - "node dist/cli.js plan --history .launch/history.json | cut -d'|' -f1-4 | tail -n +10 | head -n 8"
+    viewport: {width: 760, height: 420}
+  - id: copy
+    commands:
+      - "node dist/cli.js write --channel x | python3 -c 'import json,sys,os; print(*map(os.path.relpath,json.load(sys.stdin)[\"briefs\"]))'"
+      - "node dist/cli.js check --channel x | python3 -c 'import json,sys; r=json.load(sys.stdin); print(\"Checks passed:\",r[\"passed\"]); print(\"Issues:\",len(r[\"issues\"]))'"
+    viewport: {width: 760, height: 520}
+  - id: capture
+    commands:
+      - "node dist/cli.js shots --only sources | python3 -c 'import json,sys; s=json.load(sys.stdin)[0]; print(s[\"id\"],s[\"kind\"],s[\"width\"],s[\"height\"]); print(*s[\"files\"])'"
+    viewport: {width: 760, height: 440}
+  - id: render
+    commands:
+      - "node dist/cli.js video check --format 16x9 | python3 -c 'import json,sys; r=json.load(sys.stdin)[0]; print(r[\"format\"],r[\"width\"],\"x\",r[\"height\"]); print(r[\"duration\"],\"seconds\"); print(\"Captions:\",r[\"captions\"])'"
+    viewport: {width: 760, height: 440}
+  - id: review
+    route: /review/index.html
+    viewport: {width: 900, height: 460}
+    actions:
+      - {type: click, selector: article}
+    waitFor: article
+  - id: guard
+    commands:
+      - "node dist/cli.js publish --dry-run; test $? -eq 1"
+    viewport: {width: 760, height: 340}
+  - id: day
+    commands:
+      - node dist/cli.js warroom
+    viewport: {width: 760, height: 500}

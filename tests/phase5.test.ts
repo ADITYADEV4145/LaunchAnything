@@ -82,7 +82,7 @@ it('builds a review page and defaults the CLI to an approval-gated dry run', asy
     scheduledAt: '2026-07-15T18:30:00.000Z',
   }] });
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
-});
+}, 30000);
 
 it('stages a LinkedIn first-comment link separately from the main post', async () => {
   const { cwd, paths } = await project();

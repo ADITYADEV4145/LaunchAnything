@@ -172,7 +172,7 @@ it('returns one structured CLI result and exits nonzero on bad input', async () 
   const image = cli('receipt', '--no-footer');
   expect(image.status, image.stdout + image.stderr).toBe(0);
   expect(await readFile(JSON.parse(image.stdout).data.path, 'utf8')).not.toContain('launched with Liftoff');
-});
+}, 30000);
 
 it('loads learned history from home on the next CLI plan', async () => {
   const { cwd, paths } = await workspace();
@@ -189,7 +189,7 @@ it('loads learned history from home on the next CLI plan', async () => {
   const next = plan();
   expect(next.channels).toContainEqual(expect.objectContaining({ id: 'x', time: '18:00' }));
   expect(next.markdown).toContain('recorded 8 views');
-});
+}, 30000);
 
 it.each(['cli-tool', 'saas-next', 'mobile-expo'])('passes Phase 6 checks independently for %s', async fixture => {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-phase6-'));

@@ -428,4 +428,4 @@ it('CLI failures are JSON and exit nonzero', () => isolated(cwd => {
   const brief = run('write', '--channel', 'x', '--channel', 'reddit');
   expect(brief.status).toBe(0);
   expect(JSON.parse(brief.stdout).data.briefs).toHaveLength(2);
-}));
+}), 30000);

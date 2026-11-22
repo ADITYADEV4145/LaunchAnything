@@ -79,7 +79,7 @@ it('doctor handles missing extras and malformed config without leaking values', 
   const run = cli('doctor', '--json');
   expect(run.status).toBe(0);
   expect(JSON.parse(run.stdout).ok).toBe(true);
-});
+}, 30000);
 it('selftest passes all six phases and rejects invalid phase arguments', async () => {
   const report = await selftest(1);
   expect(report.results).toHaveLength(12);

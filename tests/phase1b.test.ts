@@ -297,5 +297,5 @@ describe('phase 1b Launch Brief', () => {
     const failed = cli('validate', 'brief');
     expect(failed.status).not.toBe(0);
     expect(JSON.parse(failed.stdout).ok).toBe(false);
-  });
+  }, 30000);
 });

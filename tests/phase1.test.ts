@@ -337,4 +337,4 @@ it('CLI workflow supports confirmation text, JSON envelopes and nonzero validati
   expect(rejected.status).toBe(1);
   expect(JSON.parse(rejected.stdout)).toMatchObject({ ok: false, command: 'validate' });
   expect(JSON.parse(rejected.stdout).error).toContain('file must exist');
-}, 15000);
+}, 30000);

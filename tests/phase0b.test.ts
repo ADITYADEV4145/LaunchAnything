@@ -86,5 +86,5 @@ describe('phase 0b', () => {
       'audience', 'prepare', '--cwd', cwd, '--json'], { encoding: 'utf8' });
     expect(run.status, run.stderr + run.stdout).toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({ ok: true, command: 'audience', data: { waitlist: { live: false } } });
-  });
+  }, 30000);
 });

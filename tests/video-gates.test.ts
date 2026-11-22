@@ -69,8 +69,8 @@ describe('video gates',() => {
   it('keeps a readable short hook within a near-cap vertical storyboard',async()=>{
     const cwd=await mkdtemp(join(tmpdir(),'video-hook-cap-')); dirs.push(cwd);
     await mkdir(join(cwd,'.launch/media/polished'),{recursive:true});
-    const roles=['hook','before','action','after','proof','proof','proof','proof','proof','cta'];
-    const shots=roles.map((purpose,index)=>({id:`${purpose}-${index}`,purpose,card:true,moneyMoment:purpose==='after',viewport:{width:800,height:600},caption:purpose==='hook'?'Private':purpose==='cta'?'Keep work private':'Keep every local change safely stored on your device'}));
+    const roles=['hook','before','action','after','proof','proof','proof','cta'];
+    const shots=roles.map((purpose,index)=>({id:`${purpose}-${index}`,purpose,card:true,moneyMoment:purpose==='after',viewport:{width:800,height:600},caption:purpose==='hook'?'Private':purpose==='cta'?'Keep every local change safely stored on your device':purpose==='proof'?'Keep every local change safely stored and available on your device':'Keep every local change safely stored and available on your own device'}));
     await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots}));
     await writeFile(join(cwd,'.launch/media/polished/frame.png'),'captured image');
     vi.spyOn(polishing,'polish').mockResolvedValue(shots.map(shot=>({id:shot.id,file:'frame.png',theme:'light'})) as never);

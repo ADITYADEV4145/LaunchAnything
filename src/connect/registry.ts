@@ -10,8 +10,9 @@ import { adapterMetadata } from '../adapters/metadata.js';
 
 export type Route = 'postiz' | 'buffer' | 'api' | 'browser' | 'mcp';
 export interface Connection { platform: string; route: Route; account: string; connectedAt: string; profile?: string; server?: string }
-export const platforms = Object.entries(builtinSiteMetadata()).filter(([, site]) => site.assisted?.routes.length).map(([id]) => id);
+export const platforms = [...Object.entries(builtinSiteMetadata()).filter(([, site]) => site.assisted?.routes.length).map(([id]) => id), 'kit'];
 export function routes(platform: string, cwd?: string): Route[] {
+  if (platform === 'kit') return ['api'];
   if (registry(cwd).get(platform)?.custom) return [];
   return (builtinSiteMetadata()[platform]?.assisted?.routes ?? []).filter(route =>
     !['postiz', 'buffer', 'api'].includes(route) || adapterMetadata.some(adapter =>

@@ -1,0 +1,9 @@
+shots:
+  - id: source-lookup
+    commands:
+      - node dist/cli/main.js --root . symbols findCode --limit 3 --no-refresh
+    viewport: {width: 1100, height: 650}
+  - id: verify-options
+    commands:
+      - node dist/cli/main.js verify --help
+    viewport: {width: 1100, height: 750}

@@ -1,0 +1,22 @@
+{
+  "name": "Agent Linux",
+  "oneLiner": "A source-built Linux desktop preview for agents on Apple silicon Macs",
+  "audience": "Apple silicon Mac developers exploring supervised agent desktop workflows",
+  "problem": "An agent and a person need a shared desktop with an explicit boundary for human control.",
+  "proofPoints": [
+    "The README describes a source-built local developer preview, not public binaries or a hosted service (README.md).",
+    "The MCP command connects to existing machine state rather than starting the local VM (internal/cli/mcp.go).",
+    "The viewer supports an interactive human-input mode (internal/cli/view.go)."
+  ],
+  "features": [
+    {"name":"Source-built preview","description":"Build the local developer preview for an Apple silicon Mac; the app is not notarized and no public VM image is published.","sources":[{"type":"file","ref":"README.md"},{"type":"file","ref":"docs/launch-readiness.md"}]},
+    {"name":"Existing-machine MCP","description":"Connect an MCP client to existing local machine state; start the VM separately.","sources":[{"type":"file","ref":"internal/cli/mcp.go"},{"type":"file","ref":"docs/mcp.md"}]},
+    {"name":"Human handoff","description":"Use the interactive viewer to take control of the same guest desktop.","sources":[{"type":"file","ref":"internal/cli/view.go"},{"type":"file","ref":"docs/desktop.md"}]}
+  ],
+  "claims": [
+    {"id":"preview","text":"Agent Linux is a source-built local developer preview for Apple silicon Macs; no public binaries or VM images are published and the app is not notarized.","sources":[{"type":"file","ref":"README.md"},{"type":"file","ref":"docs/launch-readiness.md"}]},
+    {"id":"mcp","text":"The MCP command connects to an existing local machine; it does not start the local VM.","sources":[{"type":"file","ref":"internal/cli/mcp.go"},{"type":"file","ref":"docs/mcp.md"}]},
+    {"id":"handoff","text":"The interactive viewer supports human input on the shared guest desktop.","sources":[{"type":"file","ref":"internal/cli/view.go"},{"type":"file","ref":"docs/desktop.md"}]},
+    {"id":"limits","text":"The README does not qualify real ARM64 guest agent runs or claim that hosted agents such as Devin run inside the VM; cloud and billing are development prototypes.","sources":[{"type":"file","ref":"README.md"},{"type":"file","ref":"docs/launch-readiness.md"}]}
+  ]
+}

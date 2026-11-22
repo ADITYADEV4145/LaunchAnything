@@ -9,21 +9,74 @@ plus doctor and fixture checks. Phases 2–4 and 6 remain explicit stubs (exit 2
 ## Install
 
 ```sh
-npm install -g launch-liftoff
-liftoff doctor --json
+npx skills add ADITYADEV4145/LaunchAnything
+npm i -g launch-liftoff
+liftoff setup
 ```
 
 For development: `npm ci`, `npm run dev -- doctor`. Build with `npm run build`;
 test with `npm test`; check types with `npm run typecheck`.
 
+The skill is in `skill/SKILL.md` with a YAML name/description; the skills CLI
+discovers SKILL.md files in repository subdirectories. Select `liftoff` when prompted.
+
+### First kit (offline demo)
+
+Run `liftoff demo` for a bundled Tasklight repository in a fresh temporary directory,
+or `liftoff demo --dir ./my-demo --open` (the directory must not exist).
+Each stage and total elapsed time are reported, ending at `.launch/review/index.html`.
+Prepared fixture copy stands in for agent-written product facts and posts. No accounts,
+network requests, LLM calls, publishing or posting are involved. Chrome and FFmpeg are
+optional: missing tools skip their assets with a note. A local file opener is only
+launched with `--open`. The sample kit is not approved launch copy for your product.
+
+For your repository, `liftoff setup --yes --json` reports tools, fix commands and
+PH/X/Kit/Postiz/GitHub connection commands without prompting or changing accounts.
+Interactive setup connects one account at a time through the existing OS keychain;
+tokens are read from environment variables, not recorded in configuration.
+`liftoff setup --site https://example.com` explicitly fetches HTML only (no linked
+resources); `--site-file ./site.html` imports offline. The imported `.launch/brand.json`
+contains best-effort name, description, icon/logo URL, OG image, inline theme colors and
+font families. Missing fields remain empty; external CSS and JavaScript are not run.
+`--voice ./samples/*.md` delegates to `voice learn`. Next run `liftoff init`.
+
+`liftoff estimate [--stage write|video|publish|demo]` estimates agent input tokens
+(chars/4), output tokens per planned channel, direct X API costs and render time.
+These are deterministic planning heuristics, not bills or performance guarantees.
+Write/video/publish/demo print a short estimate before running (suppressed in JSON).
+
+### Privacy
+
+Telemetry is **off by default**. `liftoff telemetry on|off|status` controls a local
+`~/.liftoff/telemetry.json` file (`LIFTOFF_HOME` overrides the directory).
+When on, demo records only allowlisted stage, completion, rounded durationMs and
+CLI version in `telemetry-events.jsonl` beside the config. No content, paths, repo
+names or handles are stored. **Local only; nothing is uploaded.** `DO_NOT_TRACK=1`
+or `LIFTOFF_TELEMETRY=0` overrides opt-in. Delete these files to erase the data.
+
 ## Proof: two repos, nothing posted
 
+- [Showcase: full GroundWork and Agent Linux kits, media and review pages](showcase/README.md) — real pipeline runs; launch results and three outside-owner permissions are pending.
 - [GroundWork: from a symbol lookup to a launch kit](docs/case-studies/groundwork.md)
 - [Agent Linux: a launch kit without booting the Mac-only VM](docs/case-studies/agentlinux.md)
 
 See what Liftoff produced, what still took judgment, and where the approval gate stopped each dry run.
 
 ## Commands
+
+See the [channel guides](docs/channels/README.md) for rules, timing, formats,
+automation boundaries and route-specific troubleshooting for all 15 channels.
+
+## LaunchBench
+
+**Liftoff win rate: not yet measured, pending human votes.**
+LaunchBench compares agent-written Liftoff and plain-model posts for 20 real public
+open-source products on Show HN and X. No votes, preferred posts or results are
+fabricated; the CLI never calls an LLM. `liftoff bench prepare`, `bench pair`,
+`bench record --votes FILE`, `bench score` and `bench run` support a reproducible
+blind human comparison. See the [protocol and rerun instructions](bench/launchbench/README.md).
+
+## Command reference
 
 All commands accept `--json` and `--cwd <repository>`. JSON is one object:
 `{ok, command, data}` on success, `{ok, command, error}` on failure.

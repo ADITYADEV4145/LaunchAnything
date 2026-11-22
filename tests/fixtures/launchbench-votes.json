@@ -1,0 +1,9 @@
+{
+  "fixture": "SYNTHETIC TEST FIXTURE ONLY. Not human votes or benchmark evidence.",
+  "votes": [
+    {"voterId":"fixture-voter-1","pair":"vite:show-hn","click":"A","trust":"B","missing":{"A":"Fixture comment A","B":"Fixture comment B"}},
+    {"voterId":"fixture-voter-2","pair":"vite:show-hn","click":"B","trust":"A","missing":{"A":"","B":""}},
+    {"voterId":"fixture-voter-1","pair":"vite:x","click":"A","trust":"A","missing":{"A":"","B":""}},
+    {"voterId":"fixture-voter-2","pair":"vite:x","click":"tie","trust":"tie","missing":{"A":"","B":""}}
+  ]
+}

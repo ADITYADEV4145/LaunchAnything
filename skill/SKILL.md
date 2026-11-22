@@ -5,6 +5,22 @@ description: Plan a product launch, feature release, changelog or relaunch from 
 
 # Liftoff
 
+## Install and first kit
+
+```sh
+npx skills add ADITYADEV4145/LaunchAnything
+npm i -g launch-liftoff
+liftoff setup
+liftoff demo
+```
+
+Setup checks tools and accounts; `--yes`/`--json` never prompts. Import a brand
+with `--site URL` (explicit network access) or `--site-file HTML` (offline),
+and owned writing with `--voice PATHS...`. Demo uses prepared offline fixture
+content; it never posts. Run `liftoff init` next for the real repository.
+`liftoff estimate` reports planning estimates only. Telemetry is off by default;
+`liftoff telemetry on` enables anonymous local demo stage counts only, never uploads.
+
 ## Phase 2b: founder voice
 
 See [phase2b](references/phase2b.md). Learn from 20–50 owned samples with

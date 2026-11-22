@@ -1,0 +1,145 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Launch Brief</title><style>body{max-width:900px;margin:3rem auto;font:16px/1.5 system-ui;padding:1rem;color:#182030}h2{border-bottom:1px solid #ccc}p{white-space:pre-wrap}a{color:#164a98}@media print{body{margin:0;max-width:none;font-size:11pt}h2,h3{break-after:avoid}a{color:inherit}p{orphans:3;widows:3}}</style><body><h1>Launch Brief: Agent Linux</h1>
+<p></p>
+<h2>Positioning statement</h2>
+<p></p>
+<p>Agent Linux: A source-built Linux desktop preview for agents on Apple silicon Macs For Apple silicon Mac developers exploring supervised agent desktop workflows. Problem: An agent and a person need a shared desktop with an explicit boundary for human control. <a href="product.json">product.json</a></p>
+<p></p>
+<h2>Target users and top pains</h2>
+<p></p>
+<p>Audience: Apple silicon Mac developers exploring supervised agent desktop workflows <a href="product.json">product.json</a></p>
+<p></p>
+<p>Pain research unavailable; no validated pains supplied.</p>
+<p></p>
+<h2>One-liner and alternative taglines</h2>
+<p></p>
+<p>One-liner: A source-built Linux desktop preview for agents on Apple silicon Macs <a href="product.json">product.json</a></p>
+<p></p>
+<p>- Tagline 1: A local desktop experiment for supervised agents. <a href="product.json#/claims">product.json</a></p>
+<p>- Tagline 2: Connect to an existing machine over MCP. <a href="product.json#/claims/1">product.json</a></p>
+<p>- Tagline 3: Keep human control explicit. <a href="product.json#/claims/2">product.json</a></p>
+<p></p>
+<h2>Key messages</h2>
+<p></p>
+<p>- A source-built Linux desktop preview for agents on Apple silicon Macs <a href="product.json">product.json</a></p>
+<p>- For Apple silicon Mac developers exploring supervised agent desktop workflows. <a href="product.json">product.json</a></p>
+<p>- An agent and a person need a shared desktop with an explicit boundary for human control. <a href="product.json">product.json</a></p>
+<p></p>
+<h2>Proof points with sources</h2>
+<p></p>
+<p>- The README describes a source-built local developer preview, not public binaries or a hosted service (README.md). <a href="product.json#/proofPoints/0">product.json</a></p>
+<p>- The MCP command connects to existing machine state rather than starting the local VM (internal/cli/mcp.go). <a href="product.json#/proofPoints/1">product.json</a></p>
+<p>- The viewer supports an interactive human-input mode (internal/cli/view.go). <a href="product.json#/proofPoints/2">product.json</a></p>
+<p></p>
+<h2>Feature-to-pain map</h2>
+<p></p>
+<p>- Source-built preview: Build the local developer preview for an Apple silicon Mac; the app is not notarized and no public VM image is published. <a href="product.json#/features/0">feature:0</a> — Pain mapping unverified.</p>
+<p>- Existing-machine MCP: Connect an MCP client to existing local machine state; start the VM separately. <a href="product.json#/features/1">feature:1</a> — Pain mapping unverified.</p>
+<p>- Human handoff: Use the interactive viewer to take control of the same guest desktop. <a href="product.json#/features/2">feature:2</a> — Pain mapping unverified.</p>
+<p></p>
+<h2>Competitor comparison</h2>
+<p></p>
+<p>No verified competitor claims available.</p>
+<p></p>
+<h2>Likely objections with answers</h2>
+<p></p>
+<p>- Is this suitable for our workflow? Review the sourced features; suitability requires human evaluation.</p>
+<p></p>
+<h2>FAQ</h2>
+<p></p>
+<h3>1. Who is this for?</h3>
+<p>Apple silicon Mac developers exploring supervised agent desktop workflows <a href="product.json">product.json</a></p>
+<p></p>
+<h3>2. What problem does it address?</h3>
+<p>An agent and a person need a shared desktop with an explicit boundary for human control. <a href="product.json">product.json</a></p>
+<p></p>
+<h3>3. What does it do?</h3>
+<p>It provides a source-built local developer preview with MCP access to existing machine state and an interactive guest viewer. <a href="product.json#/claims">product.json</a></p>
+<p></p>
+<h3>4. Where is the evidence?</h3>
+<p>Inspect README.md, the MCP and desktop guides, and the implementation files referenced by the manifest. CLI help captures are not evidence of a running guest. <a href="product.json#/claims">product.json</a></p>
+<p></p>
+<h3>5. What does it cost?</h3>
+<p>No production price is claimed; cloud and billing are development prototypes. <a href="product.json#/claims/3">product.json</a></p>
+<p></p>
+<h3>6. Is there a free tier?</h3>
+<p>No hosted free-tier entitlement is claimed by this kit. <a href="product.json#/claims/3">product.json</a></p>
+<p></p>
+<h3>7. How do I get started?</h3>
+<p>Use the source-build instructions on a supported Apple silicon Mac. Public binaries and VM images are not published, and the native app is not notarized. <a href="product.json#/claims/0">product.json</a></p>
+<p></p>
+<h3>8. What remains unverified?</h3>
+<p>A Mac VM boot, native viewer and guest agent session were not exercised on the Linux kit-building host. Guest agent qualification remains a documented limitation. <a href="product.json#/claims/3">product.json</a></p>
+<p></p>
+<h2>Pricing and free-tier story</h2>
+<p></p>
+<p>Pricing and free-tier details unverified. Agent must inspect authoritative pricing sources before making promises.</p>
+<p></p>
+<h2>Channel plan with dates</h2>
+<p></p>
+<p>Launch plan</p>
+<p></p>
+<p>Profile: devtool | Launch type: new-product</p>
+<p>Launch date: 2026-12-01 | Timezone: UTC</p>
+<p>All scheduled dates and times below are local wall-clock times in this timezone.</p>
+<p>Posting windows are starting heuristics, not performance promises.</p>
+<p></p>
+<p>Channels</p>
+<p></p>
+<p>| Channel | Local date | Local time | Why | Preparation lead time |</p>
+<p>| --- | --- | --- | --- | --- |</p>
+<p>| show-hn | 2026-12-01 | 09:00 | Invite hands-on feedback from technical peers with a tryable demo; introduce the product with grounded proof | 1 day(s) |</p>
+<p>| reddit | 2026-12-01 | 09:00 | Invite relevant community feedback with a manual, subreddit-appropriate submission; introduce the product with grounded proof | 1 day(s) |</p>
+<p>| x | 2026-12-01 | 09:00 | Share a concise update and invite direct conversation; introduce the product with grounded proof | 1 day(s) |</p>
+<p>| devto | 2026-12-01 | 09:00 | Explain the implementation with a technical walkthrough; introduce the product with grounded proof | 1 day(s) |</p>
+<p></p>
+<p>Use the next allowed posting day on or after launch day; prepare assets at least the listed lead time ahead.</p>
+<p>Every post requires human approval. Show HN and Reddit are paste-ready manual submissions only.</p>
+<p></p>
+<p>T-7 to T+3 checklist</p>
+<p></p>
+<p>- [ ] T-7: Confirm audience, profile, source-backed claims and channel selection.</p>
+<p>- [ ] T-6: Check channel rules and start any longer-lead launch preparation.</p>
+<p>- [ ] T-5: Verify product access, landing page and pricing.</p>
+<p>- [ ] T-4: Draft channel-native posts with claim citations.</p>
+<p>- [ ] T-3: Capture real screenshots and redact private information.</p>
+<p>- [ ] T-2: Prepare demo assets and verify links and media dimensions.</p>
+<p>- [ ] T-1: Collect human approvals for exact posts and media hashes.</p>
+<p>- [ ] T+0: Submit approved posts at the listed local times; never auto-post to HN or Reddit.</p>
+<p>- [ ] T+1: Record initial observations and draft replies for human review.</p>
+<p>- [ ] T+2: Check unanswered questions; do not auto-reply.</p>
+<p>- [ ] T+3: Record metrics and lessons without claiming causation.</p>
+<p></p>
+<p>History observations</p>
+<p>- No history observation changed a time slot; using bundled channel scheduling defaults.</p>
+<p></p>
+<p></p>
+<h2>Launch-day schedule hour by hour</h2>
+<p></p>
+<p>08:00 — Verify assets and approvals.</p>
+<p></p>
+<p>09:00 — Review scheduled channel times in plan.md.</p>
+<p></p>
+<p>10:00 — Human launches approved channels at their planned times.</p>
+<p></p>
+<p>11:00 — Monitor feedback.</p>
+<p></p>
+<p>12:00 — Review questions.</p>
+<p></p>
+<p>13:00 — Record issues.</p>
+<p></p>
+<p>14:00 — Review replies with human.</p>
+<p></p>
+<p>15:00 — Check links.</p>
+<p></p>
+<p>16:00 — Capture initial metrics.</p>
+<p></p>
+<p>17:00 — Record follow-ups.</p>
+<p></p>
+<h2>Success metrics</h2>
+<p></p>
+<p>Targets pending human agreement. Track visits, activation and qualified feedback; no baseline or outcome is assumed.</p>
+<p></p>
+<h2>Open risks</h2>
+<p></p>
+<p>The Linux host cannot verify the supported-Mac desktop flow. Captures show CLI help only. Pricing, competitor research and feature-to-pain mapping remain unverified. Maintainer approval is required before publication.</p>
+<p></p></body></html>

@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+import { printEstimate } from '../adopt/estimate.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { commandOptions, output } from '../core/output.js';
@@ -14,7 +15,7 @@ export function register(program: Command) {
   const action = (cmd: Command, name: string, work: (cwd:string, opts:Record<string,string>) => Promise<unknown>) => {
     cmd.action(async () => {
       const opts = commandOptions(cmd);
-      try { output(`video ${name}`,await work(opts.cwd ?? process.cwd(),cmd.optsWithGlobals()),opts.json); }
+      try { printEstimate(opts.cwd ?? process.cwd(), 'video', opts.json, parseFormats(cmd.optsWithGlobals().format).length); output(`video ${name}`,await work(opts.cwd ?? process.cwd(),cmd.optsWithGlobals()),opts.json); }
       catch (e) { output(`video ${name}`,undefined,opts.json,(e as Error).message); }
     });
   };

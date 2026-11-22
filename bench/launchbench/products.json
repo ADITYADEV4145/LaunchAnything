@@ -1,0 +1,22 @@
+[
+  {"id":"vite","name":"Vite","repo":"https://github.com/vitejs/vite","category":"Frontend build tooling","channels":["show-hn","x"]},
+  {"id":"astro","name":"Astro","repo":"https://github.com/withastro/astro","category":"Content-focused web framework","channels":["show-hn","x"]},
+  {"id":"nextjs","name":"Next.js","repo":"https://github.com/vercel/next.js","category":"React web framework","channels":["show-hn","x"]},
+  {"id":"svelte","name":"Svelte","repo":"https://github.com/sveltejs/svelte","category":"User interface compiler","channels":["show-hn","x"]},
+  {"id":"vue","name":"Vue","repo":"https://github.com/vuejs/core","category":"User interface framework","channels":["show-hn","x"]},
+  {"id":"react","name":"React","repo":"https://github.com/facebook/react","category":"User interface library","channels":["show-hn","x"]},
+  {"id":"supabase","name":"Supabase","repo":"https://github.com/supabase/supabase","category":"Postgres backend platform","channels":["show-hn","x"]},
+  {"id":"appwrite","name":"Appwrite","repo":"https://github.com/appwrite/appwrite","category":"Application backend platform","channels":["show-hn","x"]},
+  {"id":"pocketbase","name":"PocketBase","repo":"https://github.com/pocketbase/pocketbase","category":"Embedded application backend","channels":["show-hn","x"]},
+  {"id":"docusaurus","name":"Docusaurus","repo":"https://github.com/facebook/docusaurus","category":"Documentation website generator","channels":["show-hn","x"]},
+  {"id":"strapi","name":"Strapi","repo":"https://github.com/strapi/strapi","category":"Headless content management system","channels":["show-hn","x"]},
+  {"id":"ghost","name":"Ghost","repo":"https://github.com/TryGhost/Ghost","category":"Publishing and membership platform","channels":["show-hn","x"]},
+  {"id":"plausible","name":"Plausible","repo":"https://github.com/plausible/analytics","category":"Privacy-focused web analytics","channels":["show-hn","x"]},
+  {"id":"umami","name":"Umami","repo":"https://github.com/umami-software/umami","category":"Website analytics","channels":["show-hn","x"]},
+  {"id":"posthog","name":"PostHog","repo":"https://github.com/PostHog/posthog","category":"Product analytics platform","channels":["show-hn","x"]},
+  {"id":"calcom","name":"Cal.com","repo":"https://github.com/calcom/cal.com","category":"Scheduling infrastructure","channels":["show-hn","x"]},
+  {"id":"excalidraw","name":"Excalidraw","repo":"https://github.com/excalidraw/excalidraw","category":"Collaborative sketching whiteboard","channels":["show-hn","x"]},
+  {"id":"joplin","name":"Joplin","repo":"https://github.com/laurent22/joplin","category":"Notes and to-do application","channels":["show-hn","x"]},
+  {"id":"logseq","name":"Logseq","repo":"https://github.com/logseq/logseq","category":"Local-first knowledge management","channels":["show-hn","x"]},
+  {"id":"rustdesk","name":"RustDesk","repo":"https://github.com/rustdesk/rustdesk","category":"Remote desktop application","channels":["show-hn","x"]}
+]

@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:04,500
+GroundWork: real source lookup
+
+2
+00:00:04,500 --> 00:00:09,000
+Query against the local index
+
+3
+00:00:09,000 --> 00:00:13,500
+Inspect symbol locations and signatures
+
+4
+00:00:13,500 --> 00:00:18,000
+Verification command: help output only
+
+5
+00:00:18,000 --> 00:00:22,500
+Not an agent accuracy benchmark
+
+6
+00:00:22,500 --> 00:00:27,000
+Maintainer review and launch results pending

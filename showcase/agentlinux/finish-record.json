@@ -1,0 +1,111 @@
+[
+  {
+    "command": "brief",
+    "durationMs": 493,
+    "result": {
+      "ok": true,
+      "command": "brief",
+      "data": {
+        "path": "./brief.md",
+        "html": "./brief.html",
+        "warnings": [
+          "Pain research unavailable: pains.json missing or empty"
+        ],
+        "scaffold": true
+      }
+    }
+  },
+  {
+    "command": "check",
+    "durationMs": 605,
+    "result": {
+      "ok": true,
+      "command": "check",
+      "data": {
+        "passed": true,
+        "issues": [],
+        "attempts": 0,
+        "askUser": false,
+        "warnings": []
+      }
+    }
+  },
+  {
+    "command": "video --renderer ffmpeg --format 1x1",
+    "durationMs": 5130,
+    "result": {
+      "ok": true,
+      "command": "video ",
+      "data": {
+        "renderer": "ffmpeg",
+        "files": [
+          "./video/square-1x1.mp4"
+        ],
+        "captions": "./video/captions.srt",
+        "checks": [
+          {
+            "format": "1x1",
+            "duration": 30,
+            "platforms": [
+              {
+                "platform": "youtube-shorts",
+                "maxSeconds": 60,
+                "compliant": true,
+                "required": false
+              },
+              {
+                "platform": "x",
+                "maxSeconds": 140,
+                "compliant": true,
+                "required": true
+              },
+              {
+                "platform": "product-hunt",
+                "maxSeconds": 180,
+                "compliant": true,
+                "required": false
+              }
+            ],
+            "width": 720,
+            "height": 720,
+            "audio": false,
+            "captions": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "command": "review",
+    "durationMs": 518,
+    "result": {
+      "ok": true,
+      "command": "review",
+      "data": {
+        "path": "./review/index.html",
+        "posts": [
+          {
+            "channel": "devto",
+            "hash": "b4762687dbaf6144086a7dc1565e30d1a5345a168b274da6552d964ea113f638",
+            "scheduledAt": "2026-12-01T09:00:00.000Z"
+          },
+          {
+            "channel": "reddit",
+            "hash": "5fc409f8f7f3ba39cb5b694391065f774b8c4375d4320b552b4598cc9a00d99a",
+            "scheduledAt": "2026-12-01T09:00:00.000Z"
+          },
+          {
+            "channel": "show-hn",
+            "hash": "867dc92fdb15e6d8c5c4bc3898fb3ed25e9a6844a56bb19f3118d8b5cf49f23d",
+            "scheduledAt": "2026-12-01T09:00:00.000Z"
+          },
+          {
+            "channel": "x",
+            "hash": "07fe834a24793f0c31cb5524dd35e6fd8e37207d9eb811c580c6c01d4f5326a3",
+            "scheduledAt": "2026-12-01T09:00:00.000Z"
+          }
+        ]
+      }
+    }
+  }
+]

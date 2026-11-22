@@ -1,0 +1,16 @@
+{
+  "profile": "devtool",
+  "launchType": "new-product",
+  "channels": [
+    "show-hn",
+    "reddit",
+    "x",
+    "devto",
+    "github-release"
+  ],
+  "timezone": "UTC",
+  "launchDate": "2026-12-01",
+  "profileConfirmed": true,
+  "approvers": [],
+  "redact": []
+}

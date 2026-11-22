@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import type { ReviewPost } from '../review/posts.js';
 import type { PublishReceipt } from '../adapters/index.js';
 import { frontMatter } from './forms.js';
+import { sectionsOf } from '../copy/template.js';
 import { productHuntDate } from './payloads.js';
 import { builtinSiteMetadata, site } from '../core/registry.js';
 
@@ -140,9 +141,11 @@ export async function mcpDraft(platform: McpPlatform, client: McpClient, post: R
     return data(await client.callTool(name, args));
   };
   const extra = frontMatter(post);
+  const { lead, sections } = sectionsOf(post.body);
+  const maker = sections.get('## Maker comment');
   const draft = await call('start_launch', { url: post.link, idempotency_key: `liftoff-${post.hash}`,
-    values: { name: extra.name ?? post.title, tagline: extra.tagline ?? post.title, description: post.body,
-      commentBody: extra.makerComment ?? post.body, launchDate: productHuntDate(post.scheduledAt) } });
+    values: { name: extra.name ?? post.title, tagline: extra.tagline ?? post.title, description: lead || post.body,
+      commentBody: extra.makerComment ?? maker ?? post.body, launchDate: productHuntDate(post.scheduledAt) } });
   if (typeof draft.launch_id !== 'string' || draft.status !== 'draft') throw new Error('PH did not return an unsubmitted draft');
   const readiness = await call('get_launch', { launch_id: draft.launch_id });
   if (readiness.status !== 'draft' || !['blocked', 'no_known_blockers'].includes(readiness.assessment?.submission))

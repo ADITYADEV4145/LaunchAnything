@@ -6,6 +6,8 @@ import { launchDir } from '../core/launch-dir.js';
 import { fileHash, formats, type Format, parseFormats, run } from './render.js';
 import { chromeLint, endCardSeconds, loadScript, readcheck, srt, totalDuration, sceneDuration, words, type Gate, type Script } from './script.js';
 
+import { loadStyle, styleGate } from './styles.js';
+
 async function gate(id: string, name: string, work: () => Promise<string>): Promise<Gate> {
   try { return {id,name,status:'pass',detail:await work()}; }
   catch (e) { return {id,name,status:'fail',detail:(e as Error).message}; }
@@ -96,6 +98,8 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
   const script = await loadScript(cwd);
   const captions = await readFile(join(dir,'captions.srt'),'utf8');
   if (captions.trim() !== srt(script).trim()) throw new Error('Captions SRT missing or out of date');
+  const style = await loadStyle(cwd,script.style);
+  const distinct = style.custom ? await styleGate(cwd,style) : undefined;
   const results = [];
   for (const format of selected) {
     const path = join(dir,formats[format].file);
@@ -112,6 +116,7 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
     if (receipt.captions !== 'burned' && !probe.streams.some((s: {codec_type:string}) => s.codec_type === 'subtitle')) throw new Error(`Captions not present: ${path}`);
     let loudness: number | undefined;
     const gates = [...await motionGates(path),readcheck(timedScript,timedCaptions),chromeLint(script),endCardGate(timedScript,info.duration),await voiceGate(dir,timedScript)];
+    if (distinct) gates.push(distinct);
     if (info.audio) gates.push(await gate('loudness','loudness',async () => {
       const {stderr} = await run('ffmpeg',['-hide_banner','-i',path,'-af','ebur128','-f','null','-']);
       const matches = [...stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)];

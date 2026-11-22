@@ -147,6 +147,13 @@ heuristic checks. Review gates finished media before human approval.
 
 ## video — phase 4
 
+Run `liftoff video styles` for six presets and a still-only gallery at
+`.launch/video/styles.html`. Choose optional `script.json.style`; midnight is
+the unchanged default. Read the preset's STYLE.md for story direction and six
+token axes. Use `video styles --fork <id> --as <new>` for local overrides, then
+`video styles check`: custom styles must differ on ≥4 axes. Caption contrast must
+remain ≥7:1. Script briefs list styles; renderers honor their pacing bounds.
+
 For a storyboard, run `liftoff video script --from-shots`, optionally `liftoff video voice --dry-run` then `liftoff video voice` (ElevenLabs key required), and `liftoff video --renderer ffmpeg`. Music defaults to a local generated pad; use `--music <file>` or `brandKit.music` to supply a bed. With Remotion installed, run `npx skills add remotion-dev/skills` and follow its video-shotcraft recipes; the same roles, branding, captions and highlights are passed to both renderers. No voice key means captions-only, not an error.
 
 Long cuts are 45–60s; vertical cuts 20–35s. Use `--format 16x9,9x16` and run

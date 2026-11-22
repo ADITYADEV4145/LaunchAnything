@@ -84,6 +84,23 @@ non-zero for validation/tool failures.
 Checks report duration compliance for every platform, but enforce only the mapped
 targets: 9x16 → YouTube Shorts, 1x1 → X, 16x9 → X and Product Hunt.
 
+## Style presets
+
+`video styles --json` lists midnight (unchanged default), paper, neon, brutalist,
+warm and mono, and writes `.launch/video/styles.html` with SVG still previews.
+Set optional `script.json.style`. STYLE.md frontmatter carries palette gradient
+stops/text/accent/caption background, typography family/weight/case, pacing min/max,
+cut/fade/slide transition, static-push/push-in/pan camera and top/bottom/center
+caption position. Read its Markdown story/rhythm direction before scripting.
+Explicit non-default styles enforce scene pacing rather than retiming footage;
+the three-second end card is fixed. Captions must retain ≥7:1 contrast.
+
+`video styles --fork <id> --as <new>` copies a preset into
+`.launch/video/styles/<new>/STYLE.md`. Local ids override built-ins. Edit at least
+four of six axes from its declared base, not just the name or direction.
+`video styles check` validates this; `video check` includes a `style-distinct`
+gate for selected custom styles. Fresh forks deliberately fail until customized.
+
 Selftest uses the small real captures bundled under `templates/video/footage/`
 only when phase-3 captures are absent. Each fixture's manifest records the capture
 date and routes/commands. SaaS includes a real pricing-link navigation recording;

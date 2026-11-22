@@ -130,6 +130,28 @@ Playwright browser and configured executable paths. Probes never download packag
 
 ## Media workflow (local/offline)
 
+### Video style presets
+
+`liftoff video styles --json` lists **midnight**, **paper**, **neon**,
+**brutalist**, **warm**, and **mono**, and writes `.launch/video/styles.html`.
+The gallery uses real plate/caption SVG stills, not rendered videos. Set optional
+`"style": "paper"` in `script.json`; omission or explicit `midnight` preserves
+the existing default look. The script brief includes the available styles.
+
+Each `templates/video/styles/<id>/STYLE.md` contains YAML tokens for palette,
+typography, scene pacing bounds, transition, camera, and caption position, plus
+agent direction for story and rhythm. Scene durations must respect the selected
+style's bounds; they are never silently retimed. Caption colors require ≥7:1
+contrast. The automatic three-second end card is not constrained by scene pacing.
+
+Fork with `liftoff video styles --fork midnight --as my-style`, then edit
+`.launch/video/styles/my-style/STYLE.md` and set `"style": "my-style"`.
+Local ids override built-ins, including an explicitly forked `midnight`.
+`liftoff video styles check` requires custom styles to differ from their declared
+built-in base on at least four of the six axes; renaming or editing prose does not
+count. A fresh fork intentionally fails until meaningfully customized.
+`video check` adds the `style-distinct` gate when a local style is selected.
+
 ```sh
 liftoff shots plan                 # reads product.json money_moment; --force replaces a plan
 # Review captions/actions against the repository; replace every TODO before capture.

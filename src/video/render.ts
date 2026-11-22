@@ -12,6 +12,7 @@ import { renderClip } from './clip.js';
 import { branding, endAsset, frameLayout, sceneAssets } from './design.js';
 import { detectContent } from './crop.js';
 import { narrationFiles } from './voice.js';
+import { loadStyle, motionFilter } from './styles.js';
 
 const exec = promisify(execFile);
 export async function run(binary: string, args: string[], cwd?: string) {
@@ -46,6 +47,7 @@ export async function remotionCli(cwd: string): Promise<string | undefined> {
 export async function render(cwd: string, renderer = 'auto', selected: Format[] = parseFormats(), options: { music?: string } = {}) {
   if (!['auto','remotion','ffmpeg'].includes(renderer)) throw new Error('Renderer must be auto, remotion or ffmpeg');
   const script = await loadScript(cwd);
+  const style = await loadStyle(cwd,script.style);
   const dir = launchDir(cwd).video;
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'captions.srt'), srt(script));
@@ -54,7 +56,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     const results = [];
     for (const format of selected) {
       const scenes = await Promise.all(script.scenes.map(async scene => ({ role: scene.role, caption: scene.text, source: await resolveShot(cwd, scene.shot), duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)), highlight: scene.highlight })));
-      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music });
+      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music, style:script.style });
       await writeFile(`${result.file}.json`, JSON.stringify({ ...result.receipt, script: JSON.stringify(script) }, null, 2));
       await writeFile(join(dir, `captions-${format}.srt`), srt({ scenes: script.scenes.map(scene => ({ ...scene, duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)) })) }));
       results.push(result);
@@ -105,10 +107,10 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
       for (const [i,scene] of script.scenes.entries()) {
         const focus=width<=height?focused[i]:undefined;
         const frame=frameLayout(width,height,dimensions[i].width,dimensions[i].height,terminals[i],focus?.crop);
-        const source=await sceneAssets(work,`${format}-${i}`,width,height,frame,brand,scene.text,i,script.scenes.length);
+        const source=await sceneAssets(work,`${format}-${i}`,width,height,frame,brand,scene.text,i,script.scenes.length,style);
         assets[format].push({plate:await png(source.platePath),caption:await png(source.captionPath),source:focus?.path??paths[i],frame});
       }
-      endCards[format] = await png(await endAsset(work,format,width,height,brand,logo));
+      endCards[format] = await png(await endAsset(work,format,width,height,brand,logo,style));
     }
     let entry = '';
     if (cli) {
@@ -135,7 +137,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
         await cp(endCards[format],join(work,'public',basename(endCards[format])));
         endLayouts[`${formats[format].width}x${formats[format].height}`]=basename(endCards[format]);
       }
-      await writeFile(join(work, 'props.json'), JSON.stringify({scenes, endCards:endLayouts, endCardSeconds}));
+      await writeFile(join(work, 'props.json'), JSON.stringify({scenes, endCards:endLayouts, endCardSeconds, style}));
       entry = join(work, 'src', 'index.tsx');
     }
     for (const format of selected) {
@@ -157,7 +159,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
           const camera=`scale=${innerW}:${innerH}:force_original_aspect_ratio=decrease,pad=${frame.width}:${frame.height}:(ow-iw)/2:(oh-ih)/2:color=${frame.kind==='terminal'?'0x111b30':'white'},zoompan=z='1+0.015*on/${Math.max(1,duration*12)}':x='iw/2-iw/zoom/2':y=0:d=1:s=${frame.width}x${frame.height}:fps=12`;
           const detail=frame.detail;
           const footage=detail?`[1:v]fps=12,split[full][detail];[full]${camera}[shot];[detail]crop=iw:ih*${detail.fraction}:0:0,scale=${detail.width}:${detail.height}[inset];[0:v][inset]overlay=${detail.x}:${detail.y}[plate]`:`[1:v]fps=12,${camera}[shot]`;
-          const filter=`${footage};[${detail?'plate':'0:v'}][shot]overlay=${frame.x}:${frame.y}[base];[2:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=${Math.max(0,duration-.25)}:d=0.25:alpha=1[caption];[base][caption]overlay,zoompan=z='1+0.04*on/${Math.max(1,duration*12)}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s=${spec.width}x${spec.height}:fps=12[out]`;
+          const filter=`${footage};[${detail?'plate':'0:v'}][shot]overlay=${frame.x}:${frame.y}[base];[2:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=${Math.max(0,duration-.25)}:d=0.25:alpha=1[caption];[base][caption]overlay,${motionFilter(style,spec.width,spec.height,duration)}[out]`;
           await run('ffmpeg',['-y','-v','error','-filter_complex_threads','2','-loop','1','-framerate','12','-i',plate,...(video?['-stream_loop','-1']:['-loop','1','-framerate','12']),'-i',source,'-loop','1','-framerate','12','-i',caption,'-filter_complex',filter,'-map','[out]','-t',String(duration),'-an','-r','12','-c:v','libx264','-preset','ultrafast','-crf','22','-pix_fmt','yuv420p','-threads','2',piece]);
           pieces.push(piece);
         }

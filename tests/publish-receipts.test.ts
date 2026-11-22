@@ -20,11 +20,9 @@ it.each(adapterMetadata.map(adapter => [adapter.id, adapter.channels[0] ?? 'prod
       expect(adapter.name).toBe(name);
       const receipt = await adapter.schedule(post, work);
       expect(isLiveReceiptFor(receipt, post, 'unrelated')).toBe(false);
-      for (const status of ['published', 'live'] as const) {
-        const released = { ...receipt, status, url: 'https://example.test/live' };
-        expect(isLiveReceiptFor(released, post, 'unrelated')).toBe(true);
-        expect(isLiveReceiptFor(released, { ...post, hash: 'a'.repeat(64) }, 'unrelated')).toBe(false);
-      }
+      const released = { ...receipt, status: 'published' as const, url: 'https://example.test/live' };
+      expect(isLiveReceiptFor(released, post, 'unrelated')).toBe(true);
+      expect(isLiveReceiptFor(released, { ...post, hash: 'a'.repeat(64) }, 'unrelated')).toBe(false);
     } finally { await rm(cwd, { recursive: true, force: true }); }
   }, 30000);
 

@@ -10,7 +10,7 @@ import type { ReviewPost } from '../review/posts.js';
 import { assistedReminder } from '../connect/payloads.js';
 
 export type AdapterName = 'postiz' | 'buffer' | 'ayrshare' | 'github-release' | 'devto' | 'email' | 'manual' | 'linkedin-api';
-type ReceiptStatus = 'manual' | 'scheduled' | 'published' | 'live' | 'failed' | 'cancelled';
+type ReceiptStatus = 'manual' | 'scheduled' | 'published' | 'failed' | 'cancelled';
 export interface PublishReceipt {
   channel: string;
   id: string;

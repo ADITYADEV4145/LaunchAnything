@@ -25,7 +25,6 @@
               "manual",
               "scheduled",
               "published",
-              "live",
               "failed",
               "cancelled"
             ]

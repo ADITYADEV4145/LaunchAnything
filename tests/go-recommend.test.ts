@@ -30,7 +30,7 @@ it.each([['mcp', 'product-hunt'], ['browser', 'product-hunt'], ['browser', 'show
     account: 'fixture-founder', profile: '/fixture/chrome', connectedAt: ''
   }))));
   const receipt = { channel, id: `${producer}:${channel}:${hash}`,
-    status: producer === 'manual' ? 'live' : 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : 'https://news.ycombinator.com/item?id=123' };
+    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : 'https://news.ycombinator.com/item?id=123' };
   await writeFile(paths.published, JSON.stringify({ posts: [receipt] }));
   const preview = await go(work);
   expect('timeline' in preview && preview.timeline.find(row => row.channel === 'github-release')?.status).toBe('queued');

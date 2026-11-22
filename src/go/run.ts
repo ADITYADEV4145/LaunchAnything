@@ -61,8 +61,9 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
   const previous = options.mock ? JSON.parse(await readOptional(join(paths.root, 'published.mock.json')) ?? '{"posts":[]}') as { posts: PublishReceipt[] } : diskReceipts;
   const receipts = [...previous.posts];
   const confirmedReceipts = [...receipts];
-  const firstBigLive = () => firstBig && confirmedReceipts.some(receipt => receipt.id === identityFor(firstBig.post.hash, firstBig.scope) &&
-    receipt.status === 'published' && receipt.url?.startsWith('https://'));
+  const isLiveReceipt = (receipt: PublishReceipt, channel: string) => receipt.channel === channel &&
+    receipt.status === 'published' && receipt.url?.startsWith('https://');
+  const firstBigLive = () => firstBig && confirmedReceipts.some(receipt => isLiveReceipt(receipt, firstBig.post.channel));
   const heldReason = firstBig ? 'Waiting for a live receipt of ' + firstBig.post.channel : 'No big post is scheduled; owned follow-ups are held';
   const timeline = queue.map(({ post, scope }) => ({ channel: post.channel, route: scope.route,
     at: schedule.find(slot => slot.channel === post.channel)!.local, scheduledAt: post.scheduledAt,
@@ -128,8 +129,8 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       profiles.set(key, result.then(() => {}, () => {}));
       return result;
     };
-    if (queue.some(({ post, scope, connectionError }) => !connectionError && post.channel === 'product-hunt' &&
-      !receipts.some(receipt => receipt.id === identityFor(post.hash, scope) && receipt.status === 'published')) && !options.phSubmit &&
+    if (queue.some(({ post, connectionError }) => !connectionError && post.channel === 'product-hunt' &&
+      !receipts.some(receipt => isLiveReceipt(receipt, post.channel))) && !options.phSubmit &&
       !await options.ask?.('Product Hunt: confirm final Submit for this launch?'))
       throw new Error('PH final submission needs founder confirmation (--ph-submit after explicit approval)');
     let finishFirstBig!: () => void;
@@ -138,7 +139,8 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       const { post, connection, scope, connectionError } = entry;
       try {
       const identity = identityFor(post.hash, scope);
-      const existing = receipts.find(receipt => receipt.id === identity && receipt.status === 'published');
+      const existing = receipts.find(receipt => receipt.id === identity && receipt.status === 'published' ||
+        !owned.has(post.channel) && isLiveReceipt(receipt, post.channel));
       if (existing) { board.push({ channel: post.channel, status: 'live', url: existing.url }); log(`${post.channel} | live | ${existing.url}`); return; }
       let remaining = Date.parse(post.scheduledAt) - now().getTime();
       while (!connectionError && !options.noWait && remaining > 0) {

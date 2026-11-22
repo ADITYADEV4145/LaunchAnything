@@ -7,6 +7,7 @@ import { recommend } from '../src/recommend/index.js';
 import { go } from '../src/go/run.js';
 import { mockAdapter } from '../src/go/adapters.js';
 import { groundworkGoFixture } from '../src/selftest/groundwork-go.js';
+import { loadReview } from '../src/review/posts.js';
 
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -14,6 +15,35 @@ async function fixture() {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-recommend-')); temporary.push(cwd);
   return goFixture(cwd);
 }
+
+it.each(['product-hunt', 'show-hn'])('recognizes a manually published %s receipt without a go identity', async channel => {
+  const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-manual-')); temporary.push(cwd);
+  const { work, paths } = await groundworkGoFixture(cwd);
+  const { posts } = await loadReview(work, undefined, () => '2026-01-06T15:00:00.000Z');
+  const hash = posts.find(post => post.channel === channel)!.hash;
+  await writeFile(join(paths.root, 'recommendations.md'), '| Channel | Local date | Local time |\n| --- | --- | --- |\n' +
+    `| ${channel} | 2026-01-06 | 09:00 |\n| github-release | 2026-01-06 | 10:00 |\n`);
+  await writeFile(join(paths.root, 'connections.json'), JSON.stringify([channel, 'github-release'].map(platform => ({
+    platform, route: platform === 'product-hunt' ? 'mcp' : platform === 'show-hn' ? 'browser' : 'api',
+    account: 'fixture-founder', profile: '/fixture/chrome', connectedAt: ''
+  }))));
+  const receipt = { channel, id: `${channel === 'product-hunt' ? 'mcp' : 'browser'}:${channel}:${hash}`,
+    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : 'https://news.ycombinator.com/item?id=123' };
+  await writeFile(paths.published, JSON.stringify({ posts: [receipt] }));
+  const preview = await go(work);
+  expect('timeline' in preview && preview.timeline.find(row => row.channel === 'github-release')?.status).toBe('queued');
+  const mock = mockAdapter(), publish = vi.fn(mock.publish);
+  const result = await go(work, { confirm: true, yes: true, now: () => new Date('2027-01-01T00:00:00Z'),
+    home: paths.root, adapter: { publish } });
+  expect('board' in result && result.board?.find(row => row.channel === channel)).toMatchObject({ status: 'live', url: receipt.url });
+  expect(publish.mock.calls.map(([context]) => context.post.channel)).toEqual(['github-release']);
+  for (const invalid of [{ ...receipt, status: 'manual' }, { ...receipt, status: 'scheduled' },
+    { ...receipt, url: 'file:///draft.html' }, { ...receipt, channel: 'reddit' }]) {
+    await writeFile(paths.published, JSON.stringify({ posts: [invalid] }));
+    const held = await go(work);
+    expect('timeline' in held && held.timeline.find(row => row.channel === 'github-release')?.status).toBe('held');
+  }
+}, 30000);
 
 it('a Reddit draft omitted by recommend does not block scheduled channels in go', async () => {
   const { work, paths } = await fixture();

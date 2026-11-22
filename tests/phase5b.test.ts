@@ -13,6 +13,7 @@ import type { ReviewPost } from '../src/review/posts.js';
 import { loadReview } from '../src/review/posts.js';
 import { assistedPublish } from '../src/connect/publish.js';
 import { publish } from '../src/adapters/publish.js';
+import { isLiveReceiptFor } from '../src/adapters/receipts.js';
 import { dailyCaps, reserveCap } from '../src/connect/caps.js';
 import { lockTimeout, recoveryTimeout, tryLock } from '../src/connect/lock.js';
 import { launchDir } from '../src/core/launch-dir.js';
@@ -176,6 +177,17 @@ async function approvedPost(channel: string, media: string[] = [], extra = {}, b
   await writeFile(paths.approvals, JSON.stringify({ approvals: [{ channel, hash: post.hash, name: 'Owner', time: new Date().toISOString() }] }));
   return { cwd, paths, home };
 }
+
+it.each(['product-hunt', 'show-hn', 'reddit'])('recognizes the actual assisted %s browser receipt for the approved post', async channel => {
+  const { cwd, home } = await approvedPost(channel, [], { link: 'https://example.test', subreddit: 'r/test' });
+  const { posts: [post] } = await loadReview(cwd);
+  await connect({ platform: channel, route: 'browser', account: 'owner', profile: cwd }, undefined, new MemoryKeychain(), home);
+  const url = channel === 'product-hunt' ? 'https://www.producthunt.com/posts/launch' : channel === 'reddit'
+    ? 'https://www.reddit.com/r/test/comments/123/launch/' : 'https://news.ycombinator.com/item?id=123';
+  const { posts: [receipt] } = await assistedPublish(cwd, { home, browser: async () => new MockBrowser(url) });
+  expect(isLiveReceiptFor(receipt, post, 'unrelated')).toBe(true);
+  expect(isLiveReceiptFor(receipt, { ...post, hash: 'a'.repeat(64) }, 'unrelated')).toBe(false);
+}, 30000);
 
 it.each([['x', 'postiz', 'postiz'], ['x', 'buffer', 'buffer'], ['devto', 'api', 'devto'], ['github-release', 'api', 'github-release']] as const)('stages connected %s through %s without opening a browser', async (channel, route, adapter) => {
   const { cwd, paths, home } = await approvedPost(channel);

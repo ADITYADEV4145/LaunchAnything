@@ -10,6 +10,7 @@ import { xCost } from '../connect/costs.js';
 import { reserveCap } from '../connect/caps.js';
 import { tryLock } from '../connect/lock.js';
 import { readReceipts, type PublishReceipt } from '../adapters/index.js';
+import { isLiveReceiptFor } from '../adapters/receipts.js';
 import { checkPosts } from '../copy/check.js';
 import { judgeWithHistory } from '../copy/judge.js';
 import { warroom } from '../launch-ops/warroom.js';
@@ -61,12 +62,8 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
   const previous = options.mock ? JSON.parse(await readOptional(join(paths.root, 'published.mock.json')) ?? '{"posts":[]}') as { posts: PublishReceipt[] } : diskReceipts;
   const receipts = [...previous.posts];
   const confirmedReceipts = [...receipts];
-  const isLiveReceipt = (receipt: PublishReceipt, { post, scope }: typeof queue[number]) => {
-    const manualIdentity = post.channel === 'product-hunt' ? `mcp:product-hunt:${post.hash}` :
-      ['show-hn', 'reddit'].includes(post.channel) ? `browser:${post.channel}:${post.hash}` : undefined;
-    return receipt.channel === post.channel && receipt.status === 'published' && receipt.url?.startsWith('https://') &&
-      (receipt.id === identityFor(post.hash, scope) || !options.mock && receipt.id === manualIdentity);
-  };
+  const isLiveReceipt = (receipt: PublishReceipt, { post, scope }: typeof queue[number]) =>
+    isLiveReceiptFor(receipt, post, identityFor(post.hash, scope));
   const firstBigLive = () => firstBig && confirmedReceipts.some(receipt => isLiveReceipt(receipt, firstBig));
   const heldReason = firstBig ? 'Waiting for a live receipt of ' + firstBig.post.channel : 'No big post is scheduled; owned follow-ups are held';
   const timeline = queue.map(({ post, scope }) => ({ channel: post.channel, route: scope.route,

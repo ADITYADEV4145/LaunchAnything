@@ -17,7 +17,8 @@ async function fixture() {
   return goFixture(cwd);
 }
 
-it.each(['product-hunt', 'show-hn'])('recognizes a manually published %s receipt without a go identity', async channel => {
+it.each([['mcp', 'product-hunt'], ['browser', 'product-hunt'], ['browser', 'show-hn'], ['browser', 'reddit'],
+  ['manual', 'product-hunt'], ['manual', 'show-hn'], ['manual', 'reddit']])('recognizes a %s %s receipt without a go identity', async (producer, channel) => {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-manual-')); temporary.push(cwd);
   const { work, paths } = await groundworkGoFixture(cwd);
   const { posts } = await loadReview(work, undefined, () => '2026-01-06T15:00:00.000Z');
@@ -25,11 +26,11 @@ it.each(['product-hunt', 'show-hn'])('recognizes a manually published %s receipt
   await writeFile(join(paths.root, 'recommendations.md'), '| Channel | Local date | Local time |\n| --- | --- | --- |\n' +
     `| ${channel} | 2026-01-06 | 09:00 |\n| github-release | 2026-01-06 | 10:00 |\n`);
   await writeFile(join(paths.root, 'connections.json'), JSON.stringify([channel, 'github-release'].map(platform => ({
-    platform, route: platform === 'product-hunt' ? 'mcp' : platform === 'show-hn' ? 'browser' : 'api',
+    platform, route: platform === 'product-hunt' ? 'mcp' : ['show-hn', 'reddit'].includes(platform) ? 'browser' : 'api',
     account: 'fixture-founder', profile: '/fixture/chrome', connectedAt: ''
   }))));
-  const receipt = { channel, id: `${channel === 'product-hunt' ? 'mcp' : 'browser'}:${channel}:${hash}`,
-    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : 'https://news.ycombinator.com/item?id=123' };
+  const receipt = { channel, id: `${producer}:${channel}:${hash}`,
+    status: producer === 'manual' ? 'live' : 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : 'https://news.ycombinator.com/item?id=123' };
   await writeFile(paths.published, JSON.stringify({ posts: [receipt] }));
   const preview = await go(work);
   expect('timeline' in preview && preview.timeline.find(row => row.channel === 'github-release')?.status).toBe('queued');
@@ -39,7 +40,7 @@ it.each(['product-hunt', 'show-hn'])('recognizes a manually published %s receipt
   expect('board' in result && result.board?.find(row => row.channel === channel)).toMatchObject({ status: 'live', url: receipt.url });
   expect(publish.mock.calls.map(([context]) => context.post.channel)).toEqual(['github-release']);
   for (const invalid of [{ ...receipt, status: 'manual' }, { ...receipt, status: 'scheduled' },
-    { ...receipt, url: 'file:///draft.html' }, { ...receipt, channel: 'reddit' }]) {
+    { ...receipt, url: 'file:///draft.html' }, { ...receipt, channel: 'devto' }]) {
     await writeFile(paths.published, JSON.stringify({ posts: [invalid] }));
     const held = await go(work);
     expect('timeline' in held && held.timeline.find(row => row.channel === 'github-release')?.status).toBe('held');

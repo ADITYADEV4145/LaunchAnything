@@ -32,7 +32,7 @@ export async function prepareFixtureVideo(cwd:string,fixture:string) {
   const parts=description.split(/\s(?:with|that|to)\s/);
   const headline=parts[0].split(/\s+/).slice(0,8).join(' ');
   const detail=parts.slice(1).join(' ').split(/\s+/).slice(0,8).join(' ') || product.name;
-  const captions=[headline,product.features[0].name,detail,product.audience,product.name,product.features[0].name];
+  const captions=[headline,product.features[0].name,detail,product.audience.who,product.name,product.features[0].name];
   const script={scenes:Array.from({length:6},(_,i)=>({shot:sceneFiles[i%sceneFiles.length],text:captions[i].split(/\s+/).slice(0,8).join(' '),duration:4.5}))};
   await writeFile(join(paths.video,'script.json'),JSON.stringify(script));
   return script;

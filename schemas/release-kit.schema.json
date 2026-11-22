@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["draft", "channels", "files", "reshot", "skipped", "warnings", "relaunch"],
+  "additionalProperties": false,
+  "properties": {
+    "draft": { "const": true },
+    "channels": { "type": "array", "items": { "enum": ["x", "linkedin", "email", "devto"] } },
+    "files": { "type": "array", "items": { "type": "string" } },
+    "reshot": { "type": "array", "items": { "type": "string" } },
+    "skipped": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "relaunch": { "type": "object", "required": ["ph", "hn", "score", "text"], "properties": { "ph": { "type": "boolean" }, "hn": { "type": "boolean" }, "score": { "type": "number" }, "text": { "type": "string" } }, "additionalProperties": false }
+  }
+}

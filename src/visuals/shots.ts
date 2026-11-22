@@ -4,19 +4,24 @@ import { parse } from 'yaml';
 import { PNG } from 'pngjs';
 import { launchDir } from '../core/launch-dir.js';
 import { validateFile } from '../core/schema.js';
-import { browser, runTerminal, start, escapeHtml } from './runtime.js';
+import { browser, runTerminal, start, escapeHtml, CaptureError } from './runtime.js';
 import { assertPrivate } from './privacy.js';
 import { guard, gif, ocrCheck } from './capture.js';
 interface Shot { id: string; route?: string; commands?: string[]; viewport: { width: number; height: number }; theme?: 'light' | 'dark'; record?: boolean; fullPage?: boolean; waitFor?: string; actions?: { type: string; selector: string; text?: string }[] }
-export async function takeShots(cwd: string, options: { url?: string; command?: string; only?: string } = {}) {
+export async function takeShots(cwd: string, options: { url?: string; command?: string; only?: string; ids?: Set<string> } = {}) {
   const paths = launchDir(cwd);
   const spec = parse(await readFile(paths.shots, 'utf8')) as { shots: Shot[]; baseUrl?: string; startCommand?: string; readyTimeoutMs?: number };
   const validation = validateFile('shots', spec); if (!validation.valid) throw new Error(validation.errors.join('; '));
-  const selected = spec.shots.filter(s => !options.only || s.id === options.only);
+  const selected = spec.shots.filter(s => (!options.only || s.id === options.only) && (!options.ids || options.ids.has(s.id)));
   if (!selected.length) throw new Error('No matching shots');
   if (new Set(spec.shots.map(s => s.id)).size !== spec.shots.length || spec.shots.some(s => !/^[\w-]+$/.test(s.id))) throw new Error('Shot IDs must be unique safe filenames');
   let config: { redact?: string[] } = {}; try { config = JSON.parse(await readFile(paths.config, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
-  const dir = join(paths.media, 'shots'); await mkdir(dir, { recursive: true }); await rm(join(dir, 'manifest.json'), { force: true });
+  const dir = join(paths.media, 'shots'); await mkdir(dir, { recursive: true });
+  let previous: { id: string }[] = [];
+  if (options.ids || options.only) {
+    try { previous = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+    previous = previous.filter(s => spec.shots.some(shot => shot.id === s.id) && !selected.some(shot => shot.id === s.id));
+  }
   let stop = () => {}; let url = options.url ?? spec.baseUrl;
   const app = await browser(); const manifest = [];
   try {
@@ -24,7 +29,7 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
       if (!url) {
         let dev = false; try { dev = Boolean(JSON.parse(await readFile(join(cwd, 'package.json'), 'utf8')).scripts?.dev); } catch { /* no package */ }
         const command = options.command ?? spec.startCommand ?? (dev ? 'npm run dev' : undefined);
-        if (!command) throw new Error('Provide --url, baseUrl or a start command');
+        if (!command) throw new CaptureError('Provide --url, baseUrl or a start command');
         url = 'http://127.0.0.1:3000'; stop = start(command, cwd);
       }
       const deadline = Date.now() + (spec.readyTimeoutMs ?? 30000);
@@ -35,7 +40,7 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
           try { const response = await fetch(candidate, { signal: AbortSignal.timeout(1000) }); await response.body?.cancel(); if (response.status < 500) { ready = true; break; } } catch { /* not ready */ }
         }
         if (ready) break;
-        if (Date.now() >= deadline) throw new Error('App readiness timeout');
+        if (Date.now() >= deadline) throw new CaptureError('App readiness timeout');
         await new Promise(r => setTimeout(r, 150));
       }
     }
@@ -74,6 +79,6 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
         manifest.push({ id: shot.id, kind: shot.commands ? 'terminal' : shot.viewport.width < 600 ? 'mobile' : 'web', files, width, height, redactedCount, secretsFound: 0, ocr });
       } finally { await page.close(); }
     }
-    await writeFile(join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2)); return manifest;
+    await writeFile(join(dir, 'manifest.json'), JSON.stringify([...previous, ...manifest], null, 2)); return manifest;
   } finally { stop(); await app.close(); }
 }

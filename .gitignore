@@ -2,5 +2,6 @@ node_modules/
 dist/
 coverage/
 .launch/
+!fixtures/*/.launch/
 *.tgz
 bench/runs/

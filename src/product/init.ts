@@ -5,6 +5,8 @@ import { assertSchema, optionalText, readJson, writeJson } from './files.js';
 import { repositoryFiles } from './scan.js';
 
 export interface Config {
+  releaseChannels?: string[];
+  proof?: import('../proof/run.js').ProofConfig;
   profile: string;
   launchType: string;
   channels: string[];

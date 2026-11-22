@@ -2,12 +2,13 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parse } from 'yaml';
+import { validateProduct } from '../product/validate.js';
 import { launchDir } from '../core/launch-dir.js';
 import { packageRoot } from '../core/package-root.js';
 import { validateFile } from '../core/schema.js';
 import type { Pains } from '../research/index.js';
 
-interface Product { name: string; oneLiner: string; audience: string; problem: string; proofPoints: string[]; features: { name: string; description: string; sources: { ref: string }[] }[] }
+interface Product { name: string; oneLiner: string; audience: { who: string }; problem: { summary: string }; proofPoints: string[]; features: { name: string; description: string; sources: { ref: string }[] }[] }
 const rules = parse(readFileSync(join(packageRoot(), 'rules/brief.yaml'), 'utf8')) as { version: number; faqMin: number; faqMax: number; sections: { title: string; words: number }[] };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const collapseWhitespace = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -32,7 +33,7 @@ function inputs(cwd: string) {
   const root = launchDir(cwd).root;
   const productText = readFileSync(join(root, 'product.json'), 'utf8');
   const product = JSON.parse(productText) as Product;
-  const checked = validateFile('product', product);
+  const checked = validateProduct(cwd, product);
   if (!checked.valid) throw new Error(checked.errors.join('; '));
   const plan = readFileSync(join(root, 'plan.md'), 'utf8');
   const painPath = join(root, 'research/pains.json');
@@ -52,7 +53,7 @@ function inputs(cwd: string) {
 function scaffold(ctx: ReturnType<typeof inputs>) {
   const { plan, hash } = ctx;
   const p = { ...ctx.product, name: inline(ctx.product.name), oneLiner: inline(ctx.product.oneLiner),
-    audience: inline(ctx.product.audience), problem: inline(ctx.product.problem),
+    audience: inline(ctx.product.audience.who), problem: inline(ctx.product.problem.summary),
     proofPoints: ctx.product.proofPoints.map(inline),
     features: ctx.product.features.map(feature => ({ ...feature, name: inline(feature.name), description: inline(feature.description) })) };
   const pains = ctx.pains.map(pain => ({ ...pain, name: inline(pain.name), description: inline(pain.description),

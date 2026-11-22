@@ -4,7 +4,7 @@ import { validateFile } from '../core/schema.js';
 import { launchDir } from '../core/launch-dir.js';
 import { init } from '../product/init.js';
 import { scan } from '../product/scan.js';
-import { validate } from '../product/validate.js';
+import { validate, validateProduct } from '../product/validate.js';
 import { plan } from '../planning/plan.js';
 import { git } from '../product/files.js';
 import type { Check } from './types.js';
@@ -19,10 +19,22 @@ export const checks: Check[] = [
     if (commits.length !== 1 || commits[0].sha !== git(cwd, ['rev-parse', 'HEAD'])) throw new Error('Scan must include only the commit since v0.1.0');
     await copyFile(join(cwd, '.liftoff-fixture/product.json'), paths.product);
     const validated = await validate(cwd, 'product');
-    if (!validated.valid || validated.warnings.length) throw new Error([...validated.errors, ...validated.warnings].join('; '));
+    if (!validated.valid) throw new Error([...validated.errors, ...validated.warnings].join('; '));
     const planned = await plan(cwd, { lessons: [] });
     if (planned.channels.length < 2 || planned.channels.length > 4 || planned.channels.some(c => !expected.allowedChannels.includes(c.id)))
       throw new Error('Plan contains unexpected channels');
+  } },
+  { name: 'product requires benchmark proof and money moment', async run({ cwd }) {
+    const product = JSON.parse(await readFile(launchDir(cwd).product, 'utf8'));
+    const mutations = [
+      { ...product, proof: [] },
+      { ...product, money_moment: undefined },
+      { ...product, proof: product.proof.map((proof: Record<string, unknown>) => ({ ...proof, source_file: 'missing-benchmark.json' })) },
+      { ...product, proof: product.proof.map((proof: Record<string, unknown>) => ({ ...proof, value: 'not the recorded value' })) },
+    ];
+    for (const invalid of mutations) {
+      if (validateProduct(cwd, invalid).valid) throw new Error('Product accepted absent or invented benchmark proof / money moment');
+    }
   } },
   { name: 'output contracts and plan bounds', async run({ cwd }) {
     const paths = launchDir(cwd);

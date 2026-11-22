@@ -1,4 +1,5 @@
 import { register as adapters } from './adapters.js';
+import { register as proof } from './proof.js';
 import { register as init } from './init.js';
 import { register as bench } from './bench.js';
 import { register as setup } from './setup.js';
@@ -36,6 +37,6 @@ export function registerCommands(program: Command) {
   adapters(program);
   for (const register of [bench, setup, demo, estimate, telemetry]) register(program);
   voice(program);
-  for (const register of [research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
+  for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

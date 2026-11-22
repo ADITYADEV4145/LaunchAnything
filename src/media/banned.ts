@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PNG } from 'pngjs';
 import { secretPatterns } from '../visuals/privacy.js';
 import { exec } from '../visuals/runtime.js';
 
@@ -27,7 +28,17 @@ export async function ocrWords(png: Buffer): Promise<{ text: string; words: OcrW
   catch { throw new Error('OCR unavailable: install tesseract (apt install tesseract-ocr / brew install tesseract)'); }
   const dir = await mkdtemp(join(tmpdir(), 'liftoff-ocr-'));
   try {
-    const file = join(dir, 'capture.png'); await writeFile(file, png);
+    const image = PNG.sync.read(png); let luminance = 0;
+    for (let i = 0; i < image.data.length; i += 4) {
+      const alpha = image.data[i + 3] / 255;
+      for (let c = 0; c < 3; c++) image.data[i + c] = Math.round(image.data[i + c] * alpha + 255 * (1 - alpha));
+      image.data[i + 3] = 255;
+      luminance += image.data[i] * 0.2126 + image.data[i + 1] * 0.7152 + image.data[i + 2] * 0.0722;
+    }
+    if (luminance / (image.width * image.height) < 128) {
+      for (let i = 0; i < image.data.length; i += 4) for (let c = 0; c < 3; c++) image.data[i + c] = 255 - image.data[i + c];
+    }
+    const file = join(dir, 'capture.png'); await writeFile(file, PNG.sync.write(image));
     const { stdout } = await exec('tesseract', [file, 'stdout', 'tsv'], { timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
     const words: OcrWord[] = []; const lines = new Map<string, string[]>();
     for (const row of stdout.trimEnd().split(/\r?\n/).slice(1)) {

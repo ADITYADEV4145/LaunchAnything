@@ -3,8 +3,11 @@ const zones: Record<string, string> = { et: 'America/New_York', est: 'Etc/GMT+5'
 const unsupportedZones = ['cet', 'cest', 'eet', 'eest', 'ist', 'bst', 'jst', 'aest', 'aedt', 'acst', 'acdt', 'awst', 'nzst', 'nzdt', 'hkt', 'sgt', 'wet', 'west', 'ast', 'adt', 'hst', 'akst', 'akdt'];
 const zonePattern = `(?:(?:utc|gmt)[ \\t]*[+-][ \\t]*\\d+(?::\\d{2})?|[a-z_]+(?:/[a-z0-9_+-]+)+|${[...Object.keys(zones), ...unsupportedZones].join('|')})`;
 export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
-  const source = rules.flatMap(r => [r.short_name, r.description]).join('\n\n')
-    .replace(/\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi, ' ')
+  const raw = rules.flatMap(r => [r.short_name, r.description]).join('\n\n');
+  const urlPattern = /\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi;
+  const threadUrls = [...new Set([...raw.matchAll(urlPattern)].filter(m => /mega[-_]?thread|weekly[-_/]|self[-_]promo|promo[-_]thread/i.test(m[0]) || /\bonly\s+in\s*$/i.test(raw.slice(0, m.index))).map(m => m[0].replace(/[).,;]+$/, '')))];
+  const threadUrl = threadUrls.length === 1 && /^(?:https?:\/\/)?(?:(?:www|old)\.)?reddit\.com\/r\/[^/]+\/comments\/[^/]+(?:\/|$)/i.test(threadUrls[0]!) ? threadUrls[0] : undefined;
+  const source = raw.replace(urlPattern, ' ')
     .replace(/(?<![\w/])\/?[ru]\/[\w-]+(?:\/[\w/-]+)?/gi, ' ');
   const text = source.replace(/[A-Z]/g, letter => letter.toLowerCase());
   const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
@@ -42,7 +45,8 @@ export function restrictions(rules: { short_name: string; description: string }[
     const unknown = /(\p{Lu}[\p{L}\p{M}-]*)[\s()[\],:]*$/u.exec(before)?.[1] ?? /^[\s()[\],:]*(\p{Lu}[\p{L}\p{M}-]*)/u.exec(after)?.[1];
     if (unknown) manualReview = `Unrecognized rule timezone or place: ${unknown}`;
   }
-  return { days: [...new Set(days)], megathread: /mega[- ]?thread/.test(text), start, end, timezone: mentions[0] ?? timezone, manualReview };
+  if (threadUrls.length && !threadUrl) manualReview = 'Unresolved thread destination; manual review required';
+  return { days: [...new Set(days)], megathread: threadUrls.length > 0 || /mega[-_ ]?thread|weekly[-_ ]thread|(?:self[-_ ]promo|promo)[-_ ]thread/i.test(raw), threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview };
 }
 export function allowedDate(date: string, days: number[]) { return !days.length || days.includes(new Date(date + 'T12:00:00Z').getUTCDay()); }
 export function nextDate(date: string, days = 1) { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }

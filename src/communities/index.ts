@@ -79,6 +79,7 @@ type Scored = ReturnType<typeof scoreEvidence>;
 interface OtherCommunity { url: string; host: string; kind: string }
 export interface Report { subreddits: Scored[]; recommended: string[]; plan: { subreddit: string; date: string; time?: string; timezone?: string; instant?: string; destination?: string; angle: string; variant: string; file: string }[]; threads: (Post & { file: string })[]; other: OtherCommunity[] }
 const replyHeader = (p: Post) => `Not sent. Send by hand, max 10/day\n\nSource: ${p.url}\n\nYou asked: ${p.title}\n\n`;
+const destinationFor = (limit: ReturnType<typeof restrictions>) => limit.megathread ? `megathread${limit.threadUrl ? `: ${limit.threadUrl}` : ''}` : 'standalone post';
 const replyText = (body: string, p: Post) => body.startsWith(replyHeader(p)) ? body.slice(replyHeader(p).length) : body;
 async function draft(cwd: string, file: string, body: string) { const target = path(cwd, file); const existing = readLocal(cwd, target); if (existing !== undefined) return existing; writeLocal(cwd, target, body); return body; }
 export async function checkCommunities(cwd: string, supplied?: Report) {
@@ -95,7 +96,7 @@ export async function checkCommunities(cwd: string, supplied?: Report) {
     if (p.timezone !== undefined && p.timezone !== timezone) errors.push(`${p.subreddit}: posting timezone differs from config`);
     const window = postingWindow(p.date, p.time, timezone, limit, p.instant);
     if (!window.day) errors.push(`${p.subreddit}: posting day violates cited rule`);
-    if (limit.megathread && p.destination !== 'megathread') errors.push(`${p.subreddit}: must post in the megathread`);
+    if (limit.megathread && p.destination !== destinationFor(limit)) errors.push(`${p.subreddit}: must post in the megathread`);
     if (!window.time) errors.push(`${p.subreddit}: posting time violates cited rule`);
   }
   if (new Set(data.plan.map(p => p.date)).size !== data.plan.length) errors.push('More than one subreddit per day');
@@ -135,7 +136,7 @@ export async function reportCommunities(cwd: string) {
     } catch { omittedSlots.add(sub.subreddit); continue; }
     const file = `posts/${sub.subreddit}.md`;
     const variant = sub.selfPromotion === 'allowed' ? 'standard' : 'value-first';
-    const destination = limit.megathread ? 'megathread' : 'standalone post';
+    const destination = destinationFor(limit);
     const angle = `${names[i % names.length] ?? pains.idea}: lesson for r/${sub.subreddit}`;
     await draft(cwd, file, `Not sent. Founder posts by hand. One subreddit per day.\n\n# ${angle}\n\nDestination: ${destination}. Follow the cited rule and verify the current thread before posting.\n\nI'm Aditya and I built ${pains.idea}.\n\n${variant === 'value-first' ? 'Lesson to share (edit before posting): describe the workaround, what failed, and a reproducible improvement. No product link; add one only after verifying the cited rule allows it.' : 'Share a concrete example and useful steps for this community before describing the project.'}\n\nCommunity context: r/${sub.subreddit}. Edit this draft to address the readers’ specific problem.\n`);
     plan.push({ subreddit: sub.subreddit, ...slot, destination, angle, variant, file });

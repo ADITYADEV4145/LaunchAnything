@@ -11,6 +11,22 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['weekly_thread', 'megathread', 'self_promo', 'promo-thread', 'discussion'])('directs URL-only promotion restrictions to the cited %s thread', async slug => {
+    const cwd = await setup(); const url = `https://reddit.com/r/builders/comments/abc/${slug}`;
+    const rules = [{ short_name: 'Promotions', description: `Self-promo only in ${url}` }];
+    expect(restrictions(rules, 'UTC')).toMatchObject({ megathread: true, threadUrl: url, manualReview: undefined });
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.plan[0].destination).toBe(`megathread: ${url}`);
+    expect(await readFile(join(cwd, '.launch/communities', report.plan[0].file), 'utf8')).toContain(`Destination: megathread: ${url}`);
+    report.plan[0].destination = 'standalone post'; expect((await checkCommunities(cwd, report)).errors).toContain('builders: must post in the megathread');
+  });
+  it('fails closed for ambiguous or unverified URL-only thread destinations', () => {
+    for (const description of ['Self-promo only in https://example.com/weekly_thread', 'Self-promo only in https://reddit.com/r/x/comments/a/weekly_thread or https://reddit.com/r/x/comments/b/megathread']) {
+      const limit = restrictions([{ short_name: 'Promotions', description }], 'UTC');
+      expect(limit.manualReview).toContain('Unresolved thread destination'); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    }
+  });
   it.each(['communities.md', 'communities.json', 'communities/replies', 'communities/posts'])('refuses symlink report destination %s without modifying the target', async destination => {
     const cwd = await setup(); const outside = await mkdtemp(join(tmpdir(), 'communities-outside-')); dirs.push(outside);
     const marker = join(outside, 'untouched'); await writeFile(marker, 'unchanged');

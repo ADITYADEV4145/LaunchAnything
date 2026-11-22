@@ -97,7 +97,7 @@ it('does not mistake parenthesized web UI labels for terminal text without termi
 
 it('fails banned video frames with timestamps and rule names, without reproducing OCR content',async()=>{
   const cwd=await fixture(); const bad=join(cwd,'bad.png'); await picture(bad,'sed log | grep fixtures/');
-  await exec('ffmpeg',['-y','-v','error','-loop','1','-t','1','-i',join(cwd,'.launch/media/polished/after.png'),'-loop','1','-t','1','-i',bad,'-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0','-r','12','-c:v','libx264','-pix_fmt','yuv420p','-threads','1',join(cwd,'.launch/video/unsafe.mp4')]);
+  await exec('ffmpeg',['-y','-v','error','-loop','1','-framerate','12','-t','1','-i',join(cwd,'.launch/media/polished/after.png'),'-loop','1','-framerate','12','-t','1','-i',bad,'-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0','-r','12','-c:v','libx264','-pix_fmt','yuv420p','-threads','1',join(cwd,'.launch/video/unsafe.mp4')]);
   await expect(judge(cwd)).rejects.toThrow(/unsafe\.mp4@1s: banned.*shell-pipe/);
   const saved=await report(cwd); expect(saved.items.find(item=>item.timestamp===1)?.banned).toContain('fixture-path');
   expect(JSON.stringify(saved)).not.toContain('sed log');

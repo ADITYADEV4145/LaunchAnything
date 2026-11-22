@@ -17,9 +17,11 @@ import { checks as phase2b } from './phase2b.js';
 import { checks as launchOps } from './launch-ops.js';
 import { checks as phase5b } from './phase5b.js';
 import { checks as adoption } from './adoption.js';
+import { checks as phaseF } from './phaseF.js';
 
 export const phases: Phase[] = [{ phase: 0, checks: phase0 }, { phase: '0b', checks: phase0b }, { phase: 1, checks: phase1 }, { phase: '1b', checks: phase1b }, { phase: 2, checks: phase2 }, { phase: '2b', checks: phase2b }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: '5b', checks: phase5b }, { phase: 6, checks: phase6 }];
 phases.push({ phase: 'I', checks: adoption });
+phases.push({ phase: 'F', checks: phaseF });
 phases.find(phase => phase.phase === 6)!.checks = [{
   name: 'phase 6 results and launch operations',
   async run(context) {

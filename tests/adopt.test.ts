@@ -161,6 +161,6 @@ describe('adoption', () => {
 
   it('appends phase I without changing through-6 ordering', () => {
     const order = phases.map(p => String(p.phase));
-    expect(order.slice(order.indexOf('6'))).toEqual(['6', 'I']);
+    expect(order.slice(order.indexOf('6'))).toEqual(['6', 'I', 'F']);
   });
 });

@@ -146,6 +146,7 @@ it('judge gate rewrites up to three loops and then red-flags with reasons', proj
   const first = judgePosts(cwd, ['x']);
   expect(existsSync(join(judgeDir, 'x.md'))).toBe(true);
   expect(readFileSync(join(judgeDir, 'x.md'), 'utf8')).toContain('specificity');
+  expect(readFileSync(join(judgeDir, 'x.md'), 'utf8')).toContain('rests on interface: The CLI adds and lists tasks in a local JSON file. (bin/tasklight.js)');
   expect(first.verdicts[0].source).toBe('local');
   scores(9);
   expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ status: 'pass', source: 'model', judge: 'test judge' });

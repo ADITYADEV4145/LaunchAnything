@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { context, type Product } from './context.js';
 import { inspectPost, parsePost, type Post } from './check.js';
-import { annotate, grounded, splitSentences } from './citations.js';
+import { annotate, citationId, grounded, splitSentences } from './citations.js';
 import { guidelineIssues, loadExemplars, loadVoiceGuidelines } from './guides.js';
 import { openingSentence } from './template.js';
 import { blindFeedback } from './blind-test.js';
@@ -68,7 +68,12 @@ export function localScores(post: Post, channel: string, product: Product, cwd: 
 }
 
 const judgeDir = (posts: string) => join(posts, 'judge');
-function brief(cwd: string, channel: string, post: Post, sourceHash: string) {
+function brief(cwd: string, channel: string, post: Post, sourceHash: string, product: Product) {
+  const g = grounded(product);
+  const evidence = (post.citations ?? []).map(c => {
+    const id = citationId(c, g) ?? '?', claim = g.claims.find(item => item.id === id);
+    return '- "' + c.text + '" rests on ' + id + (claim ? ': ' + claim.text + (claim.sources?.length ? ' (' + claim.sources.map(s => s.ref).join(', ') + ')' : ' (no source)') : ' (unknown)');
+  });
   const exemplars = loadExemplars(channel, cwd), feedback = blindFeedback(cwd, channel), guide = loadVoiceGuidelines();
   return ['# Judge brief: ' + channel,
     'You are the judge, not the writer. Score this draft against the rubric below, 0-10 each. Be strict: 8 means you would post it unchanged on ' + channel + '.',
@@ -78,6 +83,8 @@ function brief(cwd: string, channel: string, post: Post, sourceHash: string) {
     ...(feedback.length ? ['## Blind testers said these were missing from earlier drafts', feedback.map(f => '- ' + f).join('\n')] : []),
     '## Voice rules', guide.rules.map(r => '- ' + r.rule).join('\n'),
     '## Draft', '```markdown\n---\n' + 'title: ' + post.title + '\n---\n' + post.body + '\n```',
+    'Link: ' + (post.link ? post.link + (post.linkFirstComment ? ' (posted as the first comment)' : '') : 'none in front matter'),
+    '## Evidence behind the cited sentences', evidence.join('\n') || 'No citations: treat every factual claim as unsupported.',
     '## Your answer',
     'Write .launch/posts/judge/' + channel + '.scores.json as JSON: {"sourceHash": "' + sourceHash + '", "judge": "<model or person>", "scores": {' + criteria.map(c => '"' + c + '": 0').join(', ') + '}, "reasons": ["<one line per score under 8: what to change>"]}',
     'Then run liftoff judge again.'].join('\n\n') + '\n';
@@ -112,7 +119,7 @@ export function judgePosts(cwd: string, selected?: string[]) {
     const source = readFileSync(path);
     const sourceHash = createHash('sha256').update(source).digest('hex');
     const post = parsePost(source.toString('utf8'));
-    atomicWrite(cwd, join(dir, channel + '.md'), brief(cwd, channel, post, sourceHash));
+    atomicWrite(cwd, join(dir, channel + '.md'), brief(cwd, channel, post, sourceHash, ctx.product));
     const local = localScores(post, channel, ctx.product, cwd);
     const model = modelScores(join(dir, channel + '.scores.json'), sourceHash);
     const scores = model?.scores ?? local.scores;

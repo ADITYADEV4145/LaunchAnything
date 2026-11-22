@@ -6,7 +6,7 @@ export function restrictions(rules: { short_name: string; description: string }[
   const source = rules.flatMap(r => [r.short_name, r.description]).join('\n\n')
     .replace(/\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi, ' ')
     .replace(/(?<![\w/])\/?[ru]\/[\w-]+(?:\/[\w/-]+)?/gi, ' ');
-  const text = source.toLowerCase();
+  const text = source.replace(/[A-Z]/g, letter => letter.toLowerCase());
   const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
   if (/\bweekends?\b/.test(text)) days.push(0, 6);
   const clock = (hour: string, minute?: string, period?: string) => {

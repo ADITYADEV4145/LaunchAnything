@@ -32,6 +32,14 @@ cp docs/demo/inputs/shots-bootstrap.yaml .launch/shots.yaml
 python3 -m http.server 3037 --bind 127.0.0.1 --directory .launch > .launch/demo-server.log 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT
+if test -n "${LIFTOFF_CHROME:-}"; then
+  chrome="$LIFTOFF_CHROME"
+  case "$chrome" in /*) ;; *) chrome="$PWD/$chrome" ;; esac
+  test -x "$chrome" || { printf 'LIFTOFF_CHROME must name an executable.\n' >&2; exit 1; }
+  mkdir -p .launch/browser-home/.local/bin
+  ln -s "$chrome" .launch/browser-home/.local/bin/google-chrome
+  export HOME="$PWD/.launch/browser-home"
+fi
 node dist/cli.js shots --json
 node dist/cli.js video script --json
 node dist/cli.js video --renderer ffmpeg --format 16x9 --json

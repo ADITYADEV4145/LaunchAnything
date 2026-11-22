@@ -25,7 +25,7 @@ shots:
   - id: capture
     commands:
       - >-
-        node dist/cli.js shots --only sources | jq -r '.[] | .kind, .files[]'
+        bash -o pipefail -c 'node dist/cli.js shots --only sources | jq -r ".[] | .kind, .files[]"'
     viewport: {width: 760, height: 440}
   - id: render
     commands:

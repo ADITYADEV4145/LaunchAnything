@@ -23,6 +23,13 @@ selected with `LIFTOFF_CHROME=/absolute/path/to/chrome`; otherwise Liftoff tries
 its installed browsers. Port 3037 must be free. No external API credentials,
 Remotion, TTS or research fetch are needed. Package installation needs npm access.
 
+When `LIFTOFF_CHROME` is set, the script creates a browser symlink under
+`.launch/browser-home/.local/bin/` and uses that demo-local HOME during capture.
+Nested terminal commands retain HOME but not browser override variables, so this
+lets them find the selected browser without changing runtime's environment
+allowlist or your real home directory. The nested capture pipeline uses Bash
+`pipefail` so browser/capture failures abort instead of appearing as footage.
+
 From the repository root, run the exact pipeline recorded in:
 
 ```sh

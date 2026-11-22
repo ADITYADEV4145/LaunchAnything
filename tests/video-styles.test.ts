@@ -8,6 +8,8 @@ import { stringify } from 'yaml';
 import { axes, captionContrast, checkStyles, distinctAxes, forkStyle, listStyles, loadStyle, motionFilter, parseStyle, styleGate, stylesGallery, type VideoStyle } from '../src/video/styles.js';
 import { endAsset, frameLayout, sceneAssets } from '../src/video/design.js';
 import { run } from '../src/video/render.js';
+import { renderClip } from '../src/video/clip.js';
+import { browser } from '../src/visuals/runtime.js';
 
 const dirs: string[] = [];
 async function fixture() { const dir=await mkdtemp(join(tmpdir(),'video-styles-')); dirs.push(dir); return dir; }
@@ -88,4 +90,14 @@ describe('video styles',() => {
     expect((await cli('--fork','midnight','--as','custom')).ok).toBe(true);
     await expect(cli('check')).rejects.toThrow();
   },30000);
+  it('renders top-caption styles above the safe cutoff despite Chromium rounding',async context => {
+    let app; try { app=await browser(); } catch { context.skip(true,'Chrome unavailable'); return; }
+    await app.close();
+    const cwd=await fixture(); const source=join(cwd,'capture.png');
+    await run('ffmpeg',['-y','-v','error','-f','lavfi','-i','color=white:s=96x64','-frames:v','1','-threads','1',source]);
+    for(const style of ['paper','mono']) for(const format of ['16x9','1x1'] as const) {
+      const result=await renderClip(cwd,[{caption:'Keep work private',source,duration:2}],{style,format,renderer:'ffmpeg'});
+      expect(result.receipt.scenes[0].captionContrast).toBeGreaterThanOrEqual(7);
+    }
+  },120000);
 });

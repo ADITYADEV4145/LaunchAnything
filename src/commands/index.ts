@@ -37,11 +37,13 @@ import { register as audience } from './audience.js';
 import { register as judge } from './judge.js';
 import { register as drafts } from './drafts.js';
 import { register as go } from './go.js';
+import { register as communities } from './communities.js';
 export function registerCommands(program: Command) {
   adapters(program);
   go(program);
   for (const register of [bench, setup, demo, estimate, telemetry]) register(program);
   voice(program);
+  communities(program);
   for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, judge, drafts, shots, images, media, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

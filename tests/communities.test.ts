@@ -1,0 +1,118 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { fetchCommunities, importEvidence, reportCommunities, checkCommunities, scoreEvidence } from '../src/communities/index.js';
+import type { Evidence } from '../src/communities/adapters.js';
+import { restrictions } from '../src/communities/schedule.js';
+const fixture = JSON.parse(await readFile('fixtures/cli-tool/.liftoff-fixture/communities-evidence.json', 'utf8')) as Evidence[];
+const dirs: string[] = [];
+async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
+afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
+describe('communities', () => {
+  it('lists only solution-seeking HN threads, groups sources, and labels empty sections', async () => {
+    const cwd = await setup();
+    const posts = [
+      ['Ask HN: Pain tracking tools', ''],
+      ['Which pain tracking tool do you recommend?', ''],
+      ['My workflow', 'Looking for pain tracking recommendations'],
+      ['Show HN: Pain tracking?', 'Is there a tool for pain tracking?'],
+      ['Launch HN: Pain tracking', 'Looking for pain tracking feedback'],
+      ['Show HN – Pain tracking', 'How do you handle pain tracking?'],
+      ['Pain tracking update', 'We changed the layout.'],
+      ['Ask HN: Unrelated problem', ''],
+    ].map(([title, selftext], i) => ({ title, selftext, url: `https://news.ycombinator.com/item?id=${i}`, created_utc: 1760000000, score: 1, num_comments: 0 }));
+    await mkdir(join(cwd, '.launch/communities'), { recursive: true });
+    await writeFile(join(cwd, '.launch/communities/hn.json'), JSON.stringify([...posts, posts[0]]));
+    await writeFile(join(cwd, '.launch/communities/other.json'), JSON.stringify([
+      { host: 'news.ycombinator.com', kind: 'hn', url: posts[0].url },
+      { host: 'news.ycombinator.com', kind: 'hn', url: posts[1].url },
+      { host: 'github.com', kind: 'github', url: 'https://github.com/example/repo/issues/1' },
+      { host: 'discord.gg', kind: 'other', url: 'https://discord.gg/example' },
+    ]));
+    const result = await reportCommunities(cwd);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.threads.map((p: any) => p.url)).toEqual(posts.slice(0, 3).map(p => p.url));
+    expect(result.markdown).not.toContain('Show HN'); expect(result.markdown).not.toContain('Launch HN');
+    expect(result.markdown).toContain('[Hacker News](https://news.ycombinator.com/) — news.ycombinator.com (hn); 2 cited threads.');
+    expect(result.markdown).toContain('[github.com](https://github.com/example/repo/issues/1) — github');
+    expect(result.markdown).toContain('[discord.gg](https://discord.gg/example) — other');
+    expect(result.markdown).not.toContain('{"url"');
+    expect(result.markdown).toContain('No subreddit evidence yet: set REDDIT_ACCESS_TOKEN or capture rules in the agent browser, then `liftoff communities import`.');
+    for (const section of ['Low signal', 'Do not post', 'Needs manual review', 'Cross-post plan']) expect(result.markdown).toContain(`## ${section}\nNone.`);
+    const reply = await readFile(join(cwd, '.launch/communities', report.threads[0].file), 'utf8');
+    expect(reply).toContain('You asked: Ask HN: Pain tracking tools'); expect(reply).toContain("I'm Aditya and I built Groundwork"); expect(reply).not.toMatch(/upvote/i);
+  });
+  it('schedules allowed days/times and megathreads, separates low signal, and gates forbidden replies and duplicate URLs', async () => {
+    const cwd = await setup();
+    await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-23', timezone: 'UTC' }));
+    const sunday = { ...fixture[0]!, subreddit: 'sunday', rules: [{ short_name: 'Self-Promo Sunday', description: 'Only on Sunday between 9am and 5pm UTC in the megathread.' }] };
+    const saturday = { ...fixture[3]!, rules: [{ short_name: 'Promotions', description: 'Only on Saturday in the megathread.' }] };
+    const low = { ...fixture[1]!, subreddit: 'low', topPosts: [], searchHits: [] };
+    const all = [sunday, saturday, low, fixture[4]!, fixture[6]!];
+    for (const e of all) { const file = join(cwd, e.subreddit + '.json'); await writeFile(file, JSON.stringify(e)); await importEvidence(cwd, file); }
+    await reportCommunities(cwd);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    const md = await readFile(join(cwd, '.launch/communities.md'), 'utf8');
+    expect(md).toContain('## Low signal\n- r/low: pain count 0'); expect(md).toContain('Flair: not required'); expect(md).toContain('no stated karma/age requirement'); expect(md).toContain('Verify your account meets it before posting'); expect(md).toContain('founder.json');
+    expect(report.recommended).not.toContain('low');
+    const sun = report.plan.find((p: any) => p.subreddit === 'sunday'); expect(new Date(sun.date).getUTCDay()).toBe(0); expect(sun.time).toBe('09:00'); expect(sun.destination).toBe('megathread');
+    const sat = report.plan.find((p: any) => p.subreddit === 'weekly'); expect(new Date(sat.date).getUTCDay()).toBe(6); expect(sat.destination).toBe('megathread');
+    expect(new Set(report.plan.map((p: any) => p.date)).size).toBe(report.plan.length);
+    expect(report.threads.some((t: any) => t.url.includes('/r/banned/'))).toBe(false);
+    expect(restrictions([{ short_name: 'Promo', description: 'Only on weekends' }], 'UTC').days.sort()).toEqual([0, 6]);
+    const original = sun.date; sun.date = '2026-11-23'; expect((await checkCommunities(cwd, report)).errors).toContain('sunday: posting day violates cited rule'); sun.date = original;
+    sun.time = '20:00'; expect((await checkCommunities(cwd, report)).errors).toContain('sunday: posting time violates cited rule'); sun.time = '09:00';
+    sun.destination = 'standalone post'; expect((await checkCommunities(cwd, report)).errors).toContain('sunday: must post in the megathread'); sun.destination = 'megathread';
+    report.threads.push(report.threads[0]); expect((await checkCommunities(cwd, report)).errors).toContain('Duplicate thread URL'); report.threads.pop();
+    const forbidden = { ...fixture[4]!.searchHits![0]!, file: 'replies/abcdef.md' }; await writeFile(join(cwd, '.launch/communities', forbidden.file), 'Groundwork https://example.com'); report.threads.push(forbidden);
+    expect((await checkCommunities(cwd, report)).errors).toContain('Forbidden community reply promotes: replies/abcdef.md');
+    report.recommended.push('low'); expect((await checkCommunities(cwd, report)).valid).toBe(false);
+  });
+  it('fetches OAuth evidence and caches every external response', async () => {
+    const cwd = await setup(); let calls = 0;
+    const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input); calls++;
+      if (url.includes('hn.algolia')) return new Response('{"hits":[]}');
+      expect((init?.headers as Record<string, string>)['User-Agent']).toBe('liftoff-communities/0.1');
+      const body = url.includes('/api/v1/me') ? { total_karma: 200, created_utc: 1700000000 } : url.includes('post_requirements') ? { is_flair_required: true } : url.endsWith('/about/rules') ? { rules: fixture[0]!.rules } : url.endsWith('/about') ? { data: fixture[0]!.about } : { data: { children: [{ data: { ...fixture[0]!.topPosts[0], permalink: '/r/builders/comments/a/ask' } }] } };
+      return new Response(JSON.stringify(body));
+    }) as typeof fetch;
+    const opts = { fetch: fetcher, env: { REDDIT_ACCESS_TOKEN: 'fixture-token' } };
+    expect((await fetchCommunities(cwd, [], opts)).needsBrowser).toEqual([]); const count = calls;
+    await fetchCommunities(cwd, [], opts); expect(calls).toBe(count);
+    await reportCommunities(cwd); expect((await checkCommunities(cwd)).valid).toBe(true);
+  });
+  it('uses browser fallback, caches HN and never calls Reddit without a token', async () => {
+    const cwd = await setup(); let calls = 0;
+    const fetcher = (async (url: string | URL | Request) => { expect(String(url)).toContain('hn.algolia.com'); calls++; return new Response(JSON.stringify({ hits: [] })); }) as typeof fetch;
+    const first = await fetchCommunities(cwd, [], { fetch: fetcher, env: {} }); expect(first.needsBrowser[0]!.subreddit).toBe('builders'); expect(calls).toBe(2);
+    await fetchCommunities(cwd, [], { fetch: fetcher, env: {} }); expect(calls).toBe(2);
+  });
+  it('imports evidence, generates distinct drafts, excludes bans and gates edits', async () => {
+    const cwd = await setup();
+    for (const e of fixture) { const file = join(cwd, e.subreddit + '.json'); await writeFile(file, JSON.stringify(e)); await importEvidence(cwd, file); }
+    await writeFile(join(cwd, '.launch/communities/hn.json'), await readFile('fixtures/cli-tool/.liftoff-fixture/communities-hn.json', 'utf8'));
+    await reportCommunities(cwd); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.plan.some((p: any) => p.subreddit === 'banned' || p.subreddit === 'unknown')).toBe(false);
+    expect(report.plan.find((p: any) => p.subreddit === 'weekly').variant).toBe('value-first');
+    expect(report.threads.length).toBeGreaterThan(0);
+    report.plan.push({ ...report.plan[0], subreddit: 'banned', date: '2028-01-01' }); expect((await checkCommunities(cwd, report)).valid).toBe(false); report.plan.pop();
+    report.subreddits.find((s: any) => s.subreddit === report.recommended[0]).citedRules = []; expect((await checkCommunities(cwd, report)).valid).toBe(false);
+    report.threads = Array(11).fill(report.threads[0]); expect((await checkCommunities(cwd, report)).errors).toContain('More than 10 replies');
+    const first = await readFile(join(cwd, '.launch/communities', report.plan[0].file), 'utf8');
+    await writeFile(join(cwd, '.launch/communities', report.plan[1].file), first); expect((await checkCommunities(cwd)).errors).toContain('Identical drafts');
+    await writeFile(join(cwd, '.launch/communities', report.plan[0].file), 'please upvote'); expect((await checkCommunities(cwd)).valid).toBe(false);
+  });
+  it('handles empty evidence, unknown accounts, deterministic scoring and invalid imports', async () => {
+    const cwd = await setup(); const e = fixture.find(e => e.subreddit === 'karma')!;
+    expect(scoreEvidence(e, ['pain tracking'], [], {}, 'UTC').eligibility).toBe('unknown');
+    expect(scoreEvidence(e, ['pain tracking'], [], { karma: 0, accountAgeDays: 0 }, 'UTC').eligibility).toBe('fails');
+    expect(scoreEvidence(e, ['pain tracking'], [], { karma: 100, accountAgeDays: 30 }, 'UTC').eligibility).toBe('meets');
+    await reportCommunities(cwd); expect((await checkCommunities(cwd)).valid).toBe(true);
+    const markdown = await readFile(join(cwd, '.launch/communities.md'), 'utf8');
+    expect(markdown).toContain('## Threads asking for this\nNone.'); expect(markdown).toContain('## Other communities\nNone.');
+    const bad = join(cwd, 'bad.json'); await writeFile(bad, '{"subreddit":"../bad"}'); await expect(importEvidence(cwd, bad)).rejects.toThrow();
+  });
+});

@@ -1,0 +1,15 @@
+forbidden:
+  - 'no self[- ]?promo'
+  - 'no advertising'
+  - 'no promotion'
+restricted:
+  - 'self[- ]?promo(?:tion)?.*(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|weekend)'
+  - '9:1'
+  - '10%'
+  - 'only on (saturday|weekends)'
+  - 'megathread'
+  - 'flair.*self[- ]?promo'
+allowed:
+  - 'self[- ]?promotion (is )?(allowed|welcome)'
+  - 'show off'
+  - 'share your project'

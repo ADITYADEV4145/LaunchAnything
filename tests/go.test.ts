@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { parseSchedule, displayTime } from '../src/go/schedule.js';
 import { go } from '../src/go/run.js';
-import { liveAdapter, mockAdapter, routeFor } from '../src/go/adapters.js';
+import { liveAdapter, mockAdapter, PublishRequestFailure, routeFor } from '../src/go/adapters.js';
 import { readConsent, saveConsent, sameScope } from '../src/go/consent.js';
 import { goFixture } from '../src/selftest/phaseF.js';
 import { MockBrowser } from '../src/connect/browser.js';
@@ -103,6 +103,48 @@ it('uses injectable clock/sleep to wait for each schedule slot', async () => {
   await go(work, { mock: true, confirm: true, yes: true, now: () => new Date(now), sleep });
   expect(sleep).toHaveBeenCalledWith(60000);
   expect(sleep).toHaveBeenCalledTimes(5);
+}, 30000);
+it.each(['consent', 'approval', 'allowed', 'safe-retry'])('reserves a cap only after authorization, once per post: %s', async scenario => {
+  const { work, paths, channels } = await fixture();
+  await Promise.all(channels.filter(channel => channel !== 'devto').map(channel => rm(join(paths.posts, channel + '.md'))));
+  const home = join(paths.root, 'cap-test-connections');
+  await mkdir(home);
+  await writeFile(join(home, 'connections.json'), JSON.stringify([
+    { platform: 'devto', route: 'api', account: 'fixture-founder', connectedAt: '' }
+  ]));
+  let now = Date.parse('2026-09-25T12:59:00Z');
+  const capPath = join(paths.root, 'publish-caps.json');
+  const sleep = vi.fn(async (milliseconds: number) => {
+    await expect(readFile(capPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    if (scenario === 'consent') {
+      expect((await readConsent(paths.root)).grants).toHaveLength(1);
+      await saveConsent(paths.root, { version: 1, grants: [] });
+    } else if (scenario === 'approval') {
+      expect(JSON.parse(await readFile(paths.approvals, 'utf8')).approvals).toHaveLength(1);
+      await writeFile(paths.approvals, '{"approvals":[]}');
+    }
+    now += milliseconds;
+  });
+  const mock = mockAdapter();
+  const publish = vi.fn(async (context: Parameters<typeof mock.publish>[0]) => {
+    if (scenario === 'safe-retry' && publish.mock.calls.length === 1)
+      throw new PublishRequestFailure('Fixture connection refused before send', true);
+    return mock.publish(context);
+  });
+  const result = await go(work, { confirm: true, yes: true, home, now: () => new Date(now), sleep, adapter: { publish } });
+  expect(sleep).toHaveBeenCalledTimes(1);
+  if (!('board' in result) || !result.board) throw new Error('Missing board');
+  if (scenario === 'consent' || scenario === 'approval') {
+    expect(publish).not.toHaveBeenCalled();
+    expect(result.board).toEqual([{ channel: 'devto', status: 'failed', paste: expect.any(String) }]);
+    await expect(readFile(capPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  } else {
+    expect(publish).toHaveBeenCalledTimes(scenario === 'safe-retry' ? 2 : 1);
+    expect(result.board[0].status).toBe('live');
+    expect(JSON.parse(await readFile(capPath, 'utf8'))).toEqual([
+      { platform: 'devto', day: '2026-09-25', account: 'fixture-founder' }
+    ]);
+  }
 }, 30000);
 it('a founder taking time to submit a form does not block API routes', async () => {
   const { work } = await fixture();

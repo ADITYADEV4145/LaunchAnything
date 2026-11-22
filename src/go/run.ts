@@ -131,10 +131,10 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       }
       const dispatch = async () => {
         let receipt: PublishReceipt | undefined;
+        let capReserved = false;
         let unavailableReason = connectionError;
         try {
           if (connectionError) throw new Error(connectionError);
-          if (!options.mock) await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
               if (!(await readConsent(paths.root, options.mock)).grants.some(grant => sameScope(grant, scope)))
@@ -143,6 +143,10 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
                 JSON.parse(await readOptional(join(paths.root, 'approvals.mock.json')) ?? '{"approvals":[]}'))
                 : await decisions(paths);
               requireApproval(post, current.approvals, config.approvers);
+              if (!options.mock && !capReserved) {
+                await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
+                capReserved = true;
+              }
               receipt = await adapter.publish({ post, connection, root: paths.root, notify: message => log('\u0007' + message) });
               if (receipt.status !== 'published' || !receipt.url || !/^https:\/\//.test(receipt.url)) throw new Error('No live URL returned');
               break;

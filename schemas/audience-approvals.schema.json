@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "patternProperties": {
+    "^(outreach|build)-[a-f0-9]{12}$": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "sha256", "approvedAt"],
+      "properties": {
+        "by": { "type": "string", "pattern": "\\S" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approvedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

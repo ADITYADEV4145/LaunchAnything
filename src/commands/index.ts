@@ -24,8 +24,9 @@ import { register as release } from './release.js';
 import type { Command } from 'commander';
 import { register as voice } from './voice.js';
 import { register as research } from './research.js';
+import { register as audience } from './audience.js';
 export function registerCommands(program: Command) {
   voice(program);
-  for (const register of [research, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
+  for (const register of [research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

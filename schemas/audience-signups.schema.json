@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["email", "consent", "consentedAt"],
+    "properties": {
+      "email": { "type": "string", "format": "email", "maxLength": 254, "pattern": "^[^=+@-][^\\s]*$" },
+      "consent": { "const": true },
+      "consentedAt": { "type": "string", "format": "date-time" }
+    }
+  }
+}

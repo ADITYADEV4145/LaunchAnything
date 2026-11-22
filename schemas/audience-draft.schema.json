@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "evidence", "body"],
+  "properties": {
+    "kind": { "enum": ["outreach", "build-in-public"] },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pain", "url"],
+      "properties": {
+        "pain": { "type": "string", "minLength": 1 },
+        "url": { "$ref": "#/$defs/https" }
+      }
+    },
+    "body": { "type": "string", "minLength": 1 },
+    "community": { "type": "string", "pattern": "^[a-f0-9]{12}$" },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rulesUrl", "note"],
+      "properties": {
+        "rulesUrl": { "$ref": "#/$defs/https" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "if": { "properties": { "kind": { "const": "outreach" } }, "required": ["kind"] },
+  "then": { "required": ["community"] },
+  "else": { "not": { "anyOf": [{ "required": ["community"] }, { "required": ["permission"] }] } },
+  "$defs": {
+    "https": { "type": "string", "format": "uri", "pattern": "^https://" }
+  }
+}

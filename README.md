@@ -24,6 +24,7 @@ Selftest retains its per-check report in data even when some checks fail.
 
 | Phase | Commands | Status |
 | --- | --- | --- |
+| 0b | audience | Local Kit waitlist preview, community map, and audience drafts |
 | 1 | init, scan, validate, plan | Implemented |
 | Foundation | doctor, selftest --through N | Implemented; phase 1 and 5 checks |
 | 2 | write, check | Stubs |
@@ -37,6 +38,12 @@ availability. Missing extras never fail it. CLI tool detection uses PATH; it doe
 download or execute npm packages. Later phases may add local-package adapters.
 
 ## Folder contract
+
+**Find your first readers before launch day.** Once you have a checked
+[Pain Report](skill/references/phase0.md), run `liftoff audience prepare` to find
+where the problem is already being discussed. You get a community map, conversation
+starters, and a Kit waitlist preview under `.launch/audience/` — nothing goes live.
+[Try the local workflow](skill/references/phase0b.md).
 
 For offline launch readiness, run `liftoff prelaunch --init`, then follow the
 [pre-launch guide](skill/references/prelaunch.md) to score readiness, audit launch

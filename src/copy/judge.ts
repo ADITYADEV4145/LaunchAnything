@@ -27,7 +27,7 @@ export const rubric: Record<Criterion, string> = {
 export interface Verdict {
   channel: string; sourceHash: string; source: 'model' | 'local'; judge?: string; scores: Scores; local: Scores;
   reasons: string[]; attempts: number; status: 'pass' | 'rewrite' | 'flagged';
-  rubricId?: string; aggregate?: number;
+  rubricId?: string; aggregate?: number; weights?: Scores;
 }
 const clamp = (n: number) => Math.max(0, Math.min(10, Math.round(n)));
 
@@ -160,7 +160,7 @@ function scorePosts(cwd: string, ctx: ReturnType<typeof context>, learned?: Scor
     const last = previous.get(channel);
     const attempts = passed ? 0 : last && last.sourceHash === sourceHash ? Math.max(1, last.attempts) : (last?.attempts ?? 0) + 1;
     verdicts.push({ channel, sourceHash, source: model ? 'model' : 'local', judge: model?.judge, scores, local: local.scores,
-      rubricId: scoring.rubricId, aggregate: aggregateScore(scores, scoring.weights),
+      rubricId: scoring.rubricId, aggregate: aggregateScore(scores, scoring.weights), weights: scoring.weights,
       reasons: passed ? [] : [...new Set(reasons)], attempts, status: passed ? 'pass' : attempts >= maxLoops ? 'flagged' : 'rewrite' });
   }
   for (const verdict of verdicts) previous.set(verdict.channel, verdict);

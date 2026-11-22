@@ -207,9 +207,32 @@ it('links published metrics to exact judge verdicts and weights the next judge w
   expect(next.verdicts[0].aggregate).toBeGreaterThan(80);
   expect(next.verdicts[0]).toMatchObject({ scores: { hook: 7 }, status: 'rewrite' });
   expect(next.passed).toBe(false);
+  const mixed = await collect(cwd, options);
+  expect(mixed.warnings).toContainEqual(expect.stringContaining('different weights'));
+  expect(JSON.parse(readFileSync(mixed.calibration!, 'utf8')).suggestedWeights).toBeUndefined();
+
+  for (const channel of channels) edit(posts, channel, source => source + '\n');
+  score('x', 10, 8);
+  score('devto', 8, 10);
+  score('reddit', 9, 9);
+  const secondLaunch = await judgeWithHistory(cwd, channels, history);
+  expect(secondLaunch.passed).toBe(true);
+  const secondMeasured = measured.map(({ id, ...row }, index) => ({ ...row, id: id + '-second',
+    judgeSourceHash: secondLaunch.verdicts[index].sourceHash }));
+  writeFileSync(configPath, JSON.stringify({ ...JSON.parse(readFileSync(configPath, 'utf8')), launchDate: '2026-04-07' }));
+  writeFileSync(join(root, 'published.json'), JSON.stringify({
+    posts: published.map(row => ({ ...row, id: row.id + '-second' })),
+  }));
+  writeFileSync(input, JSON.stringify({ posts: secondMeasured }));
+  await collect(cwd, { now: new Date('2026-04-11T00:00:00Z') });
+  const learnedAgain = await learn(cwd, history);
+  expect(learnedAgain.calibration?.originalWeights).toEqual(learned.calibration?.suggestedWeights);
+  expect(learnedAgain.calibration?.suggestedWeights?.specificity)
+    .toBeGreaterThan(learned.calibration!.suggestedWeights!.specificity);
+
   writeFileSync(history, 'invalid');
   const fallback = await judgeWithHistory(cwd, ['x'], history);
-  expect(fallback).toMatchObject({ passed: false, scoring: { source: 'default' }, warnings: [expect.stringContaining('Could not read')] });
+  expect(fallback).toMatchObject({ passed: true, scoring: { source: 'default' }, warnings: [expect.stringContaining('Could not read')] });
 }));
 
 it('review shows sources on hover, variants and the judge red flag without raw tags', project(async (cwd, posts) => {

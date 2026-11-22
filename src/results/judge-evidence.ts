@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { copyRubric, criteria } from '../copy/judge-rubric.js';
+import { copyRubric, copyWeights, criteria, type Scores } from '../copy/judge-rubric.js';
 import { assertSafePath } from '../copy/safe-path.js';
 import { readJson } from './files.js';
 import { record, type Judgement, type ManualObservation } from './metrics.js';
@@ -16,17 +16,23 @@ export async function linkJudgeEvidence(cwd: string, postsDir: string, manual: M
   const { posts } = record(raw);
   if (!Array.isArray(posts)) throw new Error('Invalid judge.json: expected verdicts for the published drafts.');
   const verdicts = posts.map(record);
-  return new Map<string, Judgement>(references.map(([key, observation]) => {
+  const linked = references.map(([key, observation]): { key: string; weights: Scores; judgment: Judgement } => {
     const [channel, id] = JSON.parse(key) as [string, string];
     const matches = verdicts.filter(row => row.channel === channel && row.sourceHash === observation.judgeSourceHash &&
       row.rubricId === copyRubric.rubricId);
     if (matches.length !== 1) throw new Error(`No unique matching judge verdict for ${channel} post ${id}.`);
     const { aggregate, scores } = matches[0];
     const dimensions = record(scores);
+    const weights = copyWeights(matches[0].weights);
     const valid = (value: unknown, max: number): value is number =>
       typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max;
-    if (!valid(aggregate, 100) || !criteria.every(name => valid(dimensions[name], 10)))
+    if (!weights || !valid(aggregate, 100) || !criteria.every(name => valid(dimensions[name], 10)))
       throw new Error(`Invalid judge scores for ${channel} post ${id}.`);
-    return [key, { score: aggregate, dimensions: Object.fromEntries(criteria.map(name => [name, Number(dimensions[name]) * 10])) }];
-  }));
+    return { key, weights, judgment: { score: aggregate,
+      dimensions: Object.fromEntries(criteria.map(name => [name, Number(dimensions[name]) * 10])) } };
+  });
+  const baseline = linked[0].weights;
+  const mixed = linked.some(({ weights }) => criteria.some(name => weights[name] !== baseline[name]));
+  return { evidence: new Map(linked.map(({ key, judgment }) => [key, judgment])),
+    rubric: mixed ? undefined : { rubricId: copyRubric.rubricId, weights: baseline } };
 }

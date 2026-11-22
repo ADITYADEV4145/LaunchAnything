@@ -7,10 +7,13 @@ export const copyRubric = {
   weights: Object.fromEntries(criteria.map(key => [key, 1])) as Scores,
 };
 
-export function copyWeights(weights: Record<string, number> | undefined): Scores | undefined {
-  if (weights && Object.keys(weights).length === criteria.length &&
-    criteria.every(key => Number.isFinite(weights[key]) && weights[key] > 0 && weights[key] <= 100))
-    return weights as Scores;
+export function copyWeights(value: unknown): Scores | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const weights = value as Record<string, unknown>;
+  if (Object.keys(weights).length === criteria.length && criteria.every(key => {
+    const weight = weights[key];
+    return typeof weight === 'number' && Number.isFinite(weight) && weight >= 0.001 && weight <= 100;
+  })) return weights as Scores;
 }
 
 export function aggregateScore(scores: Scores, weights: Scores) {

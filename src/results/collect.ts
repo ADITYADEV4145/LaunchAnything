@@ -1,7 +1,6 @@
 import { readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
-import { copyRubric } from '../copy/judge-rubric.js';
 import { checked, missing, readJson, withWriteLock, writeJson, writeLocal } from './files.js';
 import { githubStarsDelta } from './github.js';
 import { manualObservations, normalizeObservation, postKey, record, summarize, type ManualObservation, type ObservedPost,
@@ -48,8 +47,9 @@ export async function collect(cwd: string, options: {
   const manual = imported === undefined ? new Map<string, ManualObservation>() : manualObservations(imported, published);
   const nativeJudgments = await linkJudgeEvidence(cwd, paths.posts, manual);
   if (nativeJudgments && input.calibration !== undefined) throw new Error('judgeSourceHash uses the built-in copy rubric; omit calibration.');
-  const rubric = nativeJudgments ? copyRubric : calibrationInput(input.calibration);
+  const rubric = nativeJudgments ? nativeJudgments.rubric : calibrationInput(input.calibration);
   const warnings: string[] = [];
+  if (nativeJudgments && !rubric) warnings.push('Linked judge verdicts use different weights. Recorded scores are preserved; no calibration weights will be suggested.');
   const posts: ObservedPost[] = [];
   for (const post of published) {
     let adapter: PostObservation = {};
@@ -64,7 +64,7 @@ export async function collect(cwd: string, options: {
     const fields = Object.fromEntries(Object.entries(entered).filter(([, value]) => value !== undefined));
     posts.push({ ...post, ...adapter, ...fields,
       metrics: { ...adapter.metrics, ...entered.metrics },
-      judge: nativeJudgments ? nativeJudgments.get(key) : (entered.judge ?? adapter.judge),
+      judge: nativeJudgments ? nativeJudgments.evidence.get(key) : (entered.judge ?? adapter.judge),
     });
   }
   let starsDelta: number | undefined;

@@ -71,6 +71,8 @@ export function scoreEvidence(e: Evidence, names: string[], quotes: string[], fo
 type Scored = ReturnType<typeof scoreEvidence>;
 interface OtherCommunity { url: string; host: string; kind: string }
 export interface Report { subreddits: Scored[]; recommended: string[]; plan: { subreddit: string; date: string; time?: string; timezone?: string; destination?: string; angle: string; variant: string; file: string }[]; threads: (Post & { file: string })[]; other: OtherCommunity[] }
+const replyHeader = (p: Post) => `Not sent. Send by hand, max 10/day\n\nSource: ${p.url}\n\nYou asked: ${p.title}\n\n`;
+const replyText = (body: string, p: Post) => body.startsWith(replyHeader(p)) ? body.slice(replyHeader(p).length) : body;
 async function draft(cwd: string, file: string, body: string) { const target = path(cwd, file); const existing = readLocal(cwd, target); if (existing !== undefined) return existing; writeLocal(cwd, target, body); return body; }
 export async function checkCommunities(cwd: string, supplied?: Report) {
   const data = supplied ?? await read<Report | null>(join(cwd, '.launch/communities.json'), null); const errors: string[] = [];
@@ -100,7 +102,7 @@ export async function checkCommunities(cwd: string, supplied?: Report) {
     if (/https?:\/\/|www\.|\]\(/i.test(body) || normalize(body).includes(normalize(idea))) errors.push(`Forbidden community reply promotes: ${thread.file}`);
   }
   const seen = new Set<string>();
-  for (const item of [...data.plan, ...data.threads]) { if (!/^(posts\/[\w]+|replies\/[a-f0-9]+)\.md$/.test(item.file)) { errors.push('Unsafe draft path'); continue; } let body: string; try { body = await readFile(path(cwd, item.file), 'utf8'); } catch { errors.push(`Missing draft ${item.file}`); continue; } const n = normalize(body); if (seen.has(n)) errors.push('Identical drafts'); seen.add(n); if (prohibited.some(p => p.test(body))) errors.push(`Prohibited pattern: ${item.file}`); }
+  for (const item of [...data.plan, ...data.threads]) { if (!/^(posts\/[\w]+|replies\/[a-f0-9]+)\.md$/.test(item.file)) { errors.push('Unsafe draft path'); continue; } let body: string; try { body = await readFile(path(cwd, item.file), 'utf8'); } catch { errors.push(`Missing draft ${item.file}`); continue; } const n = normalize(body); if (seen.has(n)) errors.push('Identical drafts'); seen.add(n); const thread = data.threads.find(t => t.file === item.file); if (prohibited.some(p => p.test(thread ? replyText(body, thread) : body))) errors.push(`Prohibited pattern: ${item.file}`); }
   return { valid: !errors.length, errors };
 }
 export async function reportCommunities(cwd: string) {
@@ -130,9 +132,12 @@ export async function reportCommunities(cwd: string) {
   const hnAsking = hn.filter(p => asksForSolution(p) && names.some(n => normalize(p.title + ' ' + (p.selftext ?? '')).includes(normalize(n))));
   const unique = [...new Map([...subreddits.filter(s => s.selfPromotion !== 'forbidden').flatMap(s => s.asking), ...hnAsking].map(p => [p.url, p])).values()].slice(0, 10);
   const threads: Report['threads'] = [];
+  const omittedReplies: Post[] = [];
   for (const p of unique) {
     const file = `replies/${createHash('sha256').update(p.url).digest('hex').slice(0, 12)}.md`;
-    await draft(cwd, file, `Not sent. Send by hand, max 10/day\n\nSource: ${p.url}\n\nYou asked: ${p.title}\n\nI'm Aditya and I built ${pains.idea}, so I have a stake in this problem. Before choosing a tool, I'd pick one concrete task from your question and test it against your current workflow. Check whether the result is actually useful, what context it needed, and where it still needs manual correction. That should make the trade-offs easier to compare without relying on a demo.\n\nWhat have you tried so far, and where does it break down?\n\n[Edit before sending: add a specific, verified answer to the question above. Don't claim the project solves something you haven't tested. Link only if community rules permit.]\n`);
+    const body = `${replyHeader(p)}I'm Aditya and I built ${pains.idea}, so I have a stake in this problem. Before choosing a tool, I'd pick one concrete task from your question and test it against your current workflow. Check whether the result is actually useful, what context it needed, and where it still needs manual correction. That should make the trade-offs easier to compare without relying on a demo.\n\nWhat have you tried so far, and where does it break down?\n\n[Edit before sending: add a specific, verified answer to the question above. Don't claim the project solves something you haven't tested. Link only if community rules permit.]\n`;
+    if (readLocal(cwd, path(cwd, file)) === undefined && prohibited.some(pattern => pattern.test(replyText(body, p)))) { omittedReplies.push(p); continue; }
+    await draft(cwd, file, body);
     threads.push({ ...p, file });
   }
   const data: Report = { subreddits, recommended: eligible.map(s => s.subreddit), plan, threads, other: await read(path(cwd, 'other.json'), []) };
@@ -149,7 +154,7 @@ export async function reportCommunities(cwd: string) {
   const section = (title: string, entries: string[]) => lines.push('', `## ${title}`, ...(entries.length ? entries : ['None.']));
   section('Low signal', subreddits.filter(s => s.painMentions < 1).map(s => `- r/${s.subreddit}: pain count 0; not recommended.`));
   section('Do not post', subreddits.filter(s => s.selfPromotion === 'forbidden').map(s => `### r/${s.subreddit}\n${citation(s)}`));
-  section('Needs manual review', subreddits.filter(s => s.selfPromotion === 'unknown').map(s => `- r/${s.subreddit}: no matching promotion rule; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`));
+  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown').map(s => `- r/${s.subreddit}: no matching promotion rule; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
   const hnCount = new Set(data.other.filter(o => o.kind === 'hn').map(o => o.url)).size;
   section('Other communities', [
     ...(hnCount ? [`- [Hacker News](https://news.ycombinator.com/) — news.ycombinator.com (hn); ${hnCount} cited thread${hnCount === 1 ? '' : 's'}.`] : []),

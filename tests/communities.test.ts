@@ -51,6 +51,29 @@ describe('communities', () => {
     const reply = await readFile(join(cwd, '.launch/communities', report.threads[0].file), 'utf8');
     expect(reply).toContain('You asked: Ask HN: Pain tracking tools'); expect(reply).toContain("I'm Aditya and I built Groundwork"); expect(reply).not.toMatch(/upvote/i);
   });
+  it('ignores vote language in exact source metadata but still blocks it in founder replies', async () => {
+    const cwd = await setup(); await mkdir(join(cwd, '.launch/communities'));
+    const posts = ['Ask HN: pain tracking without asking for upvotes?', 'Ask HN: looking for pain tracking?'].map((title, i) => ({ title, url: `https://news.ycombinator.com/item?id=${i}&context=upvotes`, created_utc: 1760000000, score: 1, num_comments: 0 }));
+    await writeFile(join(cwd, '.launch/communities/hn.json'), JSON.stringify(posts));
+    expect((await reportCommunities(cwd)).valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.threads.map((t: any) => t.url)).toEqual(posts.map(p => p.url));
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    const file = join(cwd, '.launch/communities', report.threads[0].file); const original = await readFile(file, 'utf8');
+    await writeFile(file, original + '\nYou asked: Please upvote my project.');
+    expect((await checkCommunities(cwd)).errors).toContain(`Prohibited pattern: ${report.threads[0].file}`);
+    await expect(reportCommunities(cwd)).rejects.toThrow('Prohibited pattern');
+  });
+  it('omits an unsafe generated reply with a manual-review note instead of aborting the report', async () => {
+    const cwd = await setup(); await mkdir(join(cwd, '.launch/communities'));
+    await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Upvote helper', pains: [{ name: 'pain tracking', quotes: [] }] }));
+    await writeFile(join(cwd, '.launch/communities/hn.json'), JSON.stringify([{ title: 'Ask HN: pain tracking?', url: 'https://news.ycombinator.com/item?id=1', created_utc: 1760000000, score: 1, num_comments: 0 }]));
+    const result = await reportCommunities(cwd); expect(result.valid).toBe(true);
+    expect(result.markdown).toContain('generated reply contains prohibited language; no draft created.');
+    expect(result.markdown).toContain('## Threads asking for this\nNone.');
+    expect(JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8')).threads).toEqual([]);
+    await expect(readFile(join(cwd, '.launch/communities/replies/6dd66cdf745b.md'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
   it('schedules allowed days/times and megathreads, separates low signal, and gates forbidden replies and duplicate URLs', async () => {
     const cwd = await setup();
     await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-23', timezone: 'UTC' }));

@@ -55,23 +55,13 @@ export async function fetchCommunities(cwd: string, queries: string[] = [], opti
   return { needsBrowser, other, note: 'Nothing posted or sent. Use your agent browser to capture missing evidence and import it.' };
 }
 type Verdict = 'allowed' | 'restricted' | 'forbidden' | 'unknown';
-function unrelatedContentRule(rule: Evidence['rules'][number]) {
-  const text = [rule.short_name, rule.description].join('\n').replace(/\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi, ' ');
-  if (/\b(?:self[-\s]?promo(?:tion)?|promotions?|advertising|your\s+products?|show\s+off|demos?|projects?|showcases?)\b/i.test(text)) return false;
-  if (/\b(?:all|any|every)\s+(?:posts?|submissions?|content)\b(?!\s+(?:about|for|regarding)\b)|(?:^|[.;!?\n])\s*(?:posts?|submissions?)\s+in\s+general\b/i.test(text)) return false;
-  const content = 'jobs?(?:[- ]+(?:listings?|postings?|offers?|requests?|ads?))?|hiring|recruiting|recruitment|memes?|questions?|help[- ]+(?:posts?|requests?|threads?)|support[- ]+(?:posts?|requests?|questions?)|bug[- ]+reports?|feature[- ]+requests?|surveys?|polls?|classifieds';
-  const otherContent = new RegExp(`\\b(?:${content})\\b`, 'i');
-  const clauses = text.split(/[.;!?\n]+|\b(?:but|however)\b|(?:,|\band\b)\s+(?=(?:all|any|every|posts?|submissions?|only|must|should|use|submit|no|not|show|demos?|projects?)\b)/i);
-  const restricting = clauses.filter(clause => /\b(?:no|not|never|only|must|should|need|required?|allowed?|forbidden|prohibited|banned?|limits?|maximum|minimum|ratio|thread|megathread|weekly|weekends?|weekdays?|sundays?|mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|hours?|minutes?|times?|windows?)\b|\d/i.test(clause));
-  return restricting.length > 0 && restricting.every(clause => otherContent.test(clause));
-}
 export function scoreEvidence(e: Evidence, names: string[], quotes: string[], founder: { karma?: number; accountAgeDays?: number }, timezone: string) {
   const matches = (p: Post) => names.some(name => { const text = normalize(p.title + ' ' + (p.selftext ?? '')); const terms = normalize(name).match(/[\p{L}\p{N}]{4,}/gu) ?? []; return text.includes(normalize(name)) || terms.length > 0 && terms.every(t => text.includes(t)); });
   const quoteUrls = quotes.filter(u => subFor(u) === e.subreddit.toLowerCase());
   const fetchedUrls = [...new Set([...e.topPosts, ...(e.searchHits ?? [])].filter(matches).map(p => p.url))];
   const matchedUrls = [...new Set([...quoteUrls, ...fetchedUrls])];
   const painMentions = quoteUrls.length + fetchedUrls.length;
-  const citedRules = e.rules.filter(r => !unrelatedContentRule(r));
+  const citedRules = e.rules;
   let selfPromotion: Verdict = 'unknown';
   for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) { const found = citedRules.some(r => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(r.short_name + '\n' + r.description))); if (found) { selfPromotion = verdict; break; } }
   const text = e.rules.map(r => r.short_name + ' ' + r.description).join('\n');
@@ -180,7 +170,7 @@ export async function reportCommunities(cwd: string) {
   const section = (title: string, entries: string[]) => lines.push('', `## ${title}`, ...(entries.length ? entries : ['None.']));
   section('Low signal', subreddits.filter(s => s.painMentions < 1).map(s => `- r/${s.subreddit}: pain count 0; not recommended.`));
   section('Do not post', subreddits.filter(s => s.selfPromotion === 'forbidden').map(s => `### r/${s.subreddit}\n${citation(s)}`));
-  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown' || restrictions(s.citedRules, timezone).manualReview).map(s => `- r/${s.subreddit}: ${restrictions(s.citedRules, timezone).manualReview ?? 'no matching promotion rule'}; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`), ...[...omittedSlots].map(sub => `- r/${sub}: no valid generated posting slot; review the cited rules before scheduling.`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
+  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown' || restrictions(s.citedRules, timezone).manualReview).map(s => `- r/${s.subreddit}: ${restrictions(s.citedRules, timezone).manualReview ?? 'no matching promotion rule'}; pain count ${s.painMentions}. [Rules](${s.rulesUrl})\n${citation(s)}`), ...[...omittedSlots].map(sub => `- r/${sub}: no valid generated posting slot; review the cited rules before scheduling.`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
   const hnCount = new Set(data.other.filter(o => o.kind === 'hn').map(o => o.url)).size;
   section('Other communities', [
     ...(hnCount ? [`- [Hacker News](https://news.ycombinator.com/) — news.ycombinator.com (hn); ${hnCount} cited thread${hnCount === 1 ? '' : 's'}.`] : []),

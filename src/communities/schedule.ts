@@ -17,7 +17,7 @@ function unknownTimeContext(source: string) {
 function parseRestriction(rules: { short_name: string; description: string }[], timezone: string) {
   const raw = rules.flatMap(r => [r.short_name, r.description]).join('\n\n');
   const urlPattern = /\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi;
-  const threadUrls = [...new Set([...raw.matchAll(urlPattern)].filter(m => /mega[-_]?thread|weekly[-_/]|self[-_]promo|promo[-_]thread/i.test(m[0]) || /\bonly\s+in\s*$/i.test(raw.slice(0, m.index))).map(m => m[0].replace(/[).,;]+$/, '')))];
+  const threadUrls = [...new Set([...raw.matchAll(urlPattern)].filter(m => /mega[-_]?thread|weekly[-_/]|self[-_]promo|promo[-_]thread|reddit\.com\/r\/[^/]+\/comments\//i.test(m[0]) || /\bonly\s+in\s*$/i.test(raw.slice(0, m.index))).map(m => m[0].replace(/[).,;]+$/, '')))];
   const threadUrl = threadUrls.length === 1 && /^(?:https?:\/\/)?(?:(?:www|old)\.)?reddit\.com\/r\/[^/]+\/comments\/[^/]+(?:\/|$)/i.test(threadUrls[0]!) ? threadUrls[0] : undefined;
   const source = raw.replace(urlPattern, ' ')
     .replace(/(?<![\w/])\/?[ru]\/[\w-]+(?:\/[\w/-]+)?/gi, ' ');
@@ -70,8 +70,17 @@ function parseRestriction(rules: { short_name: string; description: string }[], 
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed || unparsedTime) manualReview ??= unknownTimeContext(source);
+  const threadMention = /\b(?:threads?|mega[-_\s]?threads?|weekly[-_\s]+posts?)\b/i;
+  const megathread = threadUrls.length > 0 || threadMention.test(source);
+  if (megathread) {
+    const description = rules.map(rule => rule.description).join('\n').replace(urlPattern, url => threadUrls.includes(url.replace(/[).,;]+$/, '')) ? ' thread ' : ' ');
+    const threadClauses = description.split(/[.;!?\n,]+|\b(?:and|but|however)\b/i).filter(clause => threadMention.test(clause));
+    const promotion = /\b(?:self[-_\s]?promo(?:tion)?|promotions?|advertising|your\s+(?:projects?|products?)|launch(?:es)?|showcases?|show\s+off)\b/i;
+    const otherContent = /\b(?:jobs?|hiring|recruiting|recruitment|questions?|memes?|help|support|bug\s+reports?|feature\s+requests?|surveys?|polls?|classifieds|except|everything\s+else)\b/i;
+    if (otherContent.test(raw.replace(/[_-]/g, ' ')) || !threadClauses.length || threadClauses.some(clause => !promotion.test(clause))) manualReview ??= 'Ambiguous thread scope; manual review required';
+  }
   if (threadUrls.length && !threadUrl) manualReview = 'Unresolved thread destination; manual review required';
-  return { days, megathread: threadUrls.length > 0 || /mega[-_ ]?thread|weekly[-_ ]thread|(?:self[-_ ]promo|promo)[-_ ]thread/i.test(raw), threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview, explicitTimezone: mentions.length > 0, source, hasTime: Boolean(parsed || unparsedTime) };
+  return { days, megathread, threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview, explicitTimezone: mentions.length > 0, source, hasTime: Boolean(parsed || unparsedTime) };
 }
 export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
   let limits = rules.map(rule => parseRestriction([rule], timezone));

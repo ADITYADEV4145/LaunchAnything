@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { commandOptions, output } from '../core/output.js';
 import { launchDir } from '../core/launch-dir.js';
 import { doctor } from '../core/doctor.js';
-import { loadScript, media, productName, shots, scriptFromShots } from '../video/script.js';
+import { loadScript, media, productName, readcheck, shots, scriptFromShots } from '../video/script.js';
 import { render, parseFormats } from '../video/render.js';
 import { check } from '../video/check.js';
 import { record } from '../video/record.js';
@@ -23,11 +23,11 @@ export function register(program: Command) {
   action(video,'',async (cwd,opts) => { const selected = parseFormats(opts.format); const result = await render(cwd,opts.renderer,selected,{music:opts.music}); return {...result,checks:await check(cwd,selected)}; });
   action(video.command('voice').option('--dry-run', 'Print requests without contacting ElevenLabs or writing files'),'voice',async (cwd, opts) => voice(cwd, {dryRun:Boolean(opts.dryRun)}));
   action(video.command('script').option('--from-shots', 'Write a script from storyboard captures').description('Print agent brief and validate an existing script'),'script',async (cwd, opts) => {
-    if (opts.fromShots) return {script:await scriptFromShots(cwd),valid:true};
+    if (opts.fromShots) { const script = await scriptFromShots(cwd); return {script,valid:true,readcheck:readcheck(script)}; }
     const brief = {product:await productName(cwd), shots:await shots(cwd), media:await media(cwd), capabilities:await doctor(cwd), rules:'Agent: prefer video script --from-shots for storyboards (45–60s long, 20–35s short, hook first and at most 3s). Legacy scripts use 6–10 scenes, shot, text (1–8 words), duration, optional voiceover; total 30–60s including the 3s end card. Use real captured or polished product media. Only explicit video voice can call ElevenLabs; preview with --dry-run. Local voice files go in .launch/video/vo/<zero-based scene index>.wav or .mp3. Credit only Aditya.'};
     try { await readFile(join(launchDir(cwd).video,'script.json')); }
     catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {brief,valid:null}; throw e; }
-    try { return {brief,valid:true,script:await loadScript(cwd)}; }
+    try { const script = await loadScript(cwd); return {brief,valid:true,script,readcheck:readcheck(script)}; }
     catch (e) { throw new Error(`${(e as Error).message}\nAgent brief: ${JSON.stringify(brief)}`); }
   });
   action(video.command('record').requiredOption('--url <base>','Application base URL'),'record',async (cwd,opts) => record(cwd,opts.url));

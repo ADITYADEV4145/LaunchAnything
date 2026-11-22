@@ -76,7 +76,11 @@ contract. Check the installed CLI's help for version-specific options.
   caption receipt as evidence that narration was transcribed.
 - **Technical and human checks:** Run `liftoff video check --format 16x9 --json`
   (use the same formats that were rendered) and `liftoff media judge --json`
-  if available. Machine checks do not replace watching the cut. For a web
+  if available. Video checks save `.launch/video/check.json` with decode/motion,
+  black/freeze, reading pace/SRT cue map, no-progress-chrome, end-card, optional
+  Whisper word-coverage and loudness gates. Failed gates block; skipped optional
+  checks do not. See [phase4.md](phase4.md) for thresholds.
+  Machine checks do not replace watching the cut. For a web
   embed, include a branded poster,
   playback controls and a correctly timed WebVTT dialogue track. For muted
   feeds use readable on-frame copy. Block handoff if the logo, voice or

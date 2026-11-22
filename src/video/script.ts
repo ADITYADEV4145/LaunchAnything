@@ -9,6 +9,23 @@ import { polish } from '../media/polish.js';
 export type SceneRole = 'hook' | 'before' | 'action' | 'after' | 'proof' | 'cta';
 export interface Scene { shot: string; text: string; duration: number; voiceover?: string; role?: SceneRole; shortDuration?: number; highlight?: {x:number;y:number;width:number;height:number} }
 export interface Script { scenes: Scene[] }
+export interface Gate { id: string; name: string; status: 'pass' | 'fail' | 'skipped'; detail: string }
+export const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+export function readcheck(script: Script, captions = srt(script)): Gate {
+  const errors: string[] = [];
+  if (!script.scenes.length) errors.push('No scenes');
+  script.scenes.forEach((scene, i) => {
+    if (!Number.isFinite(scene.duration) || scene.duration < 0.5 + words(scene.text).length / 3) errors.push(`Scene ${i + 1}: text needs more reading time`);
+    if (scene.voiceover && words(scene.voiceover).length > scene.duration * 2.8) errors.push(`Scene ${i + 1}: voiceover exceeds 2.8 words/s`);
+  });
+  const boundaries = (value: string) => [...value.matchAll(/^(\d\d:\d\d:\d\d,\d{3}) --> (\d\d:\d\d:\d\d,\d{3})$/gm)].map(m => [m[1], m[2]]);
+  if (JSON.stringify(boundaries(captions)) !== JSON.stringify(boundaries(srt(script)))) errors.push('SRT cue map does not align with scene boundaries');
+  return {id:'G3', name:'readcheck', status:errors.length ? 'fail' : 'pass', detail:errors.join('; ') || 'Reading time, voiceover rate and SRT cue map align'};
+}
+export function chromeLint(script: Script): Gate {
+  const bad = script.scenes.flatMap((scene, i) => /\b\d+\s*\/\s*\d+\b|\bstep\s+\d+\s+of\s+\d+\b|\d+(?:\.\d+)?\s*%|[▮▯█░▓▒■□]/iu.test(scene.text) ? [`Scene ${i + 1}`] : []);
+  return {id:'G4', name:'no-page-chrome', status:bad.length ? 'fail' : 'pass', detail:bad.length ? `${bad.join(', ')} contains counters or progress markers` : 'No counters or progress markers'};
+}
 export const endCardSeconds = 3;
 export function sceneDuration(scene: Scene, format = '16x9', storyboard = Boolean(scene.role)) { return format === '9x16' && storyboard ? scene.shortDuration ?? scene.duration * .5 : scene.duration; }
 export function totalDuration(script: Script, format = '16x9') { return script.scenes.reduce((n, s) => n + sceneDuration(s, format, script.scenes.some(scene => scene.role)), 0) + endCardSeconds; }
@@ -73,7 +90,9 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
       try { await access(join(launchDir(cwd).media, footage)); source = footage; } catch { /* Still captures remain valid scene sources. */ }
     }
     const duration = shot.purpose === 'hook' ? 3 : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
-    scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration: shot.purpose === 'hook' ? 2 : duration * .5, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
+    const readingSeconds = Math.ceil((.5 + words(shot.caption ?? '').length / 3) * 12) / 12;
+    const shortDuration = shot.purpose === 'hook' ? Math.min(3, Math.max(2, readingSeconds)) : Math.max(duration * .5, readingSeconds);
+    scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
   }
   const script = await validateScript(cwd, { scenes });
   await mkdir(launchDir(cwd).video, { recursive: true });

@@ -157,7 +157,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
           const camera=`scale=${innerW}:${innerH}:force_original_aspect_ratio=decrease,pad=${frame.width}:${frame.height}:(ow-iw)/2:(oh-ih)/2:color=${frame.kind==='terminal'?'0x111b30':'white'},zoompan=z='1+0.015*on/${Math.max(1,duration*12)}':x='iw/2-iw/zoom/2':y=0:d=1:s=${frame.width}x${frame.height}:fps=12`;
           const detail=frame.detail;
           const footage=detail?`[1:v]fps=12,split[full][detail];[full]${camera}[shot];[detail]crop=iw:ih*${detail.fraction}:0:0,scale=${detail.width}:${detail.height}[inset];[0:v][inset]overlay=${detail.x}:${detail.y}[plate]`:`[1:v]fps=12,${camera}[shot]`;
-          const filter=`${footage};[${detail?'plate':'0:v'}][shot]overlay=${frame.x}:${frame.y}[base];[2:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=${Math.max(0,duration-.25)}:d=0.25:alpha=1[caption];[base][caption]overlay[out]`;
+          const filter=`${footage};[${detail?'plate':'0:v'}][shot]overlay=${frame.x}:${frame.y}[base];[2:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=${Math.max(0,duration-.25)}:d=0.25:alpha=1[caption];[base][caption]overlay,zoompan=z='1+0.04*on/${Math.max(1,duration*12)}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s=${spec.width}x${spec.height}:fps=12[out]`;
           await run('ffmpeg',['-y','-v','error','-filter_complex_threads','2','-loop','1','-framerate','12','-i',plate,...(video?['-stream_loop','-1']:['-loop','1','-framerate','12']),'-i',source,'-loop','1','-framerate','12','-i',caption,'-filter_complex',filter,'-map','[out]','-t',String(duration),'-an','-r','12','-c:v','libx264','-preset','ultrafast','-crf','22','-pix_fmt','yuv420p','-threads','2',piece]);
           pieces.push(piece);
         }

@@ -65,7 +65,18 @@ footage in the frame. No generated product imagery.
 
 `liftoff video check --json` verifies dimensions, duration (Shorts ≤60s, X ≤140s,
 Product Hunt ≤180s), render caption receipt plus matching SRT, and audio loudness
-when audio exists. The receipt is evidence of the renderer's caption operation,
+when audio exists. It also reports G0 moves (clean decode and sampled frame diff),
+G1 no-black (blackdetect), G2 no-freeze (no hold longer than 3 seconds), G3 readcheck
+(text ≥0.5s + words/3, voiceover ≤2.8 words/s, SRT scene cue map), G4 no-page-chrome
+(no counters or progress markers), G5 end-card (3s ±0.25), and G6 voice-stt (≥80%
+normalized script word coverage via local whisper or whisper-cli). STT is skipped
+if audio or a transcriber is missing; loudness is skipped without audio (music-only
+beds retain their quieter-than -20 LUFS rule; voice targets -14 ±2 LUFS). Each gate
+has id, name, status and detail. Per-format reports are saved to
+`.launch/video/check.json` before failed gates throw; skipped gates never fail.
+`video script` includes informational `readcheck`. Both renderers gently push in
+the whole scene to avoid static holds, and plates carry no scene counter.
+The receipt is evidence of the renderer's caption operation,
 not an OCR check. Watch the final video before publishing. Bare `liftoff video`
 renders and checks; nothing is posted. Every command supports `--json` and fails
 non-zero for validation/tool failures.

@@ -13,7 +13,7 @@ function Shot({scene}:{scene:Scene}) {
   const progress=Math.min(1,frame/Math.max(1,scene.duration*fps-1));
   const opacity=interpolate(frame,[0,3,Math.max(4,scene.duration*fps-3),Math.max(5,scene.duration*fps)],[0,1,1,0],{extrapolateLeft:'clamp',extrapolateRight:'clamp'});
   const style={position:'absolute' as const,left:layout.bare?'0%':'2%',top:layout.bare?'0%':'2%',width:layout.bare?'100%':'96%',height:layout.bare?'100%':'96%',objectFit:'contain' as const,transform:`scale(${layout.bare?1:1+progress*.015})`,transformOrigin:'50% 0%'};
-  return <AbsoluteFill>
+  return <AbsoluteFill style={{transform:`scale(${1+progress*.04})`}}>
     <Img src={staticFile(layout.plate)} style={{width,height}}/>
     {layout.frame.detail && <div style={{position:'absolute',left:layout.frame.detail.x,top:layout.frame.detail.y,width:layout.frame.detail.width,height:layout.frame.detail.height,overflow:'hidden'}}>{/\.(mp4|webm)$/i.test(src)?<OffthreadVideo muted src={staticFile(src)} style={{width:'100%',height:layout.frame.detail.height/layout.frame.detail.fraction}}/>:<Img src={staticFile(src)} style={{width:'100%',height:layout.frame.detail.height/layout.frame.detail.fraction}}/>}</div>}
     {!scene.card && <div style={{position:'absolute',left:layout.frame.x,top:layout.frame.y,width:layout.frame.width,height:layout.frame.height,overflow:'hidden',background:layout.frame.kind==='terminal'?'#111b30':'white'}}>

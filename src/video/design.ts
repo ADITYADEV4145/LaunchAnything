@@ -50,7 +50,7 @@ export function frameLayout(width:number,height:number,sourceWidth:number,source
   const top = vertical ? height*.18 : height*.14;
   return {x:Math.round((width-w)/2),y:Math.round(top+(availableHeight-h)/2),width:w,height:h,radius:phone?24:8,kind:phone?'phone':terminal?'terminal':'browser'};
 }
-export async function sceneAssets(dir:string,key:string,width:number,height:number,frame:Frame,brand:Branding,caption:string,index:number,count:number) {
+export async function sceneAssets(dir:string,key:string,width:number,height:number,frame:Frame,brand:Branding,caption:string,_index:number,_count:number) {
   const vertical=height>width;
   const header=vertical?height*.075:height*.06;
   const chrome=frame.kind==='browser'?32:frame.kind==='phone'?14:0;
@@ -59,7 +59,7 @@ export async function sceneAssets(dir:string,key:string,width:number,height:numb
   const shell=`${[24,15,7].map((offset,i)=>`<rect x="${x}" y="${y+offset}" width="${w}" height="${h}" rx="${frame.radius+border}" fill="#030919" opacity="${.08+i*.04}"/>`).join('')}<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${frame.radius+border}" fill="${frame.kind==='phone'?'#0b1224':'#e9edf6'}"/>${frame.kind==='browser'?`<circle cx="${x+17}" cy="${y+17}" r="4" fill="#f08086"/><circle cx="${x+32}" cy="${y+17}" r="4" fill="#e8c278"/><circle cx="${x+47}" cy="${y+17}" r="4" fill="#6fc7b1"/>${text([brand.homepage||brand.name],x+w/2,y+21,11,'#516078',400)}`:''}`;
   const detail=frame.detail;
   const detailShell=detail?`<rect x="${detail.x-3}" y="${detail.y+10}" width="${detail.width+6}" height="${detail.height+6}" rx="12" fill="#030919" opacity=".3"/><rect x="${detail.x-3}" y="${detail.y-3}" width="${detail.width+6}" height="${detail.height+6}" rx="12" fill="#a8bfd3"/>`:'';
-  const plate=svg(width,height,`${backdrop(width,height)}${text([brand.name.toUpperCase()],width/2,header,Math.round(width*.018)+8,'#d5e0f4',700)}${shell}${detailShell}${text([`${String(index+1).padStart(2,'0')}  /  ${String(count).padStart(2,'0')}`],width/2,height*.96,14,'#aabedc',400)}`);
+  const plate=svg(width,height,`${backdrop(width,height)}${text([brand.name.toUpperCase()],width/2,header,Math.round(width*.018)+8,'#d5e0f4',700)}${shell}${detailShell}`);
   const size=Math.round(height*.055);
   const captionWidth=detail && width>height?width*.49:width*.84;
   const lines=wrapText(caption,Math.max(12,Math.floor(captionWidth/(size*.62))));

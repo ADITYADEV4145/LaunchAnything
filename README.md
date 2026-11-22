@@ -113,6 +113,16 @@ Selftest retains its per-check report in data even when some checks fail.
 | 5b | connect, publish --confirm --assist | Own accounts; official PH draft MCP, X discovery/manual fallback, browser-assisted HN/Reddit |
 | 6 | results, learn, receipt | Stubs |
 
+`liftoff video check --json` retains resolution, platform duration, SRT and receipt
+checks, then reports G0 moves (clean decode and differing sampled frames), G1
+no-black, G2 no-freeze (>3 seconds), G3 readcheck (reading/voiceover pace and cue
+map), G4 no-page-chrome, G5 end-card (3 seconds ±0.25), G6 voice-stt (80% word
+coverage when voice audio and Whisper are available), and loudness (-14 ±2 LUFS
+with voice, music-only quieter than -20 LUFS).
+Per-format gates have `id`, `name`, `status` and `detail` and are saved to
+`.launch/video/check.json` before gate failures throw. Optional missing STT or
+audio is skipped, not failed. `video script` includes an informational `readcheck`.
+
 Doctor lists skill names, MCP server names (never configuration values), and executable
 availability, versions, stage requirements and install hints. Missing extras never
 fail doctor itself. CLI detection uses PATH; Chrome also checks the bundled

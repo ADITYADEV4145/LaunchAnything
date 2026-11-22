@@ -162,6 +162,12 @@ Carousel takes `{role, caption, source?}[]` and `{size?, outDir?, prefix?}`, ret
 Voice is an indexed array of local audio paths. Clip uses supplied durations plus
 a three-second end card; neither renderer calls an API. See README's media section.
 
+Run `liftoff video check --json` for decode/motion, black/freeze, reading pace and
+SRT cue map, no progress chrome, 3-second end card, optional Whisper word coverage,
+and -14 LUFS gates, alongside dimensions, duration, captions and receipt checks.
+Results are saved in `.launch/video/check.json`; failed gates block, skipped gates
+do not. `video script` reports informational `readcheck`. See [phase4.md](references/phase4.md).
+
 ## review and publish — phase 5
 
 Run `liftoff review` to build a local approval page for exact post+media hashes.

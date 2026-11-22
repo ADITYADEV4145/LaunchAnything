@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { assertSafePath, atomicWrite } from './safe-path.js';
 import { createHash, randomInt } from 'node:crypto';
 import { join } from 'node:path';
 import { parsePost } from './check.js';
@@ -27,7 +28,7 @@ const read = (cwd: string): BlindTest | undefined => {
   if (data.version !== 1 || !Array.isArray(data.testers)) throw new Error('Invalid .launch/blind-test.json');
   return data;
 };
-const save = (cwd: string, data: BlindTest) => writeFileSync(paths(cwd).json, JSON.stringify(data, null, 2) + '\n');
+const save = (cwd: string, data: BlindTest) => atomicWrite(cwd, paths(cwd).json, JSON.stringify(data, null, 2) + '\n');
 
 /** The post as a reader sees it: no front matter, no metadata. */
 function liftoffText(cwd: string, channel: Channel) {
@@ -43,11 +44,12 @@ export function prepareBlindTest(cwd: string, testers = 5, force = false) {
   const p = paths(cwd), existing = read(cwd);
   if (existing?.testers.some(t => Object.keys(t.answers).length) && !force)
     throw new Error('Answers are already recorded; pass --force to start a new test');
+  for (const path of [join(p.root, 'plain'), join(p.root, 'sheets'), p.prompt, p.json]) assertSafePath(cwd, path);
   mkdirSync(join(p.root, 'plain'), { recursive: true });
   mkdirSync(join(p.root, 'sheets'), { recursive: true });
   const readme = existsSync(join(cwd, 'README.md')) ? readFileSync(join(cwd, 'README.md'), 'utf8') : '';
   if (!readme.trim()) throw new Error('README.md is required: plain Claude sees only the README');
-  writeFileSync(p.prompt, '# Paste this into a fresh plain Claude chat (no tools, no project, no memory)\n\n' + plainPrompt + '\n\n' + readme.trim() + '\n');
+  atomicWrite(cwd, p.prompt, '# Paste this into a fresh plain Claude chat (no tools, no project, no memory)\n\n' + plainPrompt + '\n\n' + readme.trim() + '\n');
   const missing = blindChannels.filter(c => !existsSync(p.plain(c)) || !readFileSync(p.plain(c), 'utf8').trim());
   if (missing.length) return { ready: false, prompt: p.prompt,
     next: missing.map(c => 'Save plain Claude\'s ' + (c === 'x' ? 'X thread' : 'Show HN post') + ' to ' + p.plain(c)) };
@@ -63,7 +65,7 @@ export function prepareBlindTest(cwd: string, testers = 5, force = false) {
       return '## ' + (c === 'x' ? 'X thread' : 'Show HN post') + '\n\n### Version A\n\n' + a + '\n\n### Version B\n\n' + b
         + '\n\n1. Which would you click? (A or B)\n2. Which do you trust more? (A or B)\n3. What\'s missing from A?\n4. What\'s missing from B?\n';
     });
-    writeFileSync(p.sheet(tester.id), '# Blind test for ' + tester.id + '\n\nTwo versions of each post, in random order. Answer from your gut; there is no right answer.\n\n' + sections.join('\n') );
+    atomicWrite(cwd, p.sheet(tester.id), '# Blind test for ' + tester.id + '\n\nTwo versions of each post, in random order. Answer from your gut; there is no right answer.\n\n' + sections.join('\n') );
     return p.sheet(tester.id);
   });
   save(cwd, data);

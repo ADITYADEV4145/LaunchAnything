@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { assertSafePath, atomicWrite } from './safe-path.js';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { context, type Product } from './context.js';
@@ -101,6 +102,7 @@ export function readJudgments(postsDir: string): Verdict[] {
 
 export function judgePosts(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected), dir = judgeDir(ctx.paths.posts);
+  for (const path of [dir, join(dir, 'fixes.md'), join(ctx.paths.posts, 'judge.json')]) assertSafePath(cwd, path);
   mkdirSync(dir, { recursive: true });
   const previous = new Map(readJudgments(ctx.paths.posts).map(v => [v.channel, v]));
   const verdicts: Verdict[] = [], skipped: string[] = [];
@@ -110,7 +112,7 @@ export function judgePosts(cwd: string, selected?: string[]) {
     const source = readFileSync(path);
     const sourceHash = createHash('sha256').update(source).digest('hex');
     const post = parsePost(source.toString('utf8'));
-    writeFileSync(join(dir, channel + '.md'), brief(cwd, channel, post, sourceHash));
+    atomicWrite(cwd, join(dir, channel + '.md'), brief(cwd, channel, post, sourceHash));
     const local = localScores(post, channel, ctx.product, cwd);
     const model = modelScores(join(dir, channel + '.scores.json'), sourceHash);
     const scores = model?.scores ?? local.scores;
@@ -124,11 +126,11 @@ export function judgePosts(cwd: string, selected?: string[]) {
       reasons: passed ? [] : [...new Set(reasons)], attempts, status: passed ? 'pass' : attempts >= maxLoops ? 'flagged' : 'rewrite' });
   }
   for (const verdict of verdicts) previous.set(verdict.channel, verdict);
-  writeFileSync(join(ctx.paths.posts, 'judge.json'), JSON.stringify({ threshold, maxLoops,
+  atomicWrite(cwd, join(ctx.paths.posts, 'judge.json'), JSON.stringify({ threshold, maxLoops,
     posts: [...previous.values()].sort((a, b) => a.channel.localeCompare(b.channel)) }, null, 2) + '\n');
   const rewrite = verdicts.filter(v => v.status === 'rewrite');
   const fixes = join(dir, 'fixes.md');
-  writeFileSync(fixes, rewrite.length ? '# Judge rewrite list\n\n' + rewrite.map(v => '## ' + v.channel + ' (loop ' + v.attempts + ' of ' + maxLoops + ')\n'
+  atomicWrite(cwd, fixes, rewrite.length ? '# Judge rewrite list\n\n' + rewrite.map(v => '## ' + v.channel + ' (loop ' + v.attempts + ' of ' + maxLoops + ')\n'
     + v.reasons.map(r => '- ' + r).join('\n')).join('\n\n') + '\n' : '# Judge rewrite list\n\nNothing to rewrite.\n');
   return { passed: verdicts.every(v => v.status === 'pass'), verdicts, skipped, rewrite: rewrite.map(v => v.channel),
     flagged: verdicts.filter(v => v.status === 'flagged').map(v => v.channel), fixes };

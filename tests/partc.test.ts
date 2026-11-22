@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { cpSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -218,4 +218,25 @@ it('blind test randomizes A/B, records only supplied answers and needs 80% of re
   expect(readFileSync(join(posts, 'judge/x.md'), 'utf8')).toContain('- a real number');
   expect(() => recordBlindTest(cwd, { tester: 'tester-9', channel: 'x', click: 'A', trust: 'A', missingA: '', missingB: '' })).toThrow('Unknown tester');
   expect(() => prepareBlindTest(cwd, 3)).toThrow('--force');
+}));
+
+it('refuses symlinked judge, draft and blind-test outputs', project((cwd, posts) => {
+  const outside = mkdtempSync(join(tmpdir(), 'liftoff-outside-'));
+  try {
+    writeFileSync(join(outside, 'target'), 'unchanged');
+    mkdirSync(join(posts, 'judge'), { recursive: true });
+    symlinkSync(join(outside, 'target'), join(posts, 'judge/x.md'));
+    expect(() => judgePosts(cwd, ['x'])).toThrow('Unsafe');
+    rmSync(join(posts, 'judge/x.md'));
+    const copy = join(outside, 'show-hn.md');
+    cpSync(join(posts, 'show-hn.md'), copy);
+    rmSync(join(posts, 'show-hn.md'));
+    symlinkSync(copy, join(posts, 'show-hn.md'));
+    expect(() => pickVariant(cwd, 'show-hn', 2)).toThrow('Unsafe');
+    mkdirSync(join(cwd, '.launch/blind-test'), { recursive: true });
+    symlinkSync(join(outside, 'target'), join(cwd, '.launch/blind-test/plain-claude-prompt.md'));
+    expect(() => prepareBlindTest(cwd, 3)).toThrow('Unsafe');
+    expect(readFileSync(join(outside, 'target'), 'utf8')).toBe('unchanged');
+    expect(readFileSync(copy, 'utf8')).toBe(readFileSync(join(cwd, '.liftoff-fixture/phase2/good/show-hn.md'), 'utf8'));
+  } finally { rmSync(outside, { recursive: true, force: true }); }
 }));

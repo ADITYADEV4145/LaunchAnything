@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { assertSafePath, atomicWrite } from './safe-path.js';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { context } from './context.js';
@@ -18,6 +19,7 @@ export function stripClaims(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected), changed: string[] = [];
   for (const channel of ctx.channels) {
     const path = join(ctx.paths.posts, channel + '.md');
+    assertSafePath(cwd, path);
     if (!existsSync(path)) continue;
     const source = readFileSync(path, 'utf8');
     if (!/\[claim:[^\]]+\]/.test(source)) continue;
@@ -25,7 +27,7 @@ export function stripClaims(cwd: string, selected?: string[]) {
     const result = stripInline(String(front.title ?? ''), body);
     const known = new Map(((front.citations as Citation[] | undefined) ?? []).map(c => [JSON.stringify(c), c]));
     for (const c of result.citations) known.set(JSON.stringify(c), c);
-    writeFileSync(path, join2({ ...front, title: result.title.trim(), citations: [...known.values()] }, result.body));
+    atomicWrite(cwd, path, join2({ ...front, title: result.title.trim(), citations: [...known.values()] }, result.body));
     parsePost(readFileSync(path, 'utf8'));
     changed.push(channel);
   }
@@ -36,6 +38,7 @@ export function stripClaims(cwd: string, selected?: string[]) {
 export function pickVariant(cwd: string, channel: string, variant: number) {
   if (variant !== 1 && variant !== 2) throw new Error('Variant must be 1 or 2');
   const path = join(context(cwd, [channel]).paths.posts, channel + '.md');
+  assertSafePath(cwd, path);
   const { front, body } = split(readFileSync(path, 'utf8'));
   const variants = front.variants as { title?: string[]; hook?: string[] } | undefined;
   let next = body;
@@ -46,7 +49,7 @@ export function pickVariant(cwd: string, channel: string, variant: number) {
     next = posts.join('\n---\n') + '\n';
   } else throw new Error(channel + ' has no variants to pick from');
   front.picked = variant;
-  writeFileSync(path, join2(front, next));
+  atomicWrite(cwd, path, join2(front, next));
   parsePost(readFileSync(path, 'utf8'));
   return { channel, picked: variant, title: front.title };
 }

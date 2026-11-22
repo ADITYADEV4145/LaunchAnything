@@ -12,13 +12,13 @@ approval-denied `publish --dry-run` in the capture manifest.
 All videos are H.264, 12 fps, with burned-in captions and a three-second end card.
 Liftoff currently fixes these resolutions; it has no 1920×1080 output option.
 Terminal capture fixes the font at 20px. Smaller capture viewports make the
-terminal larger in the composition. Python/sed/cut filters summarize actual CLI
+terminal larger in the composition. Short jq/cut filters summarize actual CLI
 outputs and remove absolute paths; they do not manufacture product output.
 
 ## Reproduce
 
 Use a **fresh disposable checkout of this branch/commit**, with Node 22+, npm,
-Python 3, ffmpeg/ffprobe (libx264 and librsvg), and Chrome/Chromium. Chrome can be
+Python 3, jq, ffmpeg/ffprobe (libx264 and librsvg), and Chrome/Chromium. Chrome can be
 selected with `LIFTOFF_CHROME=/absolute/path/to/chrome`; otherwise Liftoff tries
 its installed browsers. Port 3037 must be free. No external API credentials,
 Remotion, TTS or research fetch are needed. Package installation needs npm access.

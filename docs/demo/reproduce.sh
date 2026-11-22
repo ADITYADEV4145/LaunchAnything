@@ -2,6 +2,7 @@
 set -euo pipefail
 
 test -f package.json
+command -v jq >/dev/null || { printf 'jq is required. Install jq before reproducing.\n' >&2; exit 1; }
 if test -e .launch; then
   printf 'Use a fresh disposable checkout: .launch already exists.\n' >&2
   exit 1

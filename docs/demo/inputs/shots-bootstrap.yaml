@@ -6,8 +6,10 @@ shots:
     waitFor: h1
   - id: sources
     commands:
-      - "node dist/cli.js validate product | python3 -c 'import json,sys; r=json.load(sys.stdin); print(\"Sources valid:\",r[\"valid\"]); print(\"Errors:\",len(r[\"errors\"]))'"
-      - "python3 -c 'import json; c=json.load(open(\".launch/product.json\"))[\"claims\"][0]; print(c[\"id\"],\"->\",c[\"sources\"][0][\"ref\"])'"
+      - >-
+        node dist/cli.js validate product | jq -r '"Sources valid: \(.valid)"'
+      - >-
+        jq -r '.claims[0] | .id, .sources[].ref' .launch/product.json
     viewport: {width: 760, height: 520}
   - id: plan
     commands:
@@ -15,12 +17,15 @@ shots:
     viewport: {width: 760, height: 420}
   - id: copy
     commands:
-      - "node dist/cli.js write --channel x | python3 -c 'import json,sys,os; print(*map(os.path.relpath,json.load(sys.stdin)[\"briefs\"]))'"
-      - "node dist/cli.js check --channel x | python3 -c 'import json,sys; r=json.load(sys.stdin); print(\"Checks passed:\",r[\"passed\"]); print(\"Issues:\",len(r[\"issues\"]))'"
+      - >-
+        node dist/cli.js write --channel x | jq -r '.briefs[] | split("/")[-1]'
+      - >-
+        node dist/cli.js check --channel x | jq -r '"Checks passed: \(.passed)"'
     viewport: {width: 760, height: 520}
   - id: capture
     commands:
-      - "node dist/cli.js shots --only sources | python3 -c 'import json,sys; s=json.load(sys.stdin)[0]; print(s[\"id\"],s[\"kind\"],s[\"width\"],s[\"height\"]); print(*s[\"files\"])'"
+      - >-
+        node dist/cli.js shots --only sources | jq -r '.[] | .kind, .files[]'
     viewport: {width: 760, height: 440}
   - id: render
     commands:

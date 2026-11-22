@@ -128,7 +128,7 @@ export function mediaType(path: string) {
   return types[extname(path).toLowerCase()];
 }
 
-export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>) {
+export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>, scheduled?: (channel: string) => string) {
   const paths = launchDir(cwd);
   const config = validate<Config>('config', JSON.parse(await readFile(paths.config, 'utf8')));
   for (const id of (config as Config & { channels: string[] }).channels) loadRule('channels', id, cwd);
@@ -162,7 +162,7 @@ export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>
     posts.push({ ...post, channel, filename, source, media, hash: postHash(raw, media),
       sourceHash: createHash('sha256').update(raw).digest('hex'),
       label: String(rule.name),
-      scheduledAt: schedule(plan, channel, config, (rule.bestPostingTimes as string[])[0]) });
+      scheduledAt: scheduled ? scheduled(channel) : schedule(plan, channel, config, (rule.bestPostingTimes as string[])[0]) });
   }
   return { paths, config, posts };
 }

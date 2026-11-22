@@ -129,6 +129,39 @@ Run `liftoff review` to build a local approval page for exact post+media hashes.
 files, reminders and receipts, not external posts. Nothing may be staged without
 matching human approval.
 
+## One-go publishing — Part F
+
+Run `liftoff go` first: it is a read-only preview of cost, routes and the full timeline
+in config.timezone. It reads the Channel / Local date / Local time table in
+`.launch/recommendations.md`, falling back to plan.md only when recommendations
+is absent. Do not promise that an unavailable official tool can publish.
+
+Ask the founder once in chat for standing permission to publish future content on
+the displayed channels, routes and connected accounts, including the displayed
+paid-tool costs. After they say yes, run `liftoff go --confirm --yes --by "<founder>"`.
+This saves revocable, account-scoped consent in `.launch/go-consent.json` with who
+and when. New content and later schedules on those same channels/accounts do not
+ask again. Adding a channel, changing its route or switching accounts requires new
+consent. `liftoff go --revoke` revokes it. Consent never skips check/judge quality
+gates, configured additional reviewers, or the founder's manual HN/Reddit Submit.
+Each newly approved exact post/media hash is recorded with its standing-consent
+provenance in go-approvals.json and the normal approvals file.
+
+PH requires a separate final-submit confirmation per launch (`--ph-submit` only
+after the founder explicitly agrees). HN/Reddit are prefilled, ring the terminal
+bell, and wait for the founder to press Submit; never click Submit for them.
+Failures retry once, then appear as failed with a paste file under `.launch/go-paste/`.
+Inspect the destination for duplicates before using a paste file. Live URLs feed
+published.json and the warroom immediately. Postiz / official MCP routes can fail
+closed when no verified publish tool or live URL is available; a paste file is not
+a live post. Current live HTTP adapters support text-only DEV/GitHub/Postiz;
+official X/Kit publishing tools are not verified and PH draft tools cannot submit.
+
+Use `--mock --no-wait --confirm --yes` only in an isolated disposable fixture launch.
+Mock consent and approvals are separate from real standing consent. Mock links
+are marked with go-mock IDs in published.json; never use a mock launch for a real
+release. The Part F selftest gate is `liftoff selftest --through F --json`.
+
 ## results, learn and receipt — phase 6
 
 Run `liftoff results --replies` at T+1, T+3 and T+7 to collect the current checkpoint.

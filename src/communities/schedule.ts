@@ -50,18 +50,20 @@ export function postingSlot(date: string, limit: Restriction, timezone: string) 
     if (instant === undefined) continue;
     const local = localTime(instant, timezone);
     if (local.date < date) continue;
-    return { date: local.date, time: limit.start !== undefined || limit.timezone !== timezone ? restrictionTime(local.minute) : undefined, timezone };
+    const time = limit.start !== undefined || limit.timezone !== timezone ? restrictionTime(local.minute) : undefined;
+    return { date: local.date, time, timezone, ...(time !== undefined ? { instant: new Date(instant).toISOString() } : {}) };
   }
   throw new Error('No valid rule time found; manual review required');
 }
-export function postingWindow(date: string, time: string | undefined, timezone: string, limit: Restriction) {
+export function postingWindow(date: string, time: string | undefined, timezone: string, limit: Restriction, scheduledInstant?: string) {
   const validTime = time !== undefined && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time);
   const minute = validTime ? Number(time.slice(0, 2)) * 60 + Number(time.slice(3)) : 720;
-  const instant = instantAt(date, minute, timezone);
-  if (limit.manualReview || instant === undefined) return { day: false, time: false };
+  const instant = scheduledInstant === undefined ? instantAt(date, minute, timezone) : Date.parse(scheduledInstant);
+  if (limit.manualReview || instant === undefined || !Number.isFinite(instant)) return { day: false, time: false };
+  const slot = localTime(instant, timezone);
   const local = localTime(instant, limit.timezone);
   const overnight = limit.start !== undefined && limit.end! < limit.start;
   const day = overnight && local.minute <= limit.end! ? nextDate(local.date, -1) : local.date;
   const inWindow = limit.start === undefined || (validTime && (overnight ? local.minute >= limit.start || local.minute <= limit.end! : local.minute >= limit.start && local.minute <= limit.end!));
-  return { day: allowedDate(day, limit.days), time: (time === undefined || validTime) && inWindow };
+  return { day: slot.date === date && allowedDate(day, limit.days), time: slot.date === date && (time === undefined || validTime && slot.minute === minute) && inWindow };
 }

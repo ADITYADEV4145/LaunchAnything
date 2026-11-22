@@ -77,7 +77,7 @@ export function scoreEvidence(e: Evidence, names: string[], quotes: string[], fo
 }
 type Scored = ReturnType<typeof scoreEvidence>;
 interface OtherCommunity { url: string; host: string; kind: string }
-export interface Report { subreddits: Scored[]; recommended: string[]; plan: { subreddit: string; date: string; time?: string; timezone?: string; destination?: string; angle: string; variant: string; file: string }[]; threads: (Post & { file: string })[]; other: OtherCommunity[] }
+export interface Report { subreddits: Scored[]; recommended: string[]; plan: { subreddit: string; date: string; time?: string; timezone?: string; instant?: string; destination?: string; angle: string; variant: string; file: string }[]; threads: (Post & { file: string })[]; other: OtherCommunity[] }
 const replyHeader = (p: Post) => `Not sent. Send by hand, max 10/day\n\nSource: ${p.url}\n\nYou asked: ${p.title}\n\n`;
 const replyText = (body: string, p: Post) => body.startsWith(replyHeader(p)) ? body.slice(replyHeader(p).length) : body;
 async function draft(cwd: string, file: string, body: string) { const target = path(cwd, file); const existing = readLocal(cwd, target); if (existing !== undefined) return existing; writeLocal(cwd, target, body); return body; }
@@ -93,7 +93,7 @@ export async function checkCommunities(cwd: string, supplied?: Report) {
     const limit = restrictions(s.citedRules, timezone);
     if (limit.manualReview) { errors.push(`${p.subreddit}: rule timezone needs manual review`); continue; }
     if (p.timezone !== undefined && p.timezone !== timezone) errors.push(`${p.subreddit}: posting timezone differs from config`);
-    const window = postingWindow(p.date, p.time, timezone, limit);
+    const window = postingWindow(p.date, p.time, timezone, limit, p.instant);
     if (!window.day) errors.push(`${p.subreddit}: posting day violates cited rule`);
     if (limit.megathread && p.destination !== 'megathread') errors.push(`${p.subreddit}: must post in the megathread`);
     if (!window.time) errors.push(`${p.subreddit}: posting time violates cited rule`);
@@ -121,12 +121,18 @@ export async function reportCommunities(cwd: string) {
   for (const file of files.filter(f => f.endsWith('.json'))) { const value = await read<Evidence | null>(path(cwd, 'raw/reddit/' + file), null); const check = validateFile('community-evidence', value); if (!check.valid) throw new Error(check.errors.join('; ')); evidence.push(value!); }
   const names = pains.pains.map(p => p.name); const quotes = pains.pains.flatMap(p => p.quotes.map(q => q.url));
   const subreddits = evidence.map(e => scoreEvidence(e, names, quotes, founder.reddit ?? {}, timezone)).sort((a, b) => Number(a.selfPromotion === 'forbidden') - Number(b.selfPromotion === 'forbidden') || b.score - a.score || a.subreddit.localeCompare(b.subreddit));
-  const eligible = subreddits.filter(s => ['allowed', 'restricted'].includes(s.selfPromotion) && s.eligibility !== 'fails' && s.painMentions > 0 && !restrictions(s.citedRules, timezone).manualReview).slice(0, 5);
+  let eligible = subreddits.filter(s => ['allowed', 'restricted'].includes(s.selfPromotion) && s.eligibility !== 'fails' && s.painMentions > 0 && !restrictions(s.citedRules, timezone).manualReview).slice(0, 5);
   const plan: Report['plan'] = [];
+  const omittedSlots = new Set<string>();
   let date = config.launchDate ?? new Date().toISOString().slice(0, 10);
   for (const [i, sub] of eligible.entries()) {
     const limit = restrictions(sub.citedRules, timezone);
-    const slot = postingSlot(date, limit, timezone);
+    let slot: ReturnType<typeof postingSlot>;
+    try {
+      slot = postingSlot(date, limit, timezone);
+      const window = postingWindow(slot.date, slot.time, timezone, limit, slot.instant);
+      if (!window.day || !window.time || slot.date < date || slot.timezone !== timezone) { omittedSlots.add(sub.subreddit); continue; }
+    } catch { omittedSlots.add(sub.subreddit); continue; }
     const file = `posts/${sub.subreddit}.md`;
     const variant = sub.selfPromotion === 'allowed' ? 'standard' : 'value-first';
     const destination = limit.megathread ? 'megathread' : 'standalone post';
@@ -135,6 +141,7 @@ export async function reportCommunities(cwd: string) {
     plan.push({ subreddit: sub.subreddit, ...slot, destination, angle, variant, file });
     date = nextDate(slot.date);
   }
+  eligible = eligible.filter(s => !omittedSlots.has(s.subreddit));
   const hn = await read<Post[]>(path(cwd, 'hn.json'), []);
   const hnAsking = hn.filter(p => asksForSolution(p) && names.some(n => normalize(p.title + ' ' + (p.selftext ?? '')).includes(normalize(n))));
   const unique = [...new Map([...subreddits.filter(s => s.selfPromotion !== 'forbidden').flatMap(s => s.asking), ...hnAsking].map(p => [p.url, p])).values()].slice(0, 10);
@@ -161,13 +168,13 @@ export async function reportCommunities(cwd: string) {
   const section = (title: string, entries: string[]) => lines.push('', `## ${title}`, ...(entries.length ? entries : ['None.']));
   section('Low signal', subreddits.filter(s => s.painMentions < 1).map(s => `- r/${s.subreddit}: pain count 0; not recommended.`));
   section('Do not post', subreddits.filter(s => s.selfPromotion === 'forbidden').map(s => `### r/${s.subreddit}\n${citation(s)}`));
-  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown' || restrictions(s.citedRules, timezone).manualReview).map(s => `- r/${s.subreddit}: ${restrictions(s.citedRules, timezone).manualReview ?? 'no matching promotion rule'}; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
+  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown' || restrictions(s.citedRules, timezone).manualReview).map(s => `- r/${s.subreddit}: ${restrictions(s.citedRules, timezone).manualReview ?? 'no matching promotion rule'}; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`), ...[...omittedSlots].map(sub => `- r/${sub}: no valid generated posting slot; review the cited rules before scheduling.`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
   const hnCount = new Set(data.other.filter(o => o.kind === 'hn').map(o => o.url)).size;
   section('Other communities', [
     ...(hnCount ? [`- [Hacker News](https://news.ycombinator.com/) — news.ycombinator.com (hn); ${hnCount} cited thread${hnCount === 1 ? '' : 's'}.`] : []),
     ...data.other.filter(o => o.kind !== 'hn').map(o => `- [${o.host}](${o.url}) — ${o.kind}`),
   ]);
   section('Threads asking for this', threads.map(p => `- [${p.title}](${p.url}) — [editable reply](communities/${p.file})`));
-  section('Cross-post plan', plan.map(p => `- ${p.date}${p.time ? ` ${p.time} ${p.timezone}` : ''}: r/${p.subreddit} — ${p.angle}; ${p.variant}; ${p.destination}; [editable draft](communities/${p.file})`));
+  section('Cross-post plan', plan.map(p => `- ${p.date}${p.time ? ` ${p.time} ${p.timezone}${p.instant ? ` (${p.instant})` : ''}` : ''}: r/${p.subreddit} — ${p.angle}; ${p.variant}; ${p.destination}; [editable draft](communities/${p.file})`));
   const markdown = lines.join('\n') + '\n'; writeLocal(cwd, join(cwd, '.launch/communities.json'), JSON.stringify(data, null, 2)); writeLocal(cwd, join(cwd, '.launch/communities.md'), markdown); return { path: '.launch/communities.md', markdown, ...check };
 }

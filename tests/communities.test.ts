@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fetchCommunities, importEvidence, reportCommunities, checkCommunities, scoreEvidence } from '../src/communities/index.js';
 import type { Evidence } from '../src/communities/adapters.js';
 import { restrictions, postingSlot, postingWindow } from '../src/communities/schedule.js';
+import * as schedule from '../src/communities/schedule.js';
 const fixture = JSON.parse(await readFile('fixtures/cli-tool/.liftoff-fixture/communities-evidence.json', 'utf8')) as Evidence[];
 const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
@@ -110,20 +111,47 @@ describe('communities', () => {
   ])('converts %s rules on %s to %s using the posting date', (zone, date, timezone, time) => {
     const limit = restrictions([{ short_name: 'Promo', description: `Only on Sunday 9am-5pm ${zone}` }], timezone);
     expect(limit.manualReview).toBeUndefined();
-    const slot = postingSlot(date, limit, timezone); expect(slot).toEqual({ date, time, timezone });
-    expect(postingWindow(slot.date, slot.time, slot.timezone, limit)).toEqual({ day: true, time: true });
+    const slot = postingSlot(date, limit, timezone); expect(slot).toMatchObject({ date, time, timezone }); expect(slot.instant).toMatch(/Z$/);
+    expect(postingWindow(slot.date, slot.time, slot.timezone, limit, slot.instant)).toEqual({ day: true, time: true });
     expect(postingWindow(slot.date, undefined, slot.timezone, limit).time).toBe(false);
   });
   it('preserves source-zone weekdays across date rollover and overnight windows', () => {
     const late = restrictions([{ short_name: 'Promo', description: 'Only on Sunday from 11pm to 2am PT' }], 'UTC');
-    expect(postingSlot('2026-01-05', late, 'UTC')).toEqual({ date: '2026-01-05', time: '07:00', timezone: 'UTC' });
+    expect(postingSlot('2026-01-05', late, 'UTC')).toEqual({ date: '2026-01-05', time: '07:00', timezone: 'UTC', instant: '2026-01-05T07:00:00.000Z' });
     expect(postingWindow('2026-01-05', '09:00', 'UTC', late)).toEqual({ day: true, time: true });
     expect(postingWindow('2026-01-05', '11:00', 'UTC', late).time).toBe(false);
     const early = restrictions([{ short_name: 'Promo', description: 'Only on Sunday from 1am to 2am UTC' }], 'America/Los_Angeles');
-    expect(postingSlot('2026-01-03', early, 'America/Los_Angeles')).toEqual({ date: '2026-01-03', time: '17:00', timezone: 'America/Los_Angeles' });
+    expect(postingSlot('2026-01-03', early, 'America/Los_Angeles')).toEqual({ date: '2026-01-03', time: '17:00', timezone: 'America/Los_Angeles', instant: '2026-01-04T01:00:00.000Z' });
     expect(postingWindow('2026-01-03', '17:00', 'America/Los_Angeles', early)).toEqual({ day: true, time: true });
     const local = restrictions([], 'America/New_York');
     expect(postingSlot('2026-01-04', local, 'America/New_York')).toEqual({ date: '2026-01-04', time: undefined, timezone: 'America/New_York' });
+  });
+  it.each([5, 6])('preserves the %s:30 UTC instant when New York repeats 01:30 at fall-back', async hour => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'America/New_York' }));
+    const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday at ${hour}:30am UTC` }] };
+    const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify(evidence)); await importEvidence(cwd, file);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    const instant = `2026-11-01T0${hour}:30:00.000Z`;
+    expect(report.plan[0]).toMatchObject({ date: '2026-11-01', time: '01:30', timezone: 'America/New_York', instant });
+    expect(result.markdown).toContain(`01:30 America/New_York (${instant})`);
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    report.plan[0].instant = `2026-11-01T0${hour === 5 ? 6 : 5}:30:00.000Z`;
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting time violates cited rule');
+    report.plan[0].instant = 'invalid'; expect((await checkCommunities(cwd, report)).valid).toBe(false);
+  });
+  it.each(['invalid slot', 'scheduling error'])('omits a generated %s for manual review without losing the report or other slots', async failure => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'UTC' }));
+    for (const evidence of fixture.slice(0, 2)) { const file = join(cwd, evidence.subreddit + '.json'); await writeFile(file, JSON.stringify(evidence)); await importEvidence(cwd, file); }
+    const spy = vi.spyOn(schedule, 'postingSlot');
+    if (failure === 'invalid slot') spy.mockReturnValueOnce({ date: '2026-11-01', time: '09:00', timezone: 'UTC', instant: '2026-11-01T08:00:00.000Z' });
+    else spy.mockImplementationOnce(() => { throw new Error('No valid rule time found'); });
+    try {
+      const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+      expect(result.valid).toBe(true); expect(report.recommended).toEqual(['makers']); expect(report.plan.map((p: any) => p.subreddit)).toEqual(['makers']);
+      expect(result.markdown).toContain('r/builders: no valid generated posting slot');
+      await expect(readFile(join(cwd, '.launch/communities/posts/builders.md'))).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    } finally { spy.mockRestore(); }
   });
   it('writes converted plan times and gates times interpreted in the wrong zone', async () => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));

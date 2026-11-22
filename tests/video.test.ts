@@ -35,6 +35,7 @@ it('ignores stale indexed audio after narration is removed, while retaining curr
   const scenes=[{voiceover:'Current narration'},{},{voiceover:'   '}];
   expect(await narrationFiles(cwd,scenes)).toEqual([join(vo,'0.mp3'),undefined,undefined]);
   expect(await narrationFiles(cwd,scenes,['wav','mp3'])).toEqual([join(vo,'0.wav'),undefined,undefined]);
+  expect(await narrationFiles(cwd,scenes,undefined,false)).toEqual([join(vo,'0.mp3'),join(vo,'1.mp3'),join(vo,'2.wav')]);
   delete scenes[0].voiceover;
   expect(await narrationFiles(cwd,scenes)).toEqual([undefined,undefined,undefined]);
   expect(await narrationFiles(cwd,[])).toEqual([]);

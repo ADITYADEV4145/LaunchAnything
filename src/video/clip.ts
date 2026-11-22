@@ -10,9 +10,10 @@ import { mixAudio } from './audio.js';
 import type { SceneRole } from './script.js';
 import { contrast } from '../visuals/check.js';
 import { terminalSource, renderTerminal, type TerminalTranscript, type TerminalMetrics } from '../media/terminal.js';
+import { captionContrast, loadStyle, motionFilter } from './styles.js';
 
 export interface ClipScene { role?: SceneRole; caption: string; source: string; duration: number; highlight?: { x: number; y: number; width: number; height: number }; terminal?: TerminalTranscript }
-export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion' }
+export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion'; style?: string }
 export interface ClipFrame { x: number; y: number; width: number; height: number; kind: string }
 export interface ClipReceipt {
   sha256: string; format: Format; captions: 'burned'; renderer: 'ffmpeg' | 'remotion'; duration: number;
@@ -27,6 +28,9 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
   if (!(format in formats)) throw new Error('Unknown clip format');
   if (options.renderer && !['auto', 'ffmpeg', 'remotion'].includes(options.renderer)) throw new Error('Unknown clip renderer');
   const spec = formats[format]; const { width, height } = spec;
+  const style = await loadStyle(cwd,options.style);
+  const themed = style.id !== 'midnight' || style.custom;
+  if (themed && scenes.some(scene => scene.duration < style.pacing.min || scene.duration > style.pacing.max)) throw new Error(`Scene duration outside ${style.id} pacing (${style.pacing.min}–${style.pacing.max}s)`);
   const file = options.outFile ? resolve(cwd, options.outFile) : join(launchDir(cwd).video, spec.file);
   await mkdir(dirname(file), { recursive: true });
   const cli = options.renderer === 'ffmpeg' ? undefined : await remotionCli(cwd);
@@ -63,7 +67,10 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
       const plate = join(work, `${index}-plate.png`), caption = join(work, `${index}-caption.png`), ring = join(work, `${index}-ring.png`);
       try {
         await page.route('**/*', route => route.abort());
-        await page.setContent(`<html><style>*{box-sizing:border-box}body{margin:0;width:100vw;height:100vh;background:${brand.colors.background};color:white;font-family:Arial,sans-serif;overflow:hidden}header{position:absolute;left:5vw;top:4vh;display:flex;align-items:center;gap:14px;font-size:${Math.max(24, height * .027)}px;font-weight:700}header img{max-width:150px;height:${height * .045}px}header img[src=""]{display:none}header i{height:10px;width:10px;background:${brand.colors.accent};border-radius:50%}.caption{position:absolute;left:5vw;width:90vw;bottom:${card ? '31vh' : '7vh'};padding:2vh 2vw;background:#101827;border-left:5px solid ${brand.colors.accent};font-size:${height * (card ? .065 : .048)}px;font-weight:700;line-height:1.16;letter-spacing:-.02em;text-wrap:balance}.role{font-size:${height * .018}px;letter-spacing:.2em;color:#cbd5e1;margin-bottom:1.2vh}footer{position:absolute;bottom:2.5vh;left:5vw;color:#cbd5e1;font-size:${Math.max(14, height * .017)}px}.ring{position:absolute;border:4px solid ${brand.colors.accent};border-radius:9px;box-shadow:0 0 0 4px ${brand.colors.accent}22,0 0 20px ${brand.colors.accent}88;${highlight ? `left:${highlight.x}px;top:${highlight.y}px;width:${highlight.width}px;height:${highlight.height}px` : 'display:none'}}</style><body><header><i></i><img src="${escapeHtml(brand.logo)}"><span>${escapeHtml(name)}</span></header><div class="caption"><div class="role">${escapeHtml(end ? 'GET STARTED' : scene.role === 'after' ? 'THE MOMENT' : (scene.role ?? '').toUpperCase())}</div>${escapeHtml(scene.caption)}</div><footer>${escapeHtml(host)}</footer><div class="ring"></div></body></html>`);
+        await page.setContent(`<html><style>*{box-sizing:border-box}body{margin:0;width:100vw;height:100vh;background:linear-gradient(#ffffff18,#ffffff18),${brand.colors.background};color:white;font-family:Arial,sans-serif;overflow:hidden}header{position:absolute;left:5vw;top:4vh;display:flex;align-items:center;gap:14px;font-size:${Math.max(24, height * .027)}px;font-weight:700}header img{max-width:150px;height:${height * .045}px}header img[src=""]{display:none}header i{height:10px;width:10px;background:${brand.colors.accent};border-radius:50%}.caption{position:absolute;left:5vw;width:90vw;bottom:${card ? '31vh' : '7vh'};padding:2vh 2vw;background:#101827;border-left:5px solid ${brand.colors.accent};font-size:${height * (card ? .065 : .048)}px;font-weight:700;line-height:1.16;letter-spacing:-.02em;text-wrap:balance}.role{font-size:${height * .018}px;letter-spacing:.2em;color:#cbd5e1;margin-bottom:1.2vh}footer{position:absolute;bottom:2.5vh;left:5vw;color:#cbd5e1;font-size:${Math.max(14, height * .017)}px}.ring{position:absolute;border:4px solid ${brand.colors.accent};border-radius:9px;box-shadow:0 0 0 4px ${brand.colors.accent}22,0 0 20px ${brand.colors.accent}88;${highlight ? `left:${highlight.x}px;top:${highlight.y}px;width:${highlight.width}px;height:${highlight.height}px` : 'display:none'}}</style><body><header><i></i><img src="${escapeHtml(brand.logo)}"><span>${escapeHtml(name)}</span></header><div class="caption"><div class="role">${escapeHtml(end ? 'GET STARTED' : scene.role === 'after' ? 'THE MOMENT' : (scene.role ?? '').toUpperCase())}</div>${escapeHtml(scene.caption)}</div><footer>${escapeHtml(host)}</footer><div class="ring"></div></body></html>`);
+        if (themed) {
+          await page.addStyleTag({content:`body{background:linear-gradient(135deg,${style.palette.background.join(',')});color:${style.palette.text};font-family:${style.typography.fontFamily}}.caption{background:${style.palette.captionBackground};color:${style.palette.text};border-color:${style.palette.accent};font-weight:${style.typography.weight};text-transform:${style.typography.case === 'none' ? 'none' : style.typography.case};bottom:auto;top:${style.captionPosition === 'top' ? 'calc(14vh + 1px)' : style.captionPosition === 'center' ? '43vh' : '74vh'}}header,footer,.role{color:${style.palette.text}}header i,.ring{border-color:${style.palette.accent}}`});
+        }
         await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].filter(image => image.getAttribute('src')).map(image => image.decode())); });
         const fits = await page.locator('.caption').evaluate(el => { const box = el.getBoundingClientRect(); return box.top >= innerHeight * .14 && box.bottom <= innerHeight && el.scrollWidth <= el.clientWidth; });
         if (!fits) throw new Error('Clip caption does not fit at the minimum readable font size; shorten the caption');
@@ -76,7 +83,7 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
       if (cli) continue;
       const piece = join(work, `${index}.mp4`); const video = /\.(mp4|webm)$/i.test(source);
       const footage = card ? '[0:v]null[base]' : `[1:v]fps=12,scale=${fw}:${fh}[shot];[0:v][shot]overlay=${frame.x}:${frame.y}[base]`;
-      const filter = `${footage};[base][${card ? 1 : 2}:v]overlay[captioned];[${card ? 2 : 3}:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=0.75:d=0.25:alpha=1,trim=duration=1,loop=loop=-1:size=12:start=0,setpts=N/(12*TB)[ring];[captioned][ring]overlay[out]`;
+      const filter = `${footage};[base][${card ? 1 : 2}:v]overlay[captioned];[${card ? 2 : 3}:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st=0.75:d=0.25:alpha=1,trim=duration=1,loop=loop=-1:size=12:start=0,setpts=N/(12*TB)[ring];[captioned][ring]overlay,${motionFilter(style,width,height,scene.duration)}[out]`;
       const footageInput = card ? [] : [...(video ? ['-stream_loop', '-1'] : ['-loop', '1', '-framerate', '12']), '-i', source];
       await run('ffmpeg', ['-y', '-v', 'error', '-filter_complex_threads', '2', '-loop', '1', '-framerate', '12', '-i', plate, ...footageInput, '-loop', '1', '-framerate', '12', '-i', caption, '-loop', '1', '-framerate', '12', '-i', ring, '-filter_complex', filter, '-map', '[out]', '-t', String(scene.duration), '-an', '-r', '12', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20', '-pix_fmt', 'yuv420p', '-threads', '2', piece]);
       pieces.push(piece);
@@ -96,14 +103,14 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
       const end = assets.at(-1)!;
       const endCard = join(work, 'public', 'end.png');
       await run('ffmpeg', ['-y', '-v', 'error', '-i', end.plate, '-i', end.caption, '-filter_complex', 'overlay', '-frames:v', '1', '-threads', '1', endCard]);
-      await writeFile(join(work, 'props.json'), JSON.stringify({ scenes: propsScenes, endCards: { [`${width}x${height}`]: 'end.png' }, endCardSeconds: 3, logo: brand.logo }));
+      await writeFile(join(work, 'props.json'), JSON.stringify({ scenes: propsScenes, endCards: { [`${width}x${height}`]: 'end.png' }, endCardSeconds: 3, logo: brand.logo, style }));
       await run(cli, ['render', join(work, 'src/index.tsx'), spec.composition, silent, '--props', join(work, 'props.json'), '--concurrency', '2', '--log', 'error', '--codec', 'h264'], work);
     } else {
       await writeFile(join(work, 'concat.txt'), pieces.map(path => `file '${path.replaceAll("'", "'\\''")}'`).join('\n'));
       await run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', join(work, 'concat.txt'), '-c', 'copy', silent]);
     }
     const audio = await mixAudio(cwd, work, silent, file, scenes.map(scene => scene.duration), options.voice ?? [], options.music);
-    const receipt: ClipReceipt = { sha256: await fileHash(file), format, captions: 'burned', renderer: cli ? 'remotion' : 'ffmpeg', duration, audio, author: 'Aditya', scenes: scenes.map((scene, index) => ({ ...scene, terminal: assets[index].terminal, frame: assets[index].frame, crop: assets[index].crop, highlight: assets[index].highlight, captionFont: height * (scene.role === 'hook' || scene.role === 'cta' ? .065 : .048), captionContrast: contrast([255,255,255], [16,24,39]) })), logo: brand.logo ? 'logo' : 'wordmark' };
+    const receipt: ClipReceipt = { sha256: await fileHash(file), format, captions: 'burned', renderer: cli ? 'remotion' : 'ffmpeg', duration, audio, author: 'Aditya', scenes: scenes.map((scene, index) => ({ ...scene, terminal: assets[index].terminal, frame: assets[index].frame, crop: assets[index].crop, highlight: assets[index].highlight, captionFont: height * (scene.role === 'hook' || scene.role === 'cta' ? .065 : .048), captionContrast: themed ? captionContrast(style) : contrast([255,255,255], [16,24,39]) })), logo: brand.logo ? 'logo' : 'wordmark' };
     await writeFile(`${file}.json`, JSON.stringify(receipt, null, 2)); return { file, duration, receipt };
   } catch (error) { await rm(file, { force: true }); await rm(`${file}.json`, { force: true }); throw error; }
   finally { await app.close(); await rm(work, { recursive: true, force: true }); }

@@ -65,13 +65,50 @@ footage in the frame. No generated product imagery.
 
 `liftoff video check --json` verifies dimensions, duration (Shorts ≤60s, X ≤140s,
 Product Hunt ≤180s), render caption receipt plus matching SRT, and audio loudness
-when audio exists. The receipt is evidence of the renderer's caption operation,
+when audio exists. It also reports G0 moves (clean decode and sampled frame diff),
+G1 no-black (blackdetect), G2 no-freeze (no hold longer than 3 seconds), G3 readcheck
+(generated hooks use the greater of minimum reading time and narration at 2.8
+words/s plus 0.25s padding, rounded up to a frame and normally ≤3 seconds),
+with other vertical scenes trimmed toward their readable narration minimums
+when necessary to stay within a shared 34.5-second script budget, leaving rendering
+headroom below the 35-second output limit; impossible budgets require shorter copy.
+Validation keeps the hard 35-second limit for supplied scripts and checks the
+vertical-cut duration only when 9x16 is requested. Style pacing is checked on the
+requested cuts only; `video voice` also honors `--format`,
+(text ≥0.5s + words/3, voiceover ≤2.8 words/s, SRT scene cue map), G4 no-page-chrome
+(no counters or progress markers), G5 end-card (3s ±0.25), and G6 voice-stt (≥80%
+normalized script word coverage via local whisper or whisper-cli on scene-aligned
+audio extracted from that format's exported video, never local voice takes). STT is skipped
+if audio or a transcriber is missing; loudness is skipped without audio (music-only
+beds retain their quieter-than -20 LUFS rule; voice targets -14 ±2 LUFS). Each gate
+has id, name, status and detail. Per-format reports are saved to
+`.launch/video/check.json` before failed gates throw; skipped gates never fail.
+`video script` includes informational `readcheck`. Both renderers gently push in
+the whole scene to avoid static holds, and plates carry no scene counter.
+The receipt is evidence of the renderer's caption operation,
 not an OCR check. Watch the final video before publishing. Bare `liftoff video`
 renders and checks; nothing is posted. Every command supports `--json` and fails
 non-zero for validation/tool failures.
 
 Checks report duration compliance for every platform, but enforce only the mapped
 targets: 9x16 → YouTube Shorts, 1x1 → X, 16x9 → X and Product Hunt.
+
+## Style presets
+
+`video styles --json` lists midnight (unchanged default), paper, neon, brutalist,
+warm and mono, and writes `.launch/video/styles.html` with SVG still previews.
+Set optional `script.json.style`. STYLE.md frontmatter carries palette gradient
+stops/text/accent/caption background, typography family/weight/case, pacing min/max,
+cut/fade/slide transition, static-push/push-in/pan camera and top/bottom/center
+caption position. Read its Markdown story/rhythm direction before scripting.
+Explicit non-default styles enforce scene pacing rather than retiming footage;
+the three-second end card is fixed. Captions must retain ≥7:1 contrast.
+
+`video styles --fork <id> --as <new>` copies a preset into
+`.launch/video/styles/<new>/STYLE.md`. Local ids override built-ins. Edit at least
+four of six axes from its declared base, not just the name or direction.
+`video styles check` validates this; `video check` includes a `style-distinct`
+gate for selected custom styles. Fresh forks deliberately fail until customized.
 
 Selftest uses the small real captures bundled under `templates/video/footage/`
 only when phase-3 captures are absent. Each fixture's manifest records the capture

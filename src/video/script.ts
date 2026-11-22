@@ -5,11 +5,34 @@ import { launchDir } from '../core/launch-dir.js';
 import { validateFile } from '../core/schema.js';
 import { storyboard } from '../media/assets.js';
 import { polish } from '../media/polish.js';
+import { loadStyle } from './styles.js';
 
 export type SceneRole = 'hook' | 'before' | 'action' | 'after' | 'proof' | 'cta';
 export interface Scene { shot: string; text: string; duration: number; voiceover?: string; role?: SceneRole; shortDuration?: number; highlight?: {x:number;y:number;width:number;height:number} }
-export interface Script { scenes: Scene[] }
+export interface Script { scenes: Scene[]; style?: string }
+export interface Gate { id: string; name: string; status: 'pass' | 'fail' | 'skipped'; detail: string }
+export const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+function minimumHookDuration(text: string) {
+  const count = words(text).length;
+  return Math.ceil(Math.max(.5 + count / 3, count / 2.8 + .25) * 12) / 12;
+}
+export function readcheck(script: Script, captions = srt(script)): Gate {
+  const errors: string[] = [];
+  if (!script.scenes.length) errors.push('No scenes');
+  script.scenes.forEach((scene, i) => {
+    if (!Number.isFinite(scene.duration) || scene.duration < 0.5 + words(scene.text).length / 3) errors.push(`Scene ${i + 1}: text needs more reading time`);
+    if (scene.voiceover && words(scene.voiceover).length > scene.duration * 2.8) errors.push(`Scene ${i + 1}: voiceover exceeds 2.8 words/s`);
+  });
+  const boundaries = (value: string) => [...value.matchAll(/^(\d\d:\d\d:\d\d,\d{3}) --> (\d\d:\d\d:\d\d,\d{3})$/gm)].map(m => [m[1], m[2]]);
+  if (JSON.stringify(boundaries(captions)) !== JSON.stringify(boundaries(srt(script)))) errors.push('SRT cue map does not align with scene boundaries');
+  return {id:'G3', name:'readcheck', status:errors.length ? 'fail' : 'pass', detail:errors.join('; ') || 'Reading time, voiceover rate and SRT cue map align'};
+}
+export function chromeLint(script: Script): Gate {
+  const bad = script.scenes.flatMap((scene, i) => /\b\d+\s*\/\s*\d+\b|\bstep\s+\d+\s+of\s+\d+\b|\d+(?:\.\d+)?\s*%|[▮▯█░▓▒■□]/iu.test(scene.text) ? [`Scene ${i + 1}`] : []);
+  return {id:'G4', name:'no-page-chrome', status:bad.length ? 'fail' : 'pass', detail:bad.length ? `${bad.join(', ')} contains counters or progress markers` : 'No counters or progress markers'};
+}
 export const endCardSeconds = 3;
+export const shortCutBudgetSeconds = 34.5;
 export function sceneDuration(scene: Scene, format = '16x9', storyboard = Boolean(scene.role)) { return format === '9x16' && storyboard ? scene.shortDuration ?? scene.duration * .5 : scene.duration; }
 export function totalDuration(script: Script, format = '16x9') { return script.scenes.reduce((n, s) => n + sceneDuration(s, format, script.scenes.some(scene => scene.role)), 0) + endCardSeconds; }
 export interface Shot { id: string; route: string; viewport: {width: number; height: number}; record?: boolean; theme?: 'light' | 'dark'; waitFor?: string; actions?: {type: string; selector: string; text?: string}[] }
@@ -42,18 +65,24 @@ export async function resolveShot(cwd: string, shot: string): Promise<string> {
   }
   throw new Error(`Shot does not resolve to captured media: ${shot}`);
 }
-export async function validateScript(cwd: string, data: unknown): Promise<Script> {
+export async function validateScript(cwd: string, data: unknown, selected: readonly string[] = ['16x9','9x16','1x1']): Promise<Script> {
   const result = validateFile('video-script', data);
   if (!result.valid) throw new Error(result.errors.join('; '));
   const script = data as Script;
-  const duration = totalDuration(script);
   const modern = script.scenes.some(scene => scene.role);
+  const style = await loadStyle(cwd,script.style);
+  if ((style.id !== 'midnight' || style.custom) && script.scenes.some(scene => selected.map(format => sceneDuration(scene,format,modern)).some(duration => duration < style.pacing.min || duration > style.pacing.max))) throw new Error(`Scene duration outside ${style.id} pacing (${style.pacing.min}–${style.pacing.max}s)`);
+  const duration = totalDuration(script);
   if (!modern && (script.scenes.length < 6 || script.scenes.some(scene => scene.text.trim().split(/\s+/).length > 8))) throw new Error('Legacy scripts require 6–10 scenes and captions of 1–8 words');
   if (duration < (modern ? 45 : 30) || duration > 60) throw new Error(`Total duration including the 3-second end card must be ${modern ? '45' : '30'}–60 seconds`);
   if (modern) {
-    if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > 3 || sceneDuration(script.scenes[0], '9x16') > 3 || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds');
-    const short = totalDuration(script, '9x16');
-    if (short < 20 || short > 35) throw new Error('Short duration including end card must be 20–35 seconds');
+    const vertical = selected.includes('9x16');
+    const hookLimit = Math.max(3, minimumHookDuration(script.scenes[0].text));
+    if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > hookLimit || (vertical && sceneDuration(script.scenes[0], '9x16') > hookLimit) || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds, extended only for minimum reading or narration time');
+    if (vertical) {
+      const short = totalDuration(script, '9x16');
+      if (short < 20 || short > 35) throw new Error('Short duration including end card must be 20–35 seconds');
+    }
   }
   for (const scene of script.scenes) await resolveShot(cwd, scene.shot);
   return script;
@@ -72,14 +101,26 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
     if (shot.commands && !shot.moneyMoment && !shot.card) {
       try { await access(join(launchDir(cwd).media, footage)); source = footage; } catch { /* Still captures remain valid scene sources. */ }
     }
-    const duration = shot.purpose === 'hook' ? 3 : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
-    scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration: shot.purpose === 'hook' ? 2 : duration * .5, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
+    const readingSeconds = Math.ceil((.5 + words(shot.caption ?? '').length / 3) * 12) / 12;
+    const duration = shot.purpose === 'hook' ? minimumHookDuration(shot.caption ?? '') : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
+    const shortDuration = shot.purpose === 'hook' ? duration : Math.max(duration * .5, readingSeconds);
+    scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
   }
+  let excess = totalDuration({scenes},'9x16') - shortCutBudgetSeconds;
+  for (const scene of scenes) {
+    if (excess <= 1e-8) break;
+    if (scene.role === 'hook') continue;
+    const minimum = Math.ceil(Math.max(.5 + words(scene.text).length / 3, words(scene.voiceover ?? '').length / 2.8) * 12) / 12;
+    const reduction = Math.min(excess,Math.max(0,scene.shortDuration! - minimum));
+    scene.shortDuration! -= reduction;
+    excess -= reduction;
+  }
+  if (excess > 1e-8) throw new Error(`Storyboard cannot fit the ${shortCutBudgetSeconds}-second vertical budget at minimum reading and narration times; shorten captions or remove scenes`);
   const script = await validateScript(cwd, { scenes });
   await mkdir(launchDir(cwd).video, { recursive: true });
   await writeFile(join(launchDir(cwd).video, 'script.json'), JSON.stringify(script, null, 2)); return script;
 }
-export async function loadScript(cwd: string) { return validateScript(cwd, JSON.parse(await readFile(join(launchDir(cwd).video, 'script.json'), 'utf8'))); }
+export async function loadScript(cwd: string, selected?: readonly string[]) { return validateScript(cwd, JSON.parse(await readFile(join(launchDir(cwd).video, 'script.json'), 'utf8')),selected); }
 export async function productName(cwd: string) {
   try { const p = JSON.parse(await readFile(launchDir(cwd).product, 'utf8')); return String(p.name ?? p.productName ?? 'Product'); }
   catch { return 'Product'; }

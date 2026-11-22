@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { loadScript } from './script.js';
 
-export async function narrationFiles(cwd: string, scenes: { voiceover?: string }[], extensions = ['mp3','wav']): Promise<(string | undefined)[]> {
+export async function narrationFiles(cwd: string, scenes: { voiceover?: string }[], extensions = ['mp3','wav'], requireScript = true): Promise<(string | undefined)[]> {
   return Promise.all(scenes.map(async (scene, index) => {
-    if (!scene.voiceover?.trim()) return undefined;
+    if (requireScript && !scene.voiceover?.trim()) return undefined;
     for (const extension of extensions) {
       const file = join(launchDir(cwd).video, 'vo', `${index}.${extension}`);
       try { await access(file); return file; }
@@ -15,8 +15,8 @@ export async function narrationFiles(cwd: string, scenes: { voiceover?: string }
   }));
 }
 
-export async function voice(cwd: string, options: { dryRun?: boolean } = {}) {
-  const script = await loadScript(cwd);
+export async function voice(cwd: string, options: { dryRun?: boolean; formats?: readonly string[] } = {}) {
+  const script = await loadScript(cwd,options.formats);
   const id = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}`;
   const requests = script.scenes.flatMap((scene, index) => scene.voiceover?.trim() ? [{ index, url, method: 'POST', body: { text: scene.voiceover, model_id: 'eleven_multilingual_v2' } }] : []);

@@ -117,6 +117,17 @@ Selftest retains its per-check report in data even when some checks fail.
 | 5b | connect, publish --confirm --assist | Own accounts; official PH draft MCP, X discovery/manual fallback, browser-assisted HN/Reddit |
 | 6 | results, learn, receipt | Stubs |
 
+`liftoff video check --json` retains resolution, platform duration, SRT and receipt
+checks, then reports G0 moves (clean decode and differing sampled frames), G1
+no-black, G2 no-freeze (>3 seconds), G3 readcheck (reading/voiceover pace and cue
+map), G4 no-page-chrome, G5 end-card (3 seconds ±0.25), G6 voice-stt (80% word
+coverage of scene-aligned audio extracted from the exported cut when narration
+and Whisper are available), and loudness (-14 ±2 LUFS
+with voice, music-only quieter than -20 LUFS).
+Per-format gates have `id`, `name`, `status` and `detail` and are saved to
+`.launch/video/check.json` before gate failures throw. Optional missing STT or
+audio is skipped, not failed. `video script` includes an informational `readcheck`.
+
 Doctor lists skill names, MCP server names (never configuration values), and executable
 availability, versions, stage requirements and install hints. Missing extras never
 fail doctor itself. CLI detection uses PATH; Chrome also checks the bundled
@@ -124,12 +135,36 @@ Playwright browser and configured executable paths. Probes never download packag
 
 ## Media workflow (local/offline)
 
+### Video style presets
+
+`liftoff video styles --json` lists **midnight**, **paper**, **neon**,
+**brutalist**, **warm**, and **mono**, and writes `.launch/video/styles.html`.
+The gallery uses real plate/caption SVG stills, not rendered videos. Set optional
+`"style": "paper"` in `script.json`; omission or explicit `midnight` preserves
+the existing default look. The script brief includes the available styles.
+
+Each `templates/video/styles/<id>/STYLE.md` contains YAML tokens for palette,
+typography, scene pacing bounds, transition, camera, and caption position, plus
+agent direction for story and rhythm. Scene durations must respect the selected
+style's bounds; they are never silently retimed. Caption colors require ≥7:1
+contrast. The automatic three-second end card is not constrained by scene pacing.
+
+Fork with `liftoff video styles --fork midnight --as my-style`, then edit
+`.launch/video/styles/my-style/STYLE.md` and set `"style": "my-style"`.
+Local ids override built-ins, including an explicitly forked `midnight`.
+`liftoff video styles check` requires custom styles to differ from their declared
+built-in base on at least four of the six axes; renaming or editing prose does not
+count. A fresh fork intentionally fails until meaningfully customized.
+`video check` adds the `style-distinct` gate when a local style is selected.
+
 ```sh
 liftoff shots plan                 # reads product.json money_moment; --force replaces a plan
 # Review captions/actions against the repository; replace every TODO before capture.
 liftoff shots                     # add --url http://127.0.0.1:3000 for a running web app
 liftoff media polish
 liftoff images                    # automatically polishes storyboards
+liftoff shots export --targets appstore-6.9,play,product-hunt
+liftoff shots check --json
 liftoff media judge --json
 liftoff video script --from-shots
 liftoff video voice --dry-run
@@ -143,6 +178,38 @@ may be an object with summary/before/after/proof, commands/setup or route, and
 highlight; strings and missing values fall back to verified product copy. Planning
 is a scaffold, not permission to invent claims or execute unreviewed commands.
 Legacy shots without new fields retain their original rendering path.
+
+### Store-ready screenshots
+
+`shots export` uses the real capture manifest and storyboard, shares media polish's
+phone/browser/terminal frames, and puts the money moment first. It defaults to all
+six targets: `appstore-6.9` (1320×2868), `appstore-6.5` (1242×2688), `play`
+(1080×1920), `product-hunt` (1270×760), `og` (1200×630), and `x` (1600×900).
+Select a comma list with `--targets`; `--style midnight` is the default video-style
+palette and typography. Brand colors/logo apply to the shared device frame.
+Portrait exports use phone frames; landscape exports use browser/terminal frames.
+Captures are scaled to fit without inventing, cropping, or rebuilding product UI.
+
+Each shots.yaml entry needs `claim: <product.claims[].id>` (or
+`claim: features/<exact feature name>`) resolving to a sourced product.json claim.
+Add a benefit-led `caption` of 1–6 words. If omitted, the claim text (feature
+description) is used only when it already fits; long claims fail with an instruction
+to write a caption. The agent writes the benefit-led wording; the CLI cannot prove
+semantic entailment and never auto-shortens or fabricates copy.
+
+Exports live in `.launch/media/store/<target>/<NN>-<id>.png` with a shared manifest
+recording captions, claim references, geometry, source capture hashes and output
+hashes. Export automatically runs `shots check`: exact dimensions, RGB PNG color
+type (no alpha), grounded caption length, ≥6% safe margins, clearance above the
+device, ≥4.5:1 rendered-pixel contrast and visible caption ink, unchanged captures,
+unchanged exported files, complete gallery order, and the banned-content OCR guard.
+OCR is reported skipped if Tesseract is unavailable. Check writes `store/check.json`
+with pass/fail/skipped gates and fails on any failed gate. Re-export after changing
+captures or caption/claim references. Exports are staged and checked before replacing
+the entire gallery; failed renders or checks leave the previous PNGs, manifest and
+check report untouched. Receipts are local provenance checks, not
+tamper-proof signatures. **App Store Connect and Google Play upload are out of
+scope: review screenshots and upload manually.**
 
 Storyboards use scale-2 web capture and light/dark variants, or VHS CLI tapes with
 hidden setup. If VHS is absent, an HTML terminal plus ffmpeg is used. Tesseract is

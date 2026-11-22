@@ -2,10 +2,9 @@ import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { PNG } from 'pngjs';
 import { launchDir } from '../core/launch-dir.js';
-import { packageRoot } from '../core/package-root.js';
-import { browser, escapeHtml } from '../visuals/runtime.js';
+import { browser } from '../visuals/runtime.js';
 import { assertClean, ocrWords } from './banned.js';
-import { mediaBrand, homepageHost, storyboard } from './assets.js';
+import { mediaBrand, mediaFrame, homepageHost, storyboard } from './assets.js';
 import type { TerminalRegion } from './terminal.js';
 
 export interface PolishedShot {
@@ -20,7 +19,6 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
   const captures = JSON.parse(await readFile(join(paths.media, 'shots/manifest.json'), 'utf8'));
   const product = JSON.parse(await readFile(paths.product, 'utf8')); const brand = await mediaBrand(cwd);
   const dir = join(paths.media, 'polished'); await mkdir(dir, { recursive: true }); await rm(join(dir, 'manifest.json'), { force: true });
-  const template = await readFile(join(packageRoot(), 'templates/media/frame.html'), 'utf8');
   const app = await browser(); const report: PolishedShot[] = [];
   try {
     for (const shot of shots) {
@@ -59,7 +57,7 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
         const page = await app.newPage({ viewport: { width: 1400, height: shot.card ? 700 : Math.ceil(contentHeight + 128) }, deviceScaleFactor: 2 });
         try {
           await page.route('**/*', route => route.abort());
-          await page.setContent(template.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(values[key] ?? '')));
+          await page.setContent(await mediaFrame(values));
           await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].filter(image => image.getAttribute('src')).map(image => image.decode())); });
           assertClean(await page.locator('body').innerText(), `polished ${shot.id}`);
           const output = await page.screenshot(); assertClean((await ocrWords(output)).text, `polished ${shot.id}`);

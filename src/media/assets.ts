@@ -4,6 +4,13 @@ import { parse } from 'yaml';
 import { launchDir } from '../core/launch-dir.js';
 import { validateFile } from '../core/schema.js';
 import type { MediaShot } from '../visuals/modern-shot.js';
+import { packageRoot } from '../core/package-root.js';
+import { escapeHtml } from '../visuals/runtime.js';
+
+export async function mediaFrame(values: Record<string,string>) {
+  const template = await readFile(join(packageRoot(),'templates/media/frame.html'),'utf8');
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(values[key] ?? ''));
+}
 
 export async function optionalJson(path: string) {
   try { return JSON.parse(await readFile(path, 'utf8')); }

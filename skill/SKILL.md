@@ -134,6 +134,20 @@ never display fixture/tmp paths, pipes, credentials or debug output. Capture wit
 `liftoff shots` (`--url` for a running web app), then `liftoff media polish` and
 `liftoff images` (which also polishes). Do not invent UI or product claims.
 
+For store listings, add a `claim` to each shot: a sourced product.json claims[].id
+or `features/<exact feature name>` (uses that feature's sourced description).
+Write a benefit-led `caption` of 1–6 words, faithfully entailed by the reference.
+Benefit-led wording and semantic grounding are the agent's responsibility, not a
+CLI rewrite. Omit the caption only when the referenced text already fits 1–6 words;
+otherwise export deliberately fails asking you to write it. Never invent UI.
+Run `liftoff shots export` (all six targets) or `--targets appstore-6.9,play,og`;
+optional `--style <id>` defaults to midnight's tokens and reuses branded media
+frames. Review `.launch/media/store/manifest.json` and the exported PNGs; run
+`liftoff shots check --json` for the persisted size/RGB/grounding/safe-area/contrast,
+gallery, source-hash and OCR gates. OCR is skipped only when Tesseract is absent.
+Re-export stale captures or copy; never weaken receipts. App Store Connect/Google
+Play upload is out of scope and manual, after human review.
+
 Polished media and platform images use corner logo/wordmark branding. Set a local
 config.brandKit file (logo/colors/music), or media/logo.*; otherwise the product
 name is used. Images use the polished money moment; PH gets a gallery and IG gets
@@ -151,6 +165,13 @@ heuristic checks. Review gates finished media before human approval.
 
 ## video — phase 4
 
+Run `liftoff video styles` for six presets and a still-only gallery at
+`.launch/video/styles.html`. Choose optional `script.json.style`; midnight is
+the unchanged default. Read the preset's STYLE.md for story direction and six
+token axes. Use `video styles --fork <id> --as <new>` for local overrides, then
+`video styles check`: custom styles must differ on ≥4 axes. Caption contrast must
+remain ≥7:1. Script briefs list styles; renderers honor their pacing bounds.
+
 For a storyboard, run `liftoff video script --from-shots`, optionally `liftoff video voice --dry-run` then `liftoff video voice` (ElevenLabs key required), and `liftoff video --renderer ffmpeg`. Music defaults to a local generated pad; use `--music <file>` or `brandKit.music` to supply a bed. With Remotion installed, run `npx skills add remotion-dev/skills` and follow its video-shotcraft recipes; the same roles, branding, captions and highlights are passed to both renderers. No voice key means captions-only, not an error.
 
 Long cuts are 45–60s; vertical cuts 20–35s. Use `--format 16x9,9x16` and run
@@ -165,6 +186,12 @@ Carousel takes `{role, caption, source?}[]` and `{size?, outDir?, prefix?}`, ret
 `{format?, music?, voice?, outFile?, renderer?}`, returning `{file, duration, receipt}`.
 Voice is an indexed array of local audio paths. Clip uses supplied durations plus
 a three-second end card; neither renderer calls an API. See README's media section.
+
+Run `liftoff video check --json` for decode/motion, black/freeze, reading pace and
+SRT cue map, no progress chrome, 3-second end card, optional Whisper word coverage,
+and -14 LUFS gates, alongside dimensions, duration, captions and receipt checks.
+Results are saved in `.launch/video/check.json`; failed gates block, skipped gates
+do not. `video script` reports informational `readcheck`. See [phase4.md](references/phase4.md).
 
 ## review and publish — phase 5
 

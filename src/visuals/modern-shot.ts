@@ -14,7 +14,7 @@ export interface MediaShot {
   theme?: 'light' | 'dark'; themes?: ('light' | 'dark')[]; deviceScale?: number;
   record?: boolean; fullPage?: boolean; waitFor?: string; element?: string;
   actions?: { type: string; selector: string; text?: string }[];
-  purpose?: string; caption?: string; moneyMoment?: boolean; setup?: string[];
+  purpose?: string; caption?: string; claim?: string; moneyMoment?: boolean; setup?: string[];
   highlight?: { selector: string } | { text: string } | Box;
   card?: boolean; fontSize?: number; cols?: number; rows?: number; width?: number; height?: number;
 }

@@ -19,6 +19,9 @@ export interface JudgeItem {
 }
 export interface JudgeReport { ok: boolean; items: JudgeItem[]; errors: string[]; contactSheets: string[]; videoSheets: string[]; vision: string }
 interface Asset { file: string; path: string; scored: boolean; timestamp?: number; video?: string }
+export async function sampleVideoFrames(video:string,dir:string) {
+  await exec('ffmpeg',['-y','-v','error','-i',video,'-vf','fps=1:start_time=0:round=up','-threads','1',join(dir,'%06d.png')],{timeout:240000});
+}
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
 const keys = ['readability', 'focus', 'brand', 'clutter'] as const;
@@ -221,7 +224,7 @@ export async function judge(cwd: string, options: { heuristicOnly?: boolean; wri
       const id = hash(Buffer.from(file)).slice(0, 12);
       if (video) {
         const frameDir = join(dir, 'frames', id); await mkdir(frameDir);
-        try { await exec('ffmpeg', ['-y','-v','error','-i',path,'-vf','fps=1:start_time=0','-threads','1',join(frameDir,'%06d.png')], {timeout:240000}); }
+        try { await sampleVideoFrames(path,frameDir); }
         catch { throw new Error(`Unable to sample video: ${maskSecrets(file)}`); }
         const scored = path.startsWith(paths.video + '/') || path.startsWith(join(paths.media,'images') + '/') || path.startsWith(join(paths.media,'polished') + '/');
         const frames = (await readdir(frameDir)).filter(file => file.endsWith('.png')).sort().map((frame, index) => ({file:`${file}@${index}s`,path:join(frameDir,frame),scored,timestamp:index,video:file}));

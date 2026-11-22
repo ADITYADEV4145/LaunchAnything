@@ -11,7 +11,7 @@ import { reserveCap } from '../connect/caps.js';
 import { tryLock } from '../connect/lock.js';
 import { readReceipts, type PublishReceipt } from '../adapters/index.js';
 import { checkPosts } from '../copy/check.js';
-import { judgePosts } from '../copy/judge.js';
+import { judgeWithHistory } from '../copy/judge.js';
 import { warroom } from '../launch-ops/warroom.js';
 import { parseSchedule } from './schedule.js';
 import { readConsent, revokeConsent, sameScope, saveConsent, type Scope } from './consent.js';
@@ -74,7 +74,7 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
   heartbeat.unref();
   try {
     const channels = active.map(post => post.channel);
-    if (!checkPosts(cwd, channels).passed || !judgePosts(cwd, channels).passed)
+    if (!checkPosts(cwd, channels).passed || !(await judgeWithHistory(cwd, channels)).passed)
       throw new Error('Quality gates failed; run liftoff check and liftoff judge and fix the posts');
     const consent = await readConsent(paths.root, options.mock);
     const missing = queue.filter(({ scope, connectionError }) => !connectionError && !consent.grants.some(grant => sameScope(grant, scope)));

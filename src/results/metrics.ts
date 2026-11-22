@@ -17,6 +17,7 @@ export interface PostObservation {
   utmContent?: string; copy?: string; judge?: Judgement;
 }
 export interface ObservedPost extends PublishedPost, PostObservation {}
+export interface ManualObservation extends PostObservation { judgeSourceHash?: string }
 export interface ResultConfig { profile: string; launchDate: string; timezone: string }
 export interface Judgement { score: number; dimensions?: Record<string, number> }
 
@@ -86,7 +87,7 @@ export function normalizeObservation(raw: unknown, channel: string): PostObserva
 }
 
 export function manualObservations(raw: unknown, published: PublishedPost[]) {
-  const observations = new Map<string, PostObservation>();
+  const observations = new Map<string, ManualObservation>();
   const data = record(raw);
   if (!Array.isArray(data.posts)) throw new Error('Metrics input requires a posts array');
   const eligible = new Set(published.map(post => postKey(post.channel, post.id)));
@@ -96,7 +97,10 @@ export function manualObservations(raw: unknown, published: PublishedPost[]) {
     const key = postKey(entry.channel, entry.id);
     if (!eligible.has(key)) throw new Error(`No eligible published.json entry for ${entry.channel} post ${entry.id}`);
     if (observations.has(key)) throw new Error(`Duplicate metrics for ${entry.channel} post ${entry.id}`);
-    observations.set(key, normalizeObservation(entry, entry.channel));
+    const { judgeSourceHash } = entry;
+    if (judgeSourceHash !== undefined && (typeof judgeSourceHash !== 'string' || !/^[a-f0-9]{64}$/.test(judgeSourceHash)))
+      throw new Error(`Invalid ${entry.channel} judgeSourceHash; expected the SHA-256 from liftoff judge.`);
+    observations.set(key, { ...normalizeObservation(entry, entry.channel), judgeSourceHash });
   }
   return observations;
 }

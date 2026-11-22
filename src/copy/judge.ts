@@ -11,10 +11,10 @@ import { blindFeedback } from './blind-test.js';
 import { loadVoice } from '../voice/learn.js';
 import { scoreVoice } from '../voice/score.js';
 import { aiTells } from '../voice/ai-tells.js';
+import { loadJudgeWeights } from '../results/history.js';
+import { aggregateScore, copyRubric, copyWeights, criteria, type Criterion, type Scores } from './judge-rubric.js';
 
-export const criteria = ['hook', 'specificity', 'proof', 'native', 'clarity', 'voice'] as const;
-export type Criterion = typeof criteria[number];
-export type Scores = Record<Criterion, number>;
+export { criteria, type Criterion, type Scores } from './judge-rubric.js';
 export const threshold = 8, maxLoops = 3;
 export const rubric: Record<Criterion, string> = {
   hook: 'The first line names a pain the reader has or the strongest proof number, and makes them want the next line.',
@@ -27,6 +27,7 @@ export const rubric: Record<Criterion, string> = {
 export interface Verdict {
   channel: string; sourceHash: string; source: 'model' | 'local'; judge?: string; scores: Scores; local: Scores;
   reasons: string[]; attempts: number; status: 'pass' | 'rewrite' | 'flagged';
+  rubricId?: string; aggregate?: number;
 }
 const clamp = (n: number) => Math.max(0, Math.min(10, Math.round(n)));
 
@@ -119,7 +120,25 @@ export function readJudgments(postsDir: string): Verdict[] {
 }
 
 export function judgePosts(cwd: string, selected?: string[]) {
-  const ctx = context(cwd, selected), dir = judgeDir(ctx.paths.posts);
+  return scorePosts(cwd, context(cwd, selected));
+}
+
+export async function judgeWithHistory(cwd: string, selected?: string[], historyPath?: string) {
+  const ctx = context(cwd, selected);
+  const warnings: string[] = [];
+  const learned = await loadJudgeWeights(ctx.config.profile, copyRubric.rubricId, historyPath).catch(() => {
+    warnings.push('Could not read judge history; using equal weights for the reported aggregate.');
+    return undefined;
+  });
+  const weights = copyWeights(learned);
+  if (learned && !weights) warnings.push('Judge history weights do not match this rubric; using equal weights.');
+  return scorePosts(cwd, ctx, weights, warnings);
+}
+
+function scorePosts(cwd: string, ctx: ReturnType<typeof context>, learned?: Scores, warnings: string[] = []) {
+  const dir = judgeDir(ctx.paths.posts);
+  const scoring = { rubricId: copyRubric.rubricId, weights: learned ?? copyRubric.weights,
+    source: learned ? 'history' : 'default' };
   for (const path of [dir, join(dir, 'fixes.md'), join(ctx.paths.posts, 'judge.json')]) assertSafePath(cwd, path);
   mkdirSync(dir, { recursive: true });
   const previous = new Map(readJudgments(ctx.paths.posts).map(v => [v.channel, v]));
@@ -141,6 +160,7 @@ export function judgePosts(cwd: string, selected?: string[]) {
     const last = previous.get(channel);
     const attempts = passed ? 0 : last && last.sourceHash === sourceHash ? Math.max(1, last.attempts) : (last?.attempts ?? 0) + 1;
     verdicts.push({ channel, sourceHash, source: model ? 'model' : 'local', judge: model?.judge, scores, local: local.scores,
+      rubricId: scoring.rubricId, aggregate: aggregateScore(scores, scoring.weights),
       reasons: passed ? [] : [...new Set(reasons)], attempts, status: passed ? 'pass' : attempts >= maxLoops ? 'flagged' : 'rewrite' });
   }
   for (const verdict of verdicts) previous.set(verdict.channel, verdict);
@@ -150,6 +170,6 @@ export function judgePosts(cwd: string, selected?: string[]) {
   const fixes = join(dir, 'fixes.md');
   atomicWrite(cwd, fixes, rewrite.length ? '# Judge rewrite list\n\n' + rewrite.map(v => '## ' + v.channel + ' (loop ' + v.attempts + ' of ' + maxLoops + ')\n'
     + v.reasons.map(r => '- ' + r).join('\n')).join('\n\n') + '\n' : '# Judge rewrite list\n\nNothing to rewrite.\n');
-  return { passed: !skipped.length && verdicts.every(v => v.status === 'pass'), verdicts, skipped, rewrite: rewrite.map(v => v.channel),
+  return { passed: !skipped.length && verdicts.every(v => v.status === 'pass'), scoring, warnings, verdicts, skipped, rewrite: rewrite.map(v => v.channel),
     flagged: verdicts.filter(v => v.status === 'flagged').map(v => v.channel), fixes };
 }

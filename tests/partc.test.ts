@@ -7,7 +7,9 @@ import { checks } from '../src/selftest/phase2.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { checkPosts, inspectPost, parsePost } from '../src/copy/check.js';
 import { pickVariant, stripClaims } from '../src/copy/edit.js';
-import { judgePosts, criteria, judgeKeys } from '../src/copy/judge.js';
+import { judgePosts, judgeWithHistory, criteria, judgeKeys } from '../src/copy/judge.js';
+import { collect } from '../src/results/collect.js';
+import { learn } from '../src/results/history.js';
 import { prepareBlindTest, recordBlindTest, tallyBlindTest, plainPrompt } from '../src/copy/blind-test.js';
 import { writeBriefs } from '../src/copy/write.js';
 import { loadExemplars, loadVoiceGuidelines } from '../src/copy/guides.js';
@@ -162,6 +164,52 @@ it('judge gate rewrites up to three loops and then red-flags with reasons', proj
   const stale = JSON.parse(readFileSync(join(judgeDir, 'x.scores.json'), 'utf8'));
   writeFileSync(join(judgeDir, 'x.scores.json'), JSON.stringify({ ...stale, sourceHash: 'f'.repeat(64) }));
   expect(judgePosts(cwd, ['x']).verdicts[0].source).toBe('local');
+}));
+
+it('links published metrics to exact judge verdicts and weights the next judge without weakening its gate', project(async (cwd, posts) => {
+  const channels = ['x', 'devto', 'reddit'];
+  const judgeDir = join(posts, 'judge');
+  const score = (channel: string, base: number, specificity: number, hook = base) => {
+    writeFileSync(join(judgeDir, channel + '.scores.json'), JSON.stringify({ ...judgeKeys(cwd, channel),
+      scores: Object.fromEntries(criteria.map(key => [key, key === 'specificity' ? specificity : key === 'hook' ? hook : base])),
+      reasons: ['Use an actual result in the opening.'] }));
+  };
+  mkdirSync(judgeDir, { recursive: true });
+  score('x', 10, 8);
+  score('devto', 8, 10);
+  score('reddit', 9, 9);
+  const first = judgePosts(cwd, channels);
+  expect(first.passed).toBe(true);
+  const root = join(cwd, '.launch');
+  const configPath = join(root, 'config.json');
+  writeFileSync(configPath, JSON.stringify({ ...JSON.parse(readFileSync(configPath, 'utf8')), launchDate: '2026-03-07' }));
+  const published = channels.map(channel => ({ channel, id: 'fixture-' + channel, status: 'published' }));
+  writeFileSync(join(root, 'published.json'), JSON.stringify({ posts: published }));
+  const measured = published.map(({ channel, id }, index) => ({ channel, id,
+    judgeSourceHash: first.verdicts[index].sourceHash, metrics: { signups: [1, 20, 4][index] } }));
+  const options = { now: new Date('2026-03-11T00:00:00Z') };
+  const input = join(root, 'metrics.json');
+  writeFileSync(input, JSON.stringify({ posts: [{ ...measured[0], judgeSourceHash: measured[1].judgeSourceHash }] }));
+  await expect(collect(cwd, options)).rejects.toThrow('No unique matching judge verdict for x post fixture-x');
+  writeFileSync(input, JSON.stringify({ posts: measured }));
+  await collect(cwd, options);
+  const history = join(cwd, 'history.json');
+  const learned = await learn(cwd, history);
+  expect(learned.calibration).toMatchObject({ signal: 'signups', comparablePosts: 3,
+    highScoredLowPerformance: [expect.objectContaining({ channel: 'x', score: first.verdicts[0].aggregate, actual: 1 }),
+      expect.objectContaining({ channel: 'reddit', actual: 4 })] });
+  expect(learned.calibration?.suggestedWeights?.specificity).toBeGreaterThan(1);
+  score('x', 10, 10, 7);
+  const unweighted = judgePosts(cwd, ['x']).verdicts[0];
+  const next = await judgeWithHistory(cwd, ['x'], history);
+  expect(next.scoring).toMatchObject({ source: 'history', weights: learned.calibration?.suggestedWeights });
+  expect(next.verdicts[0].aggregate).not.toEqual(unweighted.aggregate);
+  expect(next.verdicts[0].aggregate).toBeGreaterThan(80);
+  expect(next.verdicts[0]).toMatchObject({ scores: { hook: 7 }, status: 'rewrite' });
+  expect(next.passed).toBe(false);
+  writeFileSync(history, 'invalid');
+  const fallback = await judgeWithHistory(cwd, ['x'], history);
+  expect(fallback).toMatchObject({ passed: false, scoring: { source: 'default' }, warnings: [expect.stringContaining('Could not read')] });
 }));
 
 it('review shows sources on hover, variants and the judge red flag without raw tags', project(async (cwd, posts) => {

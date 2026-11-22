@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { launchDir } from '../core/launch-dir.js';
 import { loadReview, readOptional, validate } from '../review/posts.js';
@@ -107,6 +107,13 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       writes = result.then(() => {}, () => {});
       return result;
     };
+    const profiles = new Map<string, Promise<void>>();
+    const withProfile = <T>(profile: string, action: () => Promise<T>): Promise<T> => {
+      const key = resolve(profile);
+      const result = (profiles.get(key) ?? Promise.resolve()).then(action);
+      profiles.set(key, result.then(() => {}, () => {}));
+      return result;
+    };
     const identityFor = (hash: string, scope: Scope) => (options.mock ? 'go-mock:' : 'go:') +
       createHash('sha256').update(JSON.stringify([hash, scope])).digest('hex');
     if (queue.some(({ post, scope, connectionError }) => !connectionError && post.channel === 'product-hunt' &&
@@ -122,6 +129,7 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
         await (options.sleep ?? setTimeout)(Math.min(remaining, 2147483647));
         remaining = Date.parse(post.scheduledAt) - now().getTime();
       }
+      const dispatch = async () => {
       let receipt: PublishReceipt | undefined;
       let unavailableReason = connectionError;
       try {
@@ -166,6 +174,8 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
         await warroom(cwd, { readStatus: async () => ({ status: 'published' }) });
       });
       board.push({ channel: post.channel, status: 'live', url: receipt.url }); log(`${post.channel} | live | ${receipt.url}`);
+      };
+      return scope.route === 'browser' ? withProfile(connection.profile ?? 'mock-default', dispatch) : dispatch();
     }));
     const failure = completed.find(result => result.status === 'rejected');
     if (failure?.status === 'rejected') throw failure.reason;

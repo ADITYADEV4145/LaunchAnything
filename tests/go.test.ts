@@ -257,6 +257,43 @@ it('accepts connected Kit API accounts and isolates missing or unsupported route
   expect(result.board.filter(row => row.status === 'live')).toHaveLength(6);
   expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toHaveLength(6);
 }, 30000);
+it.each([false, true])('serializes shared browser profiles, keeps APIs concurrent, and releases after failure=%s', async fail => {
+  const { work, paths, channels } = await fixture();
+  const home = join(paths.root, 'test-profiles');
+  await mkdir(home);
+  await writeFile(join(home, 'connections.json'), JSON.stringify(channels.map(channel => ({
+    platform: channel, route: ['show-hn', 'reddit'].includes(channel) ? 'browser' : channel === 'x' ? 'mcp' : 'api',
+    profile: channel === 'reddit' ? '/fixture/chrome/../chrome' : '/fixture/chrome', account: 'fixture-founder', connectedAt: ''
+  }))));
+  let active = 0, maximum = 0, apiCount = 0, apiDuringBrowser = 0;
+  let started!: () => void, ready!: () => void;
+  const browserStarted = new Promise<void>(resolve => { started = resolve; });
+  const apisReady = new Promise<void>(resolve => { ready = resolve; });
+  const mock = mockAdapter();
+  const result = await go(work, { confirm: true, yes: true, home, now: () => new Date('2027-01-01T00:00:00Z'),
+    adapter: { async publish(context) {
+      if (context.connection.route === 'browser') {
+        active++; maximum = Math.max(maximum, active); started();
+        try {
+          await apisReady;
+          await new Promise(resolve => setTimeout(resolve, 10));
+          if (fail && context.post.channel === 'show-hn') throw new Error('Browser failed');
+          return await mock.publish(context);
+        } finally { active--; }
+      }
+      if (['devto', 'github-release'].includes(context.post.channel)) {
+        apiCount++; if (apiCount === 2) ready();
+        await Promise.all([browserStarted, apisReady]);
+        if (active) apiDuringBrowser++;
+      }
+      return mock.publish(context);
+    } } });
+  expect(maximum).toBe(1);
+  expect(apiDuringBrowser).toBe(2);
+  if (!('board' in result) || !result.board) throw new Error('Missing board');
+  expect(result.board.find(row => row.channel === 'reddit')?.status).toBe('live');
+  expect(result.board.find(row => row.channel === 'show-hn')?.status).toBe(fail ? 'failed' : 'live');
+}, 30000);
 it('GroundWork CLI mock --confirm covers every route after chat approval and PH confirmation', async () => {
   const { work } = await groundworkFixture();
   const cli = (...args: string[]) => spawnSync(process.execPath,

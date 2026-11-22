@@ -1,9 +1,11 @@
 kind: channel
 id: show-hn
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Show Hn
 profiles: ["devtool"]
 bestPostingTimes: ["09:00", "14:00"]
-bestPostingDays: [tue, wed, thu]
+bestPostingDays: [mon, tue, wed, thu, fri]
 leadTimeDays: 1
 version: "0.1.0"
 lastVerified: "2026-11-21"

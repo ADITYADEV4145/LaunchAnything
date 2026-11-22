@@ -1,5 +1,7 @@
 kind: channel
 id: devto
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Devto
 profiles: ["devtool"]
 bestPostingTimes: ["09:00", "14:00"]

@@ -1,5 +1,7 @@
 kind: channel
 id: x
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: X
 profiles: ["devtool","indie-saas","b2b-saas","consumer-mobile","enterprise"]
 bestPostingTimes: ["09:00", "14:00"]

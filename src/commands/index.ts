@@ -10,6 +10,7 @@ import { register as brief } from './brief.js';
 import { register as scan } from './scan.js';
 import { register as validate } from './validate.js';
 import { register as plan } from './plan.js';
+import { register as recommend } from './recommend.js';
 import { register as doctor } from './doctor.js';
 import { register as selftest } from './selftest.js';
 import { register as write } from './write.js';
@@ -40,6 +41,7 @@ import { register as go } from './go.js';
 import { register as communities } from './communities.js';
 export function registerCommands(program: Command) {
   adapters(program);
+  recommend(program);
   go(program);
   for (const register of [bench, setup, demo, estimate, telemetry]) register(program);
   voice(program);

@@ -1,5 +1,7 @@
 kind: channel
 id: press-release
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Press Release
 profiles: ["enterprise"]
 bestPostingTimes: ["09:00", "14:00"]

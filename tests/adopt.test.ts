@@ -165,6 +165,6 @@ describe('adoption', () => {
   it('preserves through-6 ordering before the Part D and adoption gates', () => {
     const order = phases.map(p => String(p.phase));
     expect(order.slice(0, order.indexOf('6') + 1)).toEqual(['0', '0b', 'E', '1', '1b', '2', '2b', '3', '4', '5', '5b', '6']);
-    expect(order.slice(order.indexOf('6'))).toEqual(['6', '7', 'I', 'F']);
+    expect(order.slice(order.indexOf('6'))).toEqual(['6', '7', 'I', 'F', 'B']);
   });
 });

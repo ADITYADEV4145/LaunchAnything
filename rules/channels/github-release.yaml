@@ -1,5 +1,7 @@
 kind: channel
 id: github-release
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Github Release
 profiles: ["devtool"]
 bestPostingTimes: ["09:00", "14:00"]

@@ -10,6 +10,8 @@ import { xCost } from '../connect/costs.js';
 import { reserveCap } from '../connect/caps.js';
 import { tryLock } from '../connect/lock.js';
 import { readReceipts, type PublishReceipt } from '../adapters/index.js';
+import { isLiveReceiptFor } from '../adapters/receipts.js';
+import { frontMatter } from '../connect/forms.js';
 import { checkPosts } from '../copy/check.js';
 import { judgeWithHistory } from '../copy/judge.js';
 import { warroom } from '../launch-ops/warroom.js';
@@ -33,7 +35,7 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
     const slot = schedule.find(slot => slot.channel === channel);
     if (!slot) throw new Error(channel + ': missing schedule row');
     return slot.scheduledAt;
-  });
+  }, recommendations === undefined ? undefined : new Set(schedule.map(slot => slot.channel)));
   const { approvals, skips } = await decisions(paths);
   const active = posts.filter(post => skips[post.channel] !== post.hash);
   if (!active.length) throw new Error('No posts to publish');
@@ -53,14 +55,32 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
     return { post, connection, scope, connectionError };
   }));
   queue.sort((a, b) => a.post.scheduledAt.localeCompare(b.post.scheduledAt));
+  const owned = new Set(['email', 'blog', 'github-release', 'x']);
+  const firstBig = queue.find(({ post }) => !owned.has(post.channel));
+  const identityFor = (hash: string, scope: Scope) => (options.mock ? 'go-mock:' : 'go:') +
+    createHash('sha256').update(JSON.stringify([hash, scope])).digest('hex');
+  const diskReceipts = await readReceipts(cwd);
+  const previous = options.mock ? JSON.parse(await readOptional(join(paths.root, 'published.mock.json')) ?? '{"posts":[]}') as { posts: PublishReceipt[] } : diskReceipts;
+  const receipts = [...previous.posts];
+  const confirmedReceipts = [...receipts];
+  const isLiveReceipt = (receipt: PublishReceipt, { post, scope }: typeof queue[number]) => {
+    const subreddit = post.channel === 'reddit' ? frontMatter(post).subreddit : undefined;
+    const destination = post.channel === 'github-release' ? `https://github.com/${scope.account}/releases/` :
+      typeof subreddit === 'string' ? `https://www.reddit.com/r/${subreddit.replace(/^\/?r\//i, '')}/comments/` :
+        scope.route === 'postiz' ? null : undefined;
+    return isLiveReceiptFor(receipt, post, identityFor(post.hash, scope), destination);
+  };
+  const firstBigLive = () => firstBig && confirmedReceipts.some(receipt => isLiveReceipt(receipt, firstBig));
+  const heldReason = firstBig ? 'Waiting for a live receipt of ' + firstBig.post.channel : 'No big post is scheduled; owned follow-ups are held';
   const timeline = queue.map(({ post, scope }) => ({ channel: post.channel, route: scope.route,
-    at: schedule.find(slot => slot.channel === post.channel)!.local, scheduledAt: post.scheduledAt, status: 'queued' }));
+    at: schedule.find(slot => slot.channel === post.channel)!.local, scheduledAt: post.scheduledAt,
+    status: owned.has(post.channel) && !firstBigLive() ? 'held' : 'queued',
+    ...(owned.has(post.channel) && !firstBigLive() ? { reason: heldReason } : {}) }));
   const cost = ['X API: ' + (posts.find(p => p.channel === 'x') ? xCost(posts.find(p => p.channel === 'x')!, config.xApiCost) : 'no X posts'),
     'Paid tools: Postiz / MCP subscription and usage charges may apply; amounts unknown, check your connected plans.'].join('\n');
   log(cost);
-  for (const row of timeline) log(`${row.at} | ${row.channel} | ${row.route} | queued`);
+  for (const row of timeline) log(`${row.at} | ${row.channel} | ${row.route} | ${row.status}`);
   if (!options.confirm) return { mode: 'dry-run' as const, cost, timeline };
-  const diskReceipts = await readReceipts(cwd);
   if (options.mock && diskReceipts.posts.some(post => !post.id.startsWith('go-mock:')))
     throw new Error('Mock publishing requires an isolated launch with no real published receipts');
   if (!options.mock && diskReceipts.posts.some(post => post.id.startsWith('go-mock:')))
@@ -97,8 +117,10 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
     }
     await writeFile(options.mock ? join(paths.root, 'approvals.mock.json') : paths.approvals, JSON.stringify({ approvals }, null, 2) + '\n');
     await writeFile(join(paths.root, 'go-approvals.json'), JSON.stringify(audit, null, 2) + '\n');
-    const previous = options.mock ? JSON.parse(await readOptional(join(paths.root, 'published.mock.json')) ?? '{"posts":[]}') as { posts: PublishReceipt[] } : await readReceipts(cwd);
-    const receipts = [...previous.posts], board: { channel: string; status: string; url?: string; paste?: string }[] = [];
+    const currentReceipts = options.mock ? JSON.parse(await readOptional(join(paths.root, 'published.mock.json')) ?? '{"posts":[]}') as { posts: PublishReceipt[] } : await readReceipts(cwd);
+    receipts.splice(0, receipts.length, ...currentReceipts.posts);
+    confirmedReceipts.splice(0, confirmedReceipts.length, ...currentReceipts.posts);
+    const board: { channel: string; status: string; url?: string; paste?: string; reason?: string }[] = [];
     const adapter = options.adapter ?? (options.mock ? mockAdapter() : liveAdapter());
     const publishedPath = options.mock ? join(paths.root, 'published.mock.json') : paths.published;
     let writes = Promise.resolve();
@@ -114,20 +136,30 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       profiles.set(key, result.then(() => {}, () => {}));
       return result;
     };
-    const identityFor = (hash: string, scope: Scope) => (options.mock ? 'go-mock:' : 'go:') +
-      createHash('sha256').update(JSON.stringify([hash, scope])).digest('hex');
-    if (queue.some(({ post, scope, connectionError }) => !connectionError && post.channel === 'product-hunt' &&
-      !receipts.some(receipt => receipt.id === identityFor(post.hash, scope) && receipt.status === 'published')) && !options.phSubmit &&
+    if (queue.some(entry => !entry.connectionError && entry.post.channel === 'product-hunt' &&
+      !receipts.some(receipt => isLiveReceipt(receipt, entry))) && !options.phSubmit &&
       !await options.ask?.('Product Hunt: confirm final Submit for this launch?'))
       throw new Error('PH final submission needs founder confirmation (--ph-submit after explicit approval)');
-    const completed = await Promise.allSettled(queue.map(async ({ post, connection, scope, connectionError }) => {
+    let finishFirstBig!: () => void;
+    const firstBigFinished = new Promise<void>(resolve => { finishFirstBig = resolve; });
+    const completed = await Promise.allSettled(queue.map(async entry => {
+      const { post, connection, scope, connectionError } = entry;
+      try {
       const identity = identityFor(post.hash, scope);
-      const existing = receipts.find(receipt => receipt.id === identity && receipt.status === 'published');
+      const existing = receipts.find(receipt => isLiveReceipt(receipt, entry));
       if (existing) { board.push({ channel: post.channel, status: 'live', url: existing.url }); log(`${post.channel} | live | ${existing.url}`); return; }
       let remaining = Date.parse(post.scheduledAt) - now().getTime();
       while (!connectionError && !options.noWait && remaining > 0) {
         await (options.sleep ?? setTimeout)(Math.min(remaining, 2147483647));
         remaining = Date.parse(post.scheduledAt) - now().getTime();
+      }
+      if (owned.has(post.channel)) {
+        if (firstBig) await firstBigFinished;
+        if (!firstBigLive()) {
+          board.push({ channel: post.channel, status: 'held', reason: heldReason });
+          log(`${post.channel} | held | ${heldReason}`);
+          return;
+        }
       }
       const dispatch = async () => {
         let receipt: PublishReceipt | undefined;
@@ -177,9 +209,11 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
           if (options.mock) await writeFile(paths.published, JSON.stringify({ posts: receipts }, null, 2) + '\n');
           await warroom(cwd, { readStatus: async () => ({ status: 'published' }) });
         });
+        confirmedReceipts.push(live);
         board.push({ channel: post.channel, status: 'live', url: receipt.url }); log(`${post.channel} | live | ${receipt.url}`);
       };
-      return scope.route === 'browser' ? withProfile(connection.profile ?? 'mock-default', dispatch) : dispatch();
+      return await (scope.route === 'browser' ? withProfile(connection.profile ?? 'mock-default', dispatch) : dispatch());
+      } finally { if (entry === firstBig) finishFirstBig(); }
     }));
     const failure = completed.find(result => result.status === 'rejected');
     if (failure?.status === 'rejected') throw failure.reason;

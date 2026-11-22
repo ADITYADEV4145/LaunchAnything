@@ -6,6 +6,7 @@ Coordinate changes to those with the lead rather than editing them concurrently.
 
 | Phase | Command modules in src/commands/ | Other owned paths |
 | --- | --- | --- |
+| B | recommend | src/recommend/, src/selftest/phaseB.ts, tests/recommend.test.ts; cumulative selftest --through B |
 | 0 | research | src/research/, schemas/pains.schema.json, src/selftest/phase0.ts, tests/phase0.test.ts |
 | 1 | init, scan, validate, plan | src/product/, src/planning/, src/selftest/phase1.ts, tests/phase1.test.ts |
 | 1b | brief | src/brief/, rules/brief.yaml, src/selftest/phase1b.ts, tests/phase1b.test.ts, skill/references/phase1b.md |

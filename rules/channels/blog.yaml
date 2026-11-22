@@ -1,5 +1,7 @@
 kind: channel
 id: blog
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Blog
 profiles: ["b2b-saas","enterprise"]
 bestPostingTimes: ["09:00", "14:00"]

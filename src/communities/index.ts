@@ -38,7 +38,14 @@ export async function fetchCommunities(cwd: string, queries: string[] = [], opti
   for (const hit of hits) { const sub = subFor(hit.url); if (sub) subs.add(sub); }
   if (api.hasReddit) {
     await save(cwd, 'founder-api.json', await api.founder());
-    for (const sub of subs) { const file = path(cwd, `raw/reddit/${sub}.json`); if (!await read(file, null)) { const evidence = await api.subreddit(sub, hits.filter(p => subFor(p.url) === sub)); const check = validateFile('community-evidence', evidence); if (!check.valid) throw new Error(check.errors.join('; ')); await save(cwd, `raw/reddit/${sub}.json`, evidence); } }
+    for (const sub of subs) {
+      const file = `raw/reddit/${sub}.json`; const existing = await read<Evidence | null>(path(cwd, file), null);
+      const newHits = hits.filter(p => subFor(p.url) === sub);
+      const evidence = existing ?? await api.subreddit(sub, []);
+      evidence.searchHits = [...new Map([...(evidence.searchHits ?? []), ...newHits].map(p => [p.url, p])).values()];
+      const check = validateFile('community-evidence', evidence); if (!check.valid) throw new Error(check.errors.join('; '));
+      await save(cwd, file, evidence);
+    }
   }
   await save(cwd, 'hn.json', hn);
   const other = [...new Set(urls.filter(u => !subFor(u)))].map(url => ({ url, host: new URL(url).hostname, kind: new URL(url).hostname === 'news.ycombinator.com' ? 'hn' : new URL(url).hostname === 'github.com' ? 'github' : 'other' }));

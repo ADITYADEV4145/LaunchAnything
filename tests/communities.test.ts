@@ -114,6 +114,26 @@ describe('communities', () => {
     await fetchCommunities(cwd, [], opts); expect(calls).toBe(count);
     await reportCommunities(cwd); expect((await checkCommunities(cwd)).valid).toBe(true);
   });
+  it('merges new query hits into existing subreddit evidence by URL without refetching metadata', async () => {
+    const cwd = await setup(); const calls: string[] = [];
+    const post = (id: string) => ({ data: { ...fixture[0]!.searchHits![0], permalink: `/r/builders/comments/${id}/ask` } });
+    const fetcher = (async (input: string | URL | Request) => {
+      const url = String(input); calls.push(url);
+      const body = url.includes('hn.algolia') ? { hits: [] } : url.includes('/search?') ? { data: { children: url.includes('second') ? [post('a'), post('b'), post('b')] : [post('a')] } } : url.includes('/api/v1/me') ? { total_karma: 200, created_utc: 1700000000 } : url.includes('post_requirements') ? { is_flair_required: false } : url.endsWith('/about/rules') ? { rules: fixture[0]!.rules } : url.endsWith('/about') ? { data: fixture[0]!.about } : { data: { children: [] } };
+      return new Response(JSON.stringify(body));
+    }) as typeof fetch;
+    const opts = { fetch: fetcher, env: { REDDIT_ACCESS_TOKEN: 'fixture-token' } };
+    await fetchCommunities(cwd, ['first'], opts);
+    const file = join(cwd, '.launch/communities/raw/reddit/builders.json'); const before = JSON.parse(await readFile(file, 'utf8'));
+    const count = calls.length; await fetchCommunities(cwd, ['second'], opts);
+    expect(calls.slice(count)).toHaveLength(2); expect(calls.slice(count).every(u => u.includes('/search?'))).toBe(true);
+    const after = JSON.parse(await readFile(file, 'utf8'));
+    expect(after.searchHits.map((p: any) => p.url)).toEqual(['https://www.reddit.com/r/builders/comments/a/ask', 'https://www.reddit.com/r/builders/comments/b/ask']);
+    expect({ ...after, searchHits: [] }).toEqual({ ...before, searchHits: [] });
+    const cachedCount = calls.length; await fetchCommunities(cwd, ['second'], opts); expect(calls).toHaveLength(cachedCount);
+    expect(JSON.parse(await readFile(file, 'utf8'))).toEqual(after);
+    await reportCommunities(cwd); expect((await checkCommunities(cwd)).valid).toBe(true);
+  });
   it('uses browser fallback, caches HN and never calls Reddit without a token', async () => {
     const cwd = await setup(); let calls = 0;
     const fetcher = (async (url: string | URL | Request) => { expect(String(url)).toContain('hn.algolia.com'); calls++; return new Response(JSON.stringify({ hits: [] })); }) as typeof fetch;

@@ -8,11 +8,13 @@ import { browser, escapeHtml, exec } from '../visuals/runtime.js';
 import { maskSecrets } from '../visuals/privacy.js';
 import { dataImage, mediaBrand, optionalJson, storyboard } from './assets.js';
 import { ocrWords, scanBanned, type OcrWord } from './banned.js';
+import { terminalCapHeight, type TerminalRegion } from './terminal.js';
 
 export interface Scores { readability: number; focus: number; brand: number; clutter: number }
 export interface JudgeItem {
   file: string; sha256: string; scored: boolean; timestamp?: number; video?: string;
   banned: string[]; heuristic?: Scores; scores?: Scores; overall?: number; fixes: string[];
+  terminalCapHeight?: number;
   metrics?: { confidence: number; capHeight: number; contrast: number; cornerWordmark: boolean; cornerLogo: boolean; highlightCount: number; wordsPerMegapixel: number; edgeDensity: number; salientArea: number };
 }
 export interface JudgeReport { ok: boolean; items: JudgeItem[]; errors: string[]; contactSheets: string[]; videoSheets: string[]; vision: string }
@@ -240,6 +242,8 @@ export async function judge(cwd: string, options: { heuristicOnly?: boolean; wri
     const planned = await storyboard(cwd); const money = planned?.find(shot => shot.moneyMoment);
     const product = await optionalJson(paths.product); const brand = await mediaBrand(cwd); const logo = await logoReference(app,brand.logo);
     const keywords = (money?.caption ?? '').split(/\s+/).map(normalize).filter(word => word.length >= 4 && !['before','after','your','with','they','from','that','this'].includes(word));
+    const imageRecords = await optionalJson(join(paths.media, 'images/report.json'));
+    const polishedRecords = await optionalJson(join(paths.media, 'polished/manifest.json'));
     for (const asset of assets) {
       const png = await readFile(asset.path); const ocr = await ocrWords(png); const banned = scanBanned(ocr.text);
       const item: JudgeItem = {file:maskSecrets(asset.file),sha256:hash(asset.video ? png : await readFile(resolve(cwd, asset.file))),scored:asset.scored,timestamp:asset.timestamp,video:asset.video ? maskSecrets(asset.video) : undefined,banned,fixes:[]};
@@ -247,6 +251,25 @@ export async function judge(cwd: string, options: { heuristicOnly?: boolean; wri
       if (asset.scored) {
         const measured = measure(PNG.sync.read(png),ocr.words,String(product.name ?? 'Product'),brand.colors,keywords,/\/(?:x|product-hunt-1|og)\.png$/.test(asset.file),logo);
         item.heuristic = measured.scores; item.scores = {...measured.scores}; item.metrics = measured.metrics;
+        let terminalBox: TerminalRegion | undefined;
+        if (asset.video) {
+          const receipt = await optionalJson(resolve(cwd, asset.video) + '.json');
+          let start = 0;
+          for (const scene of receipt.scenes ?? []) {
+            if (asset.timestamp! >= start && asset.timestamp! < start + scene.duration) { terminalBox = scene.terminal?.box; break; }
+            start += scene.duration;
+          }
+        } else {
+          const record = Array.isArray(imageRecords) ? imageRecords.find(record => resolve(paths.media, 'images', record.file) === asset.path) : undefined;
+          const polished = Array.isArray(polishedRecords) ? polishedRecords.find(record => resolve(paths.media, 'polished', record.file) === asset.path) : undefined;
+          terminalBox = record?.terminal?.box ?? polished?.terminalBox;
+        }
+        item.terminalCapHeight = terminalCapHeight(ocr.words, PNG.sync.read(png).height, terminalBox);
+        if (item.terminalCapHeight !== undefined && item.terminalCapHeight < .022) {
+          item.scores.readability = Math.min(item.scores.readability, 5);
+          item.heuristic.readability = item.scores.readability;
+          report.errors.push(`${maskSecrets(asset.file)}: terminal text cap height below 2.2%; reflow the transcript at a larger font, never crop`);
+        }
       }
       report.items.push(item);
     }

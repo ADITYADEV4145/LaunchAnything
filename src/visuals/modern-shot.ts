@@ -92,7 +92,7 @@ async function terminal(cwd: string, shot: MediaShot, page: Page, dir: string, t
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       await exec('ffmpeg', ['-v', 'error', '-y', '-sseof', '-0.1', '-i', outputs[1], '-frames:v', '1', '-threads', '1', outputs[2]], { env: sanitizedEnv(), timeout: 30000 });
     }
-    return { renderer: 'vhs' as const, columns: layout.columns };
+    return { renderer: 'vhs' as const, columns: layout.columns, transcript };
   }
   for (const [index, fraction] of [0.15, 0.4, 0.7, 1].entries()) {
     await page.setContent(`<body style="margin:0;background:#101827;color:#e8f0ff;padding:40px;font:${shot.fontSize ?? 32}px monospace"><pre style="margin:0;white-space:pre">${escapeHtml(layout.text.slice(0, Math.ceil(layout.text.length * fraction)))}</pre>`);
@@ -103,7 +103,7 @@ async function terminal(cwd: string, shot: MediaShot, page: Page, dir: string, t
   for (const [output, args] of [[outputs[0], ['-vf', 'fps=10']], [outputs[1], ['-c:v', 'libx264', '-pix_fmt', 'yuv420p']]] as [string, string[]][]) {
     await exec('ffmpeg', ['-v', 'error', '-y', '-framerate', '1', '-i', join(scratch, 'frame-%04d.png'), ...args, '-threads', '1', output], { env: sanitizedEnv(), timeout: 120000 });
   }
-  return { renderer: 'html' as const, columns: layout.columns };
+  return { renderer: 'html' as const, columns: layout.columns, transcript };
 }
 export async function captureModernShot(cwd: string, shot: MediaShot, app: Browser, dir: string, url: string | undefined, config: { redact?: string[]; brandKit?: string }) {
   const tapes = join(dir, '..', 'tapes'); await mkdir(tapes, { recursive: true });
@@ -124,6 +124,7 @@ export async function captureModernShot(cwd: string, shot: MediaShot, app: Brows
       const highlights: Partial<Record<'light' | 'dark', Box>> = {};
       let highlight: Box | undefined; let redactedCount = 0; let renderer: 'vhs' | 'html' | 'playwright' = 'playwright';
       let columns: number | undefined;
+      let transcript: string | undefined;
       let width = 0, height = 0; const scale = shot.commands ? 1 : shot.deviceScale ?? 2;
       const themes = shot.commands ? [shot.theme ?? 'dark'] : shot.themes ?? [shot.theme ?? 'light'];
       for (const theme of themes) {
@@ -137,7 +138,7 @@ export async function captureModernShot(cwd: string, shot: MediaShot, app: Brows
               const brand = JSON.parse(await readFile(resolve(cwd, config.brandKit), 'utf8'));
               terminalTheme = brand.terminalTheme ?? brand.theme;
             }
-            ({ renderer, columns } = await terminal(cwd, shot, page, dir, tape, scratch, terminalTheme));
+            ({ renderer, columns, transcript } = await terminal(cwd, shot, page, dir, tape, scratch, terminalTheme));
             png = await readFile(join(dir, name)); files.push(`${shot.id}.gif`, `${shot.id}.mp4`);
           } else if (shot.card) {
             clean(shot.caption ?? '', 0);
@@ -185,7 +186,7 @@ export async function captureModernShot(cwd: string, shot: MediaShot, app: Brows
       }
       for (const file of files.filter(file => /\.(gif|mp4)$/.test(file))) await sample(join(dir, file), check);
       const actualScale = shot.commands ? renderer === 'vhs' ? 1 : shot.deviceScale ?? 2 : scale;
-      return { id: shot.id, kind: shot.commands ? 'terminal' : shot.viewport.width < 600 ? 'mobile' : 'web', files, width, height, columns, redactedCount, secretsFound: 0, ocr: true, purpose: shot.purpose, caption: shot.caption, moneyMoment: shot.moneyMoment ?? false, variants, highlight, highlights, renderer, scale: actualScale, banned: [] as string[] };
+      return { id: shot.id, kind: shot.commands ? 'terminal' : shot.viewport.width < 600 ? 'mobile' : 'web', files, width, height, columns, transcript, redactedCount, secretsFound: 0, ocr: true, purpose: shot.purpose, caption: shot.caption, moneyMoment: shot.moneyMoment ?? false, variants, highlight, highlights, renderer, scale: actualScale, banned: [] as string[] };
     } catch (error) {
       await cleanup();
       if (!(error instanceof BannedFrame)) throw error;

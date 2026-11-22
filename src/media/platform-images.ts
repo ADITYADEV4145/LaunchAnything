@@ -7,9 +7,10 @@ import { platforms, checkImage, contrast, type Size } from '../visuals/check.js'
 import { assertClean, ocrWords } from './banned.js';
 import { mediaBrand, dataImage, mediaHost, storyboard } from './assets.js';
 import { polish } from './polish.js';
-export interface CarouselSlide { role: string; caption: string; source?: string; id?: string }
+import { terminalSource, renderTerminal, type TerminalTranscript, type TerminalMetrics } from './terminal.js';
+export interface CarouselSlide { role: string; caption: string; source?: string; id?: string; terminal?: TerminalTranscript }
 export interface CarouselOptions { size?: Size; outDir?: string; prefix?: string }
-export type CarouselReportItem = Awaited<ReturnType<typeof checkImage>> & { file: string; role: string; shot?: string; source: string | null; banned: string[] };
+export type CarouselReportItem = Awaited<ReturnType<typeof checkImage>> & { file: string; role: string; shot?: string; source: string | null; banned: string[]; terminal?: TerminalMetrics };
 /** Render local image slides or caption-only brand cards without shots.yaml. One slide uses prefix.png; multiple slides use prefix-1.png, etc. */
 export async function renderCarousel(cwd: string, slides: CarouselSlide[], options: CarouselOptions = {}): Promise<{ files: string[]; report: CarouselReportItem[] }> {
   if (!slides.length) throw new Error('Carousel requires at least one slide');
@@ -30,15 +31,17 @@ export async function renderCarousel(cwd: string, slides: CarouselSlide[], optio
   const app = await browser(); const report: CarouselReportItem[] = [];
   try {
     for (const [index, slide] of slides.entries()) {
-      const dimensions = platforms[size]; const titleCard = !slide.source;
+      const dimensions = platforms[size]; const titleCard = !slide.source && !slide.terminal;
       const source = slide.source ? resolve(cwd, slide.source) : null;
+      const transcript = slide.terminal ?? (source ? await terminalSource(cwd, source) : undefined);
+      let terminal: TerminalMetrics | undefined;
       const headline = slide.caption;
       const filename = `${prefix}${slides.length > 1 ? `-${index + 1}` : ''}.png`;
       assertClean(`${product.name}\n${headline}`, `image ${filename}`);
       const values: Record<string, string> = {
         ...brand.colors, foreground, title: product.name, headline, logo: brand.logo,
         screenshot: source ? await dataImage(source) : '', host,
-        classes: [size === 'instagram' ? 'portrait' : '', titleCard ? 'title-card' : '', brand.logo ? 'has-logo' : ''].join(' '),
+        classes: [size === 'instagram' ? 'portrait' : '', titleCard ? 'title-card' : '', brand.logo ? 'has-logo' : '', transcript ? 'terminal-image' : ''].join(' '),
         eyebrow: labels[slide.role] ?? '', pagination: slides.length > 1 ? `${index + 1} / ${slides.length}` : '',
       };
       const file = join(dir, filename); await rm(file, { force: true });
@@ -47,6 +50,14 @@ export async function renderCarousel(cwd: string, slides: CarouselSlide[], optio
         await page.route('**/*', route => route.abort());
         await page.setContent(template.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(values[key] ?? '')));
         await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].filter(image => image.getAttribute('src')).map(image => image.decode())); });
+        if (transcript) {
+          const stage = (await page.locator('.stage').boundingBox())!;
+          const portrait = dimensions.height > dimensions.width;
+          const rendered = await renderTerminal(app, transcript, { width: stage.width, height: stage.height, minCapHeight: dimensions.height * (portrait ? .022 : .025), columns: portrait ? 44 : 80, title: product.name, accent: brand.colors.accent });
+          await page.locator('.stage img').evaluate(async (image: HTMLImageElement, src) => { image.src = src; await image.decode(); }, `data:image/png;base64,${rendered.png.toString('base64')}`);
+          const scale = Math.min(stage.width / rendered.width, stage.height / rendered.height);
+          terminal = { ...rendered.terminal, capHeight: rendered.terminal.capHeight * scale, box: { x: stage.x + (stage.width - rendered.width * scale) / 2 + rendered.terminal.box.x * scale, y: stage.y + (stage.height - rendered.height * scale) / 2 + rendered.terminal.box.y * scale, width: rendered.terminal.box.width * scale, height: rendered.terminal.box.height * scale } };
+        }
         assertClean(await page.locator('body').innerText(), `image ${filename}`);
         const metrics = await page.locator('[data-headline]').evaluate(el => {
           const box = el.getBoundingClientRect(); const style = getComputedStyle(el);
@@ -56,7 +67,7 @@ export async function renderCarousel(cwd: string, slides: CarouselSlide[], optio
         await writeFile(file, png);
         const result = await checkImage(file, size, metrics);
         result.checks.contrast = result.contrastRatio >= 7; result.ok = Object.values(result.checks).every(Boolean);
-        report.push({ ...result, file: filename, role: slide.role, shot: slide.id, source, banned: [] as string[] });
+        report.push({ ...result, file: filename, role: slide.role, shot: slide.id, source, terminal, banned: [] as string[] });
       } catch (error) { await rm(file, { force: true }); throw error; }
       finally { await page.close(); }
     }

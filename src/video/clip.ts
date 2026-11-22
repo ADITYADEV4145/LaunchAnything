@@ -9,14 +9,15 @@ import { formats, fileHash, remotionCli, run, type Format } from './render.js';
 import { mixAudio } from './audio.js';
 import type { SceneRole } from './script.js';
 import { contrast } from '../visuals/check.js';
+import { terminalSource, renderTerminal, type TerminalTranscript, type TerminalMetrics } from '../media/terminal.js';
 
-export interface ClipScene { role?: SceneRole; caption: string; source: string; duration: number; highlight?: { x: number; y: number; width: number; height: number } }
+export interface ClipScene { role?: SceneRole; caption: string; source: string; duration: number; highlight?: { x: number; y: number; width: number; height: number }; terminal?: TerminalTranscript }
 export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion' }
 export interface ClipFrame { x: number; y: number; width: number; height: number; kind: string }
 export interface ClipReceipt {
   sha256: string; format: Format; captions: 'burned'; renderer: 'ffmpeg' | 'remotion'; duration: number;
   audio: Awaited<ReturnType<typeof mixAudio>>; author: string; logo: 'logo' | 'wordmark';
-  scenes: (ClipScene & { frame: ClipFrame; crop?: {x:number;y:number;width:number;height:number}; captionFont: number; captionContrast: number })[];
+  scenes: (Omit<ClipScene, 'terminal'> & { terminal?: TerminalMetrics; frame: ClipFrame; crop?: {x:number;y:number;width:number;height:number}; captionFont: number; captionContrast: number })[];
 }
 
 /** Render local footage with branded captions, music and optional indexed voice files; durations are used verbatim, plus a 3-second end card. No shots.yaml is required. */
@@ -35,19 +36,28 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
   assertClean(`${name}\n${host}\n${scenes.map(scene => scene.caption).join('\n')}`, 'clip captions');
   const work = await mkdtemp(join(dirname(file), '.clip-')); const app = await browser();
   const duration = scenes.reduce((sum, scene) => sum + scene.duration, 3);
-  const assets: { plate: string; caption: string; ring: string; source: string; bare: boolean; crop?: {x:number;y:number;width:number;height:number}; highlight?: ClipScene['highlight']; frame: {x:number;y:number;width:number;height:number;kind:string} }[] = [];
+  const assets: { plate: string; caption: string; ring: string; source: string; bare: boolean; terminal?: TerminalMetrics; crop?: {x:number;y:number;width:number;height:number}; highlight?: ClipScene['highlight']; frame: {x:number;y:number;width:number;height:number;kind:string} }[] = [];
   const pieces: string[] = [];
   try {
     const all = [...scenes, { role: 'cta' as const, caption: name, source: scenes[0].source, duration: 3 }];
     for (const [index, scene] of all.entries()) {
       const end = index === scenes.length; const card = end || scene.role === 'hook' || scene.role === 'cta';
-      const source = resolve(cwd, scene.source); await access(source);
+      let source = resolve(cwd, scene.source); await access(source);
       if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(source)) throw new Error('Clip sources must be local images or video');
       const probe = JSON.parse((await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', source])).stdout).streams[0];
-      const box = scene.highlight;
+      let box = scene.highlight;
+      let terminal: TerminalMetrics | undefined;
+      const transcript = !card ? scene.terminal ?? await terminalSource(cwd, source) : undefined;
+      if (transcript) {
+        const rendered = await renderTerminal(app, transcript, { width: width * .94, height: height * .57, minCapHeight: height * (format === '16x9' ? .025 : .0225), columns: format === '16x9' ? 80 : 44, title: name, accent: brand.colors.accent });
+        source = join(work, `${index}-terminal.png`); await writeFile(source, rendered.png);
+        probe.width = rendered.width; probe.height = rendered.height;
+        box = rendered.highlight; terminal = rendered.terminal;
+      }
       const scale = Math.min(width * .94 / probe.width, height * .57 / probe.height);
       const fw = Math.max(2, Math.floor(probe.width * scale / 2) * 2), fh = Math.max(2, Math.floor(probe.height * scale / 2) * 2);
       const frame = { x: Math.round((width - fw) / 2), y: Math.round(height * .15 + (height * .57 - fh) / 2), width: fw, height: fh, kind: 'terminal' };
+      if (terminal) terminal = { ...terminal, capHeight: terminal.capHeight * fh / probe.height, box: { x: frame.x + terminal.box.x * fw / probe.width, y: frame.y + terminal.box.y * fh / probe.height, width: terminal.box.width * fw / probe.width, height: terminal.box.height * fh / probe.height } };
       const highlight = !card && box ? { x: frame.x + box.x * fw / probe.width - 5, y: frame.y + box.y * fh / probe.height - 5, width: box.width * fw / probe.width + 10, height: box.height * fh / probe.height + 10 } : undefined;
       const page = await app.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
       const plate = join(work, `${index}-plate.png`), caption = join(work, `${index}-caption.png`), ring = join(work, `${index}-ring.png`);
@@ -62,7 +72,7 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
         const captionPng = await page.screenshot({ omitBackground: true }); assertClean((await ocrWords(captionPng)).text, 'clip caption plate'); await writeFile(caption, captionPng);
         await page.addStyleTag({ content: '.caption{visibility:hidden}.ring{visibility:visible}' }); await page.screenshot({ path: ring, omitBackground: true });
       } finally { await page.close(); }
-      assets.push({ plate, caption, ring, source, frame, bare: true, highlight });
+      assets.push({ plate, caption, ring, source, frame, bare: true, highlight, terminal });
       if (cli) continue;
       const piece = join(work, `${index}.mp4`); const video = /\.(mp4|webm)$/i.test(source);
       const footage = card ? '[0:v]null[base]' : `[1:v]fps=12,scale=${fw}:${fh}[shot];[0:v][shot]overlay=${frame.x}:${frame.y}[base]`;
@@ -93,7 +103,7 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
       await run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', join(work, 'concat.txt'), '-c', 'copy', silent]);
     }
     const audio = await mixAudio(cwd, work, silent, file, scenes.map(scene => scene.duration), options.voice ?? [], options.music);
-    const receipt: ClipReceipt = { sha256: await fileHash(file), format, captions: 'burned', renderer: cli ? 'remotion' : 'ffmpeg', duration, audio, author: 'Aditya', scenes: scenes.map((scene, index) => ({ ...scene, frame: assets[index].frame, crop: assets[index].crop, highlight: assets[index].highlight, captionFont: height * (scene.role === 'hook' || scene.role === 'cta' ? .065 : .048), captionContrast: contrast([255,255,255], [16,24,39]) })), logo: brand.logo ? 'logo' : 'wordmark' };
+    const receipt: ClipReceipt = { sha256: await fileHash(file), format, captions: 'burned', renderer: cli ? 'remotion' : 'ffmpeg', duration, audio, author: 'Aditya', scenes: scenes.map((scene, index) => ({ ...scene, terminal: assets[index].terminal, frame: assets[index].frame, crop: assets[index].crop, highlight: assets[index].highlight, captionFont: height * (scene.role === 'hook' || scene.role === 'cta' ? .065 : .048), captionContrast: contrast([255,255,255], [16,24,39]) })), logo: brand.logo ? 'logo' : 'wordmark' };
     await writeFile(`${file}.json`, JSON.stringify(receipt, null, 2)); return { file, duration, receipt };
   } catch (error) { await rm(file, { force: true }); await rm(`${file}.json`, { force: true }); throw error; }
   finally { await app.close(); await rm(work, { recursive: true, force: true }); }

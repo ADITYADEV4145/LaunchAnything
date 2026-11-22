@@ -49,7 +49,7 @@ it('judges a clean storyboard set and rendered frames, scans unbranded raw captu
   await overrides(cwd,result.items); expect((await judge(cwd)).items).toHaveLength(result.items.length);
 },120000);
 
-it('scores a letterboxed terminal with a readable main caption independently of small UI copy and corner branding',async()=>{
+it('fails tiny terminal text even when the main caption is readable, including video frames and vision overrides',async()=>{
   const cwd=await fixture(); const path=join(cwd,'.launch/media/images/portrait.png');
   const app=await browser();
   try {
@@ -57,10 +57,16 @@ it('scores a letterboxed terminal with a readable main caption independently of 
     await page.setContent(`<body style="margin:0;background:#101827;color:white;font-family:Arial"><header style="position:absolute;left:36px;top:40px;font-size:32px">Scope</header><pre style="position:absolute;left:50px;top:400px;font-size:13px">${Array(6).fill('BLOCK grounding: inspect the missing export in local source').join('\n')}</pre><div style="position:absolute;left:36px;top:900px;width:640px;border-left:5px solid #77e5b3;font-size:60px;font-weight:bold;padding:15px">Catch unknown exports before they ship</div></body>`);
     await page.screenshot({path});
   } finally { await app.close(); }
-  const item=(await judge(cwd)).items.find(item=>item.file.endsWith('/portrait.png'))!;
+  await exec('ffmpeg',['-y','-v','error','-loop','1','-i',path,'-t','1','-r','12','-c:v','libx264','-pix_fmt','yuv420p','-threads','1',join(cwd,'.launch/video/portrait.mp4')]);
+  await expect(judge(cwd)).rejects.toThrow('terminal text cap height below 2.2%');
+  const saved=await report(cwd);
+  const item=saved.items.find(item=>item.file.endsWith('/portrait.png'))!;
   expect(item.scores!.focus).toBeGreaterThanOrEqual(8);
-  expect(item.scores!.readability).toBeGreaterThanOrEqual(8);
-});
+  expect(item.terminalCapHeight).toBeLessThan(.022);
+  expect(saved.items.find(item=>item.video)?.terminalCapHeight).toBeLessThan(.022);
+  await overrides(cwd,saved.items);
+  await expect(judge(cwd)).rejects.toThrow('terminal text cap height below 2.2%');
+},120000);
 
 it('fails banned video frames with timestamps and rule names, without reproducing OCR content',async()=>{
   const cwd=await fixture(); const bad=join(cwd,'bad.png'); await picture(bad,'sed log | grep fixtures/');

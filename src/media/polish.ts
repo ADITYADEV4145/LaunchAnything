@@ -6,11 +6,13 @@ import { packageRoot } from '../core/package-root.js';
 import { browser, escapeHtml } from '../visuals/runtime.js';
 import { assertClean, ocrWords } from './banned.js';
 import { mediaBrand, homepageHost, storyboard } from './assets.js';
+import type { TerminalRegion } from './terminal.js';
 
 export interface PolishedShot {
   id: string; file: string; source: string; theme: string; kind: string; purpose?: string; caption?: string; moneyMoment: boolean;
   width: number; height: number; scale: number; banned: string[];
   highlight?: { x: number; y: number; width: number; height: number };
+  terminalBox?: TerminalRegion;
 }
 export async function polish(cwd: string): Promise<PolishedShot[]> {
   const paths = launchDir(cwd); const shots = await storyboard(cwd);
@@ -64,7 +66,8 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
           await writeFile(destination, output); const { width, height } = PNG.sync.read(output);
           const area = await page.locator('.content').boundingBox();
           const highlight = box && area ? { x: (area.x + box.x / crop.width * area.width) * 2, y: (area.y + box.y / crop.height * area.height) * 2, width: box.width / crop.width * area.width * 2, height: box.height / crop.height * area.height * 2 } : undefined;
-          report.push({ id: shot.id, file, source, theme, kind: capture.kind, purpose: shot.purpose, caption: shot.caption, moneyMoment: shot.moneyMoment ?? false, width, height, scale: 2, highlight, banned: [] });
+          const terminalBox = capture.kind === 'terminal' && area ? { x: area.x * 2, y: area.y * 2, width: area.width * 2, height: area.height * 2 } : undefined;
+          report.push({ id: shot.id, file, source, theme, kind: capture.kind, purpose: shot.purpose, caption: shot.caption, moneyMoment: shot.moneyMoment ?? false, width, height, scale: 2, highlight, terminalBox, banned: [] });
         } catch (error) { await rm(destination, { force: true }); throw error; }
         finally { await page.close(); }
       }

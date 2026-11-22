@@ -201,7 +201,8 @@ npm run dev -- doctor
 npm run build
 npm run typecheck
 npm test
-node dist/cli.js selftest --through 6 --json
+node dist/cli.js selftest --through 6 --json   # baseline launch workflow
+node dist/cli.js selftest --through B --json   # every phase, including media and recommend
 ```
 
 See [contributor ownership and fixture guidance](CONTRIBUTING/AGENTS.md)

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromeLint, readcheck, sceneDuration, scriptFromShots, srt, totalDuration } from '../src/video/script.js';
+import { chromeLint, readcheck, sceneDuration, scriptFromShots, srt, totalDuration, words } from '../src/video/script.js';
 import * as polishing from '../src/media/polish.js';
 import { endCardGate, motionGates, transcriptCoverage, voiceGate } from '../src/video/check.js';
 import { run } from '../src/video/render.js';
@@ -47,10 +47,10 @@ describe('video gates',() => {
     expect(chromeLint(script).status).toBe('pass');
     expect(chromeLint({scenes:[]}).status).toBe('pass');
   });
-  it('gives a generated eight-word hook enough reading time in both cuts',async () => {
+  it.each(['Keep every local change private on your device','Keep every local change safely stored and available on your own device'])('gives a generated hook reading and narration time in both cuts: %s',async caption => {
     const cwd=await mkdtemp(join(tmpdir(),'video-hook-')); dirs.push(cwd);
     await mkdir(join(cwd,'.launch/media/polished'),{recursive:true});
-    const shots=['hook','before','after','cta'].map(purpose=>({id:purpose,purpose,card:true,moneyMoment:purpose==='after',viewport:{width:800,height:600},caption:purpose==='hook'?'Keep every local change private on your device':'Keep work private'}));
+    const shots=['hook','before','after','cta'].map(purpose=>({id:purpose,purpose,card:true,moneyMoment:purpose==='after',viewport:{width:800,height:600},caption:purpose==='hook'?caption:'Keep work private'}));
     await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots}));
     await writeFile(join(cwd,'.launch/media/polished/frame.png'),'captured image');
     vi.spyOn(polishing,'polish').mockResolvedValue(shots.map(shot=>({id:shot.id,file:'frame.png',theme:'light'})) as never);
@@ -60,6 +60,8 @@ describe('video gates',() => {
       expect(totalDuration(generated,format)).toBeLessThanOrEqual(format==='9x16'?35:60);
     }
     expect(generated.scenes[0].duration).toBeGreaterThan(3);
+    expect(generated.scenes[0].duration).toBeGreaterThanOrEqual(words(caption).length/2.8+.25);
+    expect(generated.scenes[0].shortDuration).toBe(generated.scenes[0].duration);
   });
   it('measures the final scene boundary against the file duration',() => {
     expect(endCardGate(script,6.25).status).toBe('pass');

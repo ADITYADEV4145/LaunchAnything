@@ -67,7 +67,8 @@ footage in the frame. No generated product imagery.
 Product Hunt ≤180s), render caption receipt plus matching SRT, and audio loudness
 when audio exists. It also reports G0 moves (clean decode and sampled frame diff),
 G1 no-black (blackdetect), G2 no-freeze (no hold longer than 3 seconds), G3 readcheck
-(generated hooks use their minimum reading time, normally ≤3 seconds),
+(generated hooks use the greater of minimum reading time and narration at 2.8
+words/s plus 0.25s padding, rounded up to a frame and normally ≤3 seconds),
 (text ≥0.5s + words/3, voiceover ≤2.8 words/s, SRT scene cue map), G4 no-page-chrome
 (no counters or progress markers), G5 end-card (3s ±0.25), and G6 voice-stt (≥80%
 normalized script word coverage via local whisper or whisper-cli on scene-aligned

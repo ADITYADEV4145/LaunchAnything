@@ -1,6 +1,6 @@
 import { checked } from './files.js';
 
-export const metricNames = ['views', 'likes', 'comments', 'clicks', 'starsDelta', 'signups'] as const;
+export const metricNames = ['views', 'likes', 'comments', 'clicks', 'starsDelta', 'signups', 'waitlistConversions'] as const;
 type Metric = typeof metricNames[number];
 export type Metrics = Partial<Record<Metric, number>>;
 export interface ResultChannel extends Metrics { channel: string }
@@ -13,17 +13,40 @@ export interface Comment {
   id: string; author: string; body: string; answered: boolean; url?: string; likes?: number;
 }
 export interface PostObservation {
-  metrics?: Metrics; owned?: boolean; comments?: Comment[]; hook?: string;
+  metrics?: Metrics; owned?: boolean; comments?: Comment[]; hook?: string; angle?: string;
+  utmContent?: string; copy?: string; judge?: Judgement;
 }
 export interface ObservedPost extends PublishedPost, PostObservation {}
 export interface ResultConfig { profile: string; launchDate: string; timezone: string }
+export interface Judgement { score: number; dimensions?: Record<string, number> }
 
-function record(value: unknown): Record<string, unknown> {
+export function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected an object');
   return value as Record<string, unknown>;
 }
-const nonempty = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+export const nonempty = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+export const validUtmContent = (value: unknown): value is string =>
+  typeof value === 'string' && /^[\w.~:-]{1,200}$/.test(value);
 export const postKey = (channel: string, id: string) => JSON.stringify([channel, id]);
+
+function textField(data: Record<string, unknown>, key: string, channel: string) {
+  const value = data[key];
+  if (value !== undefined && !nonempty(value)) throw new Error(`Invalid ${channel} ${key}`);
+  return value;
+}
+
+function normalizeJudge(value: unknown, channel: string): Judgement | undefined {
+  if (value === undefined) return;
+  const { score, dimensions } = record(value);
+  const valid = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 100;
+  if (!valid(score)) throw new Error(`Invalid ${channel} judge score; expected 0–100`);
+  if (dimensions === undefined) return { score };
+  const values = Object.entries(record(dimensions)).map(([key, n]) => {
+    if (!/^[a-z][a-z0-9_-]{0,63}$/.test(key) || !valid(n)) throw new Error(`Invalid ${channel} judge dimension`);
+    return [key, n] as const;
+  });
+  return { score, dimensions: Object.fromEntries(values) };
+}
 
 export function normalizeObservation(raw: unknown, channel: string): PostObservation {
   const data = record(raw);
@@ -41,8 +64,8 @@ export function normalizeObservation(raw: unknown, channel: string): PostObserva
   }
   const owned = data.owned;
   if (owned !== undefined && typeof owned !== 'boolean') throw new Error(`Invalid ${channel} ownership flag`);
-  const hook = data.hook;
-  if (hook !== undefined && !nonempty(hook)) throw new Error(`Invalid ${channel} hook`);
+  const { utmContent } = data;
+  if (utmContent !== undefined && !validUtmContent(utmContent)) throw new Error(`Invalid ${channel} utmContent`);
   let comments: Comment[] | undefined;
   if (data.comments !== undefined) {
     if (!Array.isArray(data.comments)) throw new Error(`Invalid ${channel} comments`);
@@ -57,7 +80,9 @@ export function normalizeObservation(raw: unknown, channel: string): PostObserva
       return { id, author, body, answered, url, likes };
     });
   }
-  return { metrics, owned, comments, hook };
+  return { metrics, owned, comments, utmContent, hook: textField(data, 'hook', channel),
+    angle: textField(data, 'angle', channel), copy: textField(data, 'copy', channel),
+    judge: normalizeJudge(data.judge, channel) };
 }
 
 export function manualObservations(raw: unknown, published: PublishedPost[]) {

@@ -39,12 +39,14 @@ export function restrictions(rules: { short_name: string; description: string }[
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed) {
-    const context = source.replace(new RegExp(`(?<![\\w./:])${zonePattern}(?![\\w/])`, 'gi'), token => ' '.repeat(token.length))
-      .replace(new RegExp(`\\b(?:(?:${weekdays.join('|')})s?|weekends?|at|from|between|to|and|in|on|only|post|posting|time)\\b`, 'gi'), token => ' '.repeat(token.length));
-    const before = context.slice(0, parsed.index).split('\n\n').at(-1)!;
-    const after = context.slice(parsed.index! + parsed[0].length).split('\n\n')[0]!;
-    const unknown = /(\p{Lu}[\p{L}\p{M}-]*)[\s()[\],:]*$/u.exec(before)?.[1] ?? /^[\s()[\],:]*(\p{Lu}[\p{L}\p{M}-]*)/u.exec(after)?.[1];
-    if (unknown) manualReview = `Unrecognized rule timezone or place: ${unknown}`;
+    const before = source.slice(0, parsed.index).split('\n\n').at(-1)!;
+    const after = source.slice(parsed.index! + parsed[0].length).split('\n\n')[0]!;
+    const attachedZone = new RegExp(`^[ \\t]*[(\\[]?[ \\t]*(?:(?:in|at)[ \\t]+)?${zonePattern}(?![\\w/])`, 'i').test(after) || new RegExp(`\\b${zonePattern}[ \\t]*$`, 'i').test(before);
+    if (!attachedZone) {
+      const previous = /^(?:at|from|between)\b/i.test(parsed[0]) ? /(\p{Lu}[\p{L}\p{M}-]*)(?:[ \t]+time)?[ \t]+$/u.exec(before)?.[1] : /\b(?:in|at)[ \t]+(\p{Lu}[\p{L}\p{M}-]*)[ \t]+$/u.exec(before)?.[1];
+      const unknown = /^[ \t]*[(\[]?[ \t]*(?:(?:in|at)[ \t]+)?(\p{Lu}[\p{L}\p{M}-]*)/u.exec(after)?.[1] ?? previous;
+      if (unknown && !new RegExp(`^(?:(?:${weekdays.join('|')})s?|weekends?|at|from|between|to|and|in|on|only|post|posting|time)$`, 'i').test(unknown)) manualReview = `Unrecognized rule timezone or place: ${unknown}`;
+    }
   }
   if (threadUrls.length && !threadUrl) manualReview = 'Unresolved thread destination; manual review required';
   return { days: [...new Set(days)], megathread: threadUrls.length > 0 || /mega[-_ ]?thread|weekly[-_ ]thread|(?:self[-_ ]promo|promo)[-_ ]thread/i.test(raw), threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview };

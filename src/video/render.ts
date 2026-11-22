@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { launchDir } from '../core/launch-dir.js';
 import { packageRoot } from '../core/package-root.js';
-import { endCardSeconds, loadScript, resolveShot, srt, totalDuration } from './script.js';
+import { endCardSeconds, loadScript, resolveShot, srt, totalDuration, sceneDuration } from './script.js';
+import { renderClip } from './clip.js';
 import { branding, endAsset, frameLayout, sceneAssets } from './design.js';
 import { detectContent } from './crop.js';
 
@@ -41,12 +42,27 @@ export async function remotionCli(cwd: string): Promise<string | undefined> {
     }
   }
 }
-export async function render(cwd: string, renderer = 'auto', selected: Format[] = parseFormats()) {
+export async function render(cwd: string, renderer = 'auto', selected: Format[] = parseFormats(), options: { music?: string } = {}) {
   if (!['auto','remotion','ffmpeg'].includes(renderer)) throw new Error('Renderer must be auto, remotion or ffmpeg');
   const script = await loadScript(cwd);
   const dir = launchDir(cwd).video;
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'captions.srt'), srt(script));
+  if (script.scenes.some(scene => scene.role) || options.music) {
+    const voices = await Promise.all(script.scenes.map(async (_, index) => {
+      for (const ext of ['mp3', 'wav']) { const path = join(dir, 'vo', `${index}.${ext}`); if (await exists(path)) return path; }
+      return undefined;
+    }));
+    const results = [];
+    for (const format of selected) {
+      const scenes = await Promise.all(script.scenes.map(async scene => ({ role: scene.role, caption: scene.text, source: await resolveShot(cwd, scene.shot), duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)), highlight: scene.highlight })));
+      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music });
+      await writeFile(`${result.file}.json`, JSON.stringify({ ...result.receipt, script: JSON.stringify(script) }, null, 2));
+      await writeFile(join(dir, `captions-${format}.srt`), srt({ scenes: script.scenes.map(scene => ({ ...scene, duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)) })) }));
+      results.push(result);
+    }
+    return { renderer: results[0]?.receipt.renderer ?? renderer, files: results.map(result => result.file), captions: join(dir, 'captions.srt') };
+  }
   const cli = renderer === 'ffmpeg' ? undefined : await remotionCli(cwd);
   if (renderer === 'remotion' && !cli) throw new Error('Remotion is not installed. Install templates/video/remotion dependencies locally or use --renderer ffmpeg.');
   const chosen = cli ? 'remotion' : 'ffmpeg';

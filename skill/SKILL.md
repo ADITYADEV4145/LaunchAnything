@@ -120,6 +120,8 @@ Future: capture real product screenshots, redact secrets and compose launch imag
 
 ## video — phase 4
 
+For a storyboard, run `liftoff video script --from-shots`, optionally `liftoff video voice --dry-run` then `liftoff video voice` (ElevenLabs key required), and `liftoff video --renderer ffmpeg`. Music defaults to a local generated pad; use `--music <file>` or `brandKit.music` to supply a bed. With Remotion installed, run `npx skills add remotion-dev/skills` and follow its video-shotcraft recipes; the same roles, branding, captions and highlights are passed to both renderers. No voice key means captions-only, not an error.
+
 Future: render real-footage demos and vertical cuts with optional-tool fallbacks.
 
 ## review and publish — phase 5

@@ -5,11 +5,12 @@ import { launchDir } from '../core/launch-dir.js';
 import { packageRoot } from '../core/package-root.js';
 import { browser, escapeHtml } from '../visuals/runtime.js';
 import { assertClean, ocrWords } from './banned.js';
-import { dataImage, mediaBrand, homepageHost, storyboard } from './assets.js';
+import { mediaBrand, homepageHost, storyboard } from './assets.js';
 
 export interface PolishedShot {
   id: string; file: string; source: string; theme: string; kind: string; purpose?: string; caption?: string; moneyMoment: boolean;
   width: number; height: number; scale: number; banned: string[];
+  highlight?: { x: number; y: number; width: number; height: number };
 }
 export async function polish(cwd: string): Promise<PolishedShot[]> {
   const paths = launchDir(cwd); const shots = await storyboard(cwd);
@@ -31,21 +32,29 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
         const source = join(paths.media, 'shots', file); const png = await readFile(source); const image = PNG.sync.read(png);
         const ocr = await ocrWords(png); assertClean(ocr.text, `source ${shot.id}`);
         const mobile = capture.kind === 'mobile' || shot.viewport.width < 600;
-        const box = capture.highlights?.[theme] ?? capture.highlight;
-        const bottom = Math.max(0, ...ocr.words.map(word => word.y + word.height), box ? box.y + box.height : 0);
-        const visibleHeight = capture.kind === 'terminal' && ocr.words.length ? Math.min(image.height, Math.max(image.height * .35, bottom + 64 * (capture.scale ?? 1))) : image.height;
-        const frameWidth = Math.min(mobile ? 340 : 1272, 700 * image.width / visibleHeight);
-        const contentHeight = frameWidth * visibleHeight / image.width;
+        const originalBox = capture.highlights?.[theme] ?? capture.highlight;
+        let crop = { x: 0, y: 0, width: image.width, height: image.height };
+        if (capture.kind === 'terminal' && ocr.words.length) {
+          const padding = 40 * (capture.scale ?? 1);
+          const x = Math.max(0, Math.floor(Math.min(...ocr.words.map(word => word.x)) - padding));
+          const y = Math.max(0, Math.floor(Math.min(...ocr.words.map(word => word.y)) - padding));
+          crop = { x, y, width: Math.min(image.width, Math.ceil(Math.max(...ocr.words.map(word => word.x + word.width)) + padding)) - x, height: Math.min(image.height, Math.ceil(Math.max(...ocr.words.map(word => word.y + word.height)) + padding)) - y };
+        }
+        const cropped = new PNG({ width: crop.width, height: crop.height }); PNG.bitblt(image, cropped, crop.x, crop.y, crop.width, crop.height, 0, 0);
+        const box = originalBox ? { ...originalBox, x: originalBox.x - crop.x, y: originalBox.y - crop.y } : undefined;
+        const visibleHeight = crop.height;
+        const frameWidth = Math.min(mobile ? 340 : 1272, 700 * crop.width / visibleHeight);
+        const contentHeight = frameWidth * visibleHeight / crop.width;
         const host = homepageHost(product.homepage ?? product.homepageUrl ?? product.url);
         const values: Record<string, string> = {
           ...brand.colors, frameWidth: String(frameWidth), contentHeight: String(contentHeight),
           kind: mobile ? 'phone' : capture.kind === 'terminal' ? 'terminal' : 'browser', addressClass: capture.kind === 'web' ? 'address' : '',
           windowTitle: capture.kind === 'web' ? host || product.name : product.name,
-          screenshot: await dataImage(source), caption: shot.caption ?? '', cardClass: shot.card ? 'title-card' : '',
-          hx: String(box ? box.x / image.width * 100 : 0), hy: String(box ? box.y / visibleHeight * 100 : 0),
-          hw: String(box ? box.width / image.width * 100 : 0), hh: String(box ? box.height / visibleHeight * 100 : 0), ringDisplay: box ? 'block' : 'none',
+          screenshot: `data:image/png;base64,${PNG.sync.write(cropped).toString('base64')}`, caption: shot.caption ?? '', cardClass: shot.card ? 'title-card' : '',
+          hx: String(box ? box.x / crop.width * 100 : 0), hy: String(box ? box.y / visibleHeight * 100 : 0),
+          hw: String(box ? box.width / crop.width * 100 : 0), hh: String(box ? box.height / visibleHeight * 100 : 0), ringDisplay: box ? 'block' : 'none',
         };
-        const page = await app.newPage({ viewport: { width: 1400, height: shot.card ? 700 : Math.ceil(contentHeight + 160) }, deviceScaleFactor: 2 });
+        const page = await app.newPage({ viewport: { width: 1400, height: shot.card ? 700 : Math.ceil(contentHeight + 128) }, deviceScaleFactor: 2 });
         try {
           await page.route('**/*', route => route.abort());
           await page.setContent(template.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(values[key] ?? '')));
@@ -53,7 +62,9 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
           assertClean(await page.locator('body').innerText(), `polished ${shot.id}`);
           const output = await page.screenshot(); assertClean((await ocrWords(output)).text, `polished ${shot.id}`);
           await writeFile(destination, output); const { width, height } = PNG.sync.read(output);
-          report.push({ id: shot.id, file, source, theme, kind: capture.kind, purpose: shot.purpose, caption: shot.caption, moneyMoment: shot.moneyMoment ?? false, width, height, scale: 2, banned: [] });
+          const area = await page.locator('.content').boundingBox();
+          const highlight = box && area ? { x: (area.x + box.x / crop.width * area.width) * 2, y: (area.y + box.y / crop.height * area.height) * 2, width: box.width / crop.width * area.width * 2, height: box.height / crop.height * area.height * 2 } : undefined;
+          report.push({ id: shot.id, file, source, theme, kind: capture.kind, purpose: shot.purpose, caption: shot.caption, moneyMoment: shot.moneyMoment ?? false, width, height, scale: 2, highlight, banned: [] });
         } catch (error) { await rm(destination, { force: true }); throw error; }
         finally { await page.close(); }
       }

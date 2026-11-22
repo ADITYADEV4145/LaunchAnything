@@ -51,6 +51,12 @@ it('captures a real tiny CLI product, polishes it and automatically builds the b
     expect(entries.find((item: { file: string }) => item.file === 'product-hunt-2.png').shot).toBe('action');
     expect(entries.find((item: { file: string }) => item.file === 'product-hunt-3.png').shot).toBe('proof');
     expect((await ocrWords(await readFile(join(paths, 'images/x.png')))).text).toContain('Scope');
+    for (const size of ['x', 'og', 'linkedin', 'youtube', 'product-hunt'] as const) {
+      const ocr = await ocrWords(await readFile(join(paths, 'images', `${size}.png`)));
+      const cap = ocr.words.find(word => word.text.replace(/[^a-z]/gi, '').toUpperCase() === 'BLOCK');
+      expect(cap, `${size} terminal label`).toBeDefined();
+      expect(cap!.height).toBeGreaterThanOrEqual(platforms[size].height * .025 - 1);
+    }
     shots[3].caption = 'foo'; await writeFile(join(cwd, '.launch/shots.yaml'), JSON.stringify({ shots }));
     await expect(polish(cwd)).rejects.toThrow('Banned content in polished after: foo');
     await expect(readFile(join(paths, 'polished/after.png'))).rejects.toMatchObject({ code: 'ENOENT' });

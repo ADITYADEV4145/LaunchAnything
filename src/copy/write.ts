@@ -31,6 +31,8 @@ export function writeBriefs(cwd: string, selected?: string[]) {
       'Every draft opens with the top pain or the strongest proof metric. Never open with "I built", "Introducing" or "Excited to".',
       pains(ctx.product).map((p, i) => '- pain ' + (i + 1) + ': ' + p.text + (p.quotes.length ? ' — in their words: ' + p.quotes.slice(0, 2).map(q => JSON.stringify(q)).join(', ') : '')).join('\n') || '- No pain recorded in product.json; run liftoff research first.',
       proofs(ctx.product).map(p => '- proof ' + p.metric + ': ' + proofText(p)).join('\n') || '- No proof metrics in product.json yet.',
+      ...(() => { const m = (ctx.product as { money_moment?: { before: string; action: string; after: string } }).money_moment;
+        return m ? ['Money moment (lead media and gallery image 1): before ' + m.before + ' → ' + m.action + ' → after ' + m.after + '.'] : []; })(),
       '## Grounded product facts and claim IDs', JSON.stringify(ctx.product, null, 2),
       'Citable IDs: ' + groundedClaims(ctx.product).map(c => c.id).join(', ') + '.',
       'Use only supported facts. Keep the post text clean: no [claim:...] tags. Instead list each factual sentence (any number or feature name) under citations in front matter, quoted exactly, with the claim, proof or pain it rests on. The review page shows each source on hover. Declare cited claim IDs in claims.',

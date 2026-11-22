@@ -23,7 +23,10 @@ export function proofs(product: Product): Proof[] {
 }
 export function pains(product: Product): { text: string; quotes: string[]; urls: string[] }[] {
   const value = (product as Product & { problem?: unknown }).problem;
-  const list = Array.isArray(value) ? value : value ? [value] : [];
+  const named = value && typeof value === 'object' && !Array.isArray(value) ? (value as { pains?: unknown; summary?: unknown }) : undefined;
+  const list = Array.isArray(value) ? value : named && Array.isArray(named.pains) && named.pains.length
+    ? [...(named.pains as unknown[]).map(p => p && typeof p === 'object' ? { ...(p as object), text: (p as { name?: unknown }).name } : p), ...(named.summary ? [named.summary] : [])]
+    : value ? [value] : [];
   return list.map(item => ({ text: asText(item), quotes: quoteTexts(item), urls: quoteUrls(item) })).filter(p => p.text);
 }
 export const proofText = (p: Proof) => (/^\d+$/.test(p.metric) ? [String(p.value)] : [p.metric, String(p.value), p.unit, p.context]).filter(Boolean).join(' ');

@@ -1,0 +1,83 @@
+{
+  "show-hn": {
+    "label": "Show HN",
+    "goal": "Invite hands-on feedback from technical peers with a tryable demo",
+    "submitUrl": "https://news.ycombinator.com/submit",
+    "route": "manual"
+  },
+  "product-hunt": {
+    "label": "Product Hunt",
+    "goal": "Present the product demo and maker story to product discovery readers",
+    "submitUrl": "https://www.producthunt.com/posts/new",
+    "route": "manual"
+  },
+  "x": {
+    "label": "X",
+    "goal": "Share a concise update and invite direct conversation",
+    "submitUrl": "https://x.com/compose/post",
+    "route": "integration"
+  },
+  "linkedin": {
+    "label": "LinkedIn",
+    "goal": "Explain the customer problem in a professional context",
+    "submitUrl": "https://www.linkedin.com/feed/",
+    "route": "integration"
+  },
+  "reddit": {
+    "label": "Reddit",
+    "goal": "Invite relevant community feedback with a manual, subreddit-appropriate submission",
+    "submitUrl": "https://www.reddit.com/submit",
+    "route": "manual"
+  },
+  "devto": {
+    "label": "DEV",
+    "goal": "Explain the implementation with a technical walkthrough",
+    "submitUrl": "https://dev.to/new",
+    "route": "integration"
+  },
+  "indie-hackers": {
+    "label": "Indie Hackers",
+    "goal": "Share the founder story and lessons with fellow builders",
+    "route": "manual"
+  },
+  "github-release": {
+    "label": "GitHub release",
+    "goal": "Give repository users a durable release note tied to the code",
+    "route": "integration"
+  },
+  "tiktok": {
+    "label": "TikTok",
+    "goal": "Demonstrate the core mobile workflow with a short vertical clip",
+    "route": "integration"
+  },
+  "reels": {
+    "label": "Reels",
+    "goal": "Show the product in use with a visual, vertical demonstration",
+    "route": "integration"
+  },
+  "shorts": {
+    "label": "Shorts",
+    "goal": "Make the central workflow understandable in a short video",
+    "route": "integration"
+  },
+  "instagram": {
+    "label": "Instagram",
+    "goal": "Show real product screens with a focused visual story",
+    "route": "integration"
+  },
+  "email": {
+    "label": "Email",
+    "goal": "Explain the release directly to the opted-in audience",
+    "route": "integration"
+  },
+  "blog": {
+    "label": "Blog",
+    "goal": "Provide a durable explanation of the problem, solution and evidence",
+    "route": "manual"
+  },
+  "press-release": {
+    "label": "Press release",
+    "goal": "Prepare a brand-reviewed announcement for press distribution",
+    "route": "manual"
+  }
+}

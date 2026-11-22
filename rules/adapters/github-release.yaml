@@ -1,0 +1,1 @@
+{"id":"github-release","name":"github-release","channels":["github-release"],"envKeys":["GH_TOKEN","GITHUB_TOKEN"],"mcpAliases":["github-release","github-release-mcp","mcp-github-release"],"priority":3}

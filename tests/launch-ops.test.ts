@@ -259,6 +259,47 @@ it.each([new TypeError('Unexpected capture implementation error'), new Error('Pr
   try { await expect(release(cwd)).rejects.toBe(error); }
   finally { capture.mockRestore(); }
 });
+it('skips shots and clips when the release target is not the checked-out commit', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  git(cwd, 'tag', 'v0.2.0');
+  await writeLocal(join(cwd, 'later.md'), 'Later commit'); git(cwd, 'add', 'later.md'); git(cwd, 'commit', '-m', 'docs: later work');
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    commands: ["node --version"]\n    viewport: {width: 800, height: 500}\n');
+  const capture = vi.spyOn(shotCapture, 'takeShots');
+  try {
+    const kit = await release(cwd, { from: 'v0.1.0', to: 'v0.2.0' });
+    expect(capture).not.toHaveBeenCalled();
+    expect(kit.reshot).toEqual(['changed']);
+    const reason = 'target is not the checked-out commit; check it out to re-shoot';
+    expect(kit.skipped).toContain(`Capture skipped: ${reason}`);
+    expect(kit.skipped).toContain(`clip skipped: ${reason}`);
+    expect(await readJson(kit.kit)).toMatchObject({ draft: true });
+  } finally { capture.mockRestore(); }
+});
+it.each([false, true])('skips shots for dirty tracked range files (staged: %s)', async staged => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    commands: ["node --version"]\n    viewport: {width: 800, height: 500}\n');
+  await writeLocal(join(cwd, 'CHANGELOG.md'), 'Uncommitted work');
+  if (staged) git(cwd, 'add', 'CHANGELOG.md');
+  const capture = vi.spyOn(shotCapture, 'takeShots');
+  try {
+    const kit = await release(cwd);
+    expect(capture).not.toHaveBeenCalled();
+    const reason = 'tracked files changed in this range have uncommitted changes; commit or restore them to re-shoot';
+    expect(kit.skipped).toContain(`Capture skipped: ${reason}`);
+    expect(kit.skipped).toContain(`clip skipped: ${reason}`);
+  } finally { capture.mockRestore(); }
+});
+it('does not skip capture for unrelated untracked files', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    commands: ["node --version"]\n    viewport: {width: 800, height: 500}\n');
+  await writeLocal(join(cwd, 'scratch.md'), 'Untracked work');
+  const capture = vi.spyOn(shotCapture, 'takeShots').mockRejectedValue(new CaptureError('Capture attempted'));
+  try {
+    const kit = await release(cwd);
+    expect(capture).toHaveBeenCalledOnce();
+    expect(kit.skipped).toContain('Capture skipped: Capture attempted');
+  } finally { capture.mockRestore(); }
+});
 it('release uses the exact target tag rather than the requested ref label', async () => {
   const { cwd } = await workspace(); await repository(cwd);
   git(cwd, 'tag', 'v0.2.0');

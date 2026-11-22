@@ -129,7 +129,10 @@ export async function makeKit(cwd: string, folder: string, target: string, base:
   const skipped: string[] = [];
   let captureUnavailable = '';
   if (reshot.length && options.shots !== false) {
-    try {
+    if (target !== git(cwd, 'rev-parse', 'HEAD')) captureUnavailable = 'target is not the checked-out commit; check it out to re-shoot';
+    else if (git(cwd, 'diff', '--name-only', '-z', 'HEAD', '--').split('\0').some(file => files.includes(file))) captureUnavailable = 'tracked files changed in this range have uncommitted changes; commit or restore them to re-shoot';
+    if (captureUnavailable) skipped.push(`Capture skipped: ${captureUnavailable}`);
+    else try {
       const captured = await takeShots(cwd, { ids: new Set(reshot) });
       await mkdir(join(folder, 'media'), { recursive: true });
       for (const shot of captured) for (const file of shot.files) await cp(join(launchDir(cwd).media, 'shots', file), join(folder, 'media', file));

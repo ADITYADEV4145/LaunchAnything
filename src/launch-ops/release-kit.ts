@@ -48,7 +48,7 @@ export function technical(profile: string, changes: Pick<Change, 'files' | 'titl
 }
 export function affected(shot: { sources?: string[]; commands?: string[]; route?: string }, files: string[]) {
   if (shot.sources) return shot.sources.some(glob => {
-    const pattern = glob.split('**').map(part => part.split('*').map(s => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('.*');
+    const pattern = glob.split(/(\*\*\/|\*\*|\*)/).map(part => part === '**/' ? '(?:[^/]+/)*' : part === '**' ? '.*' : part === '*' ? '[^/]*' : part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('');
     return files.some(file => new RegExp(`^${pattern}$`).test(file));
   });
   if (shot.commands) return files.some(f => /^(src\/|bin\/|package.json$)/.test(f));

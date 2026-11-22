@@ -199,6 +199,20 @@ it('maps routes, explicit sources, global files and terminal changes without res
   expect(affected({ commands: ['node --version'] }, ['bin/tool.js'])).toBe(true);
   expect(affected({ commands: ['node --version'] }, ['docs/tool.md'])).toBe(false);
 });
+it.each([
+  ['src/**/*.tsx', 'src/page.tsx', true],
+  ['src/**/*.tsx', 'src/app/page.tsx', true],
+  ['src/**/*.tsx', 'src/app/settings/page.tsx', true],
+  ['src/**/*.tsx', 'src/page.ts', false],
+  ['src/**/*.tsx', 'other/src/page.tsx', false],
+  ['src/**/*.tsx', 'src/pageXtsx', false],
+  ['src/*.tsx', 'src/app/page.tsx', false],
+  ['**/page.tsx', 'page.tsx', true],
+  ['**/page.tsx', 'src/app/page.tsx', true],
+])('matches shot source glob %s against %s as %s', (glob, file, expected) => {
+  expect(affected({ sources: [glob] }, [file])).toBe(expected);
+  expect(affected({ sources: [glob] }, [])).toBe(false);
+});
 it('writes weekly drafts with no invented screenshot, one latest real image, and deterministic date errors', async () => {
   const { cwd, paths } = await workspace(); await repository(cwd);
   const options = { now: '2026-01-03T00:00:00Z' };

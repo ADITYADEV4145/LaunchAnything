@@ -18,7 +18,7 @@ The agent is the model; the CLI never calls an LLM API. All commands support
 
 ## Run order
 
-doctor → research → init → confirm profile → scan → agent writes product.json → validate → plan → brief.
+doctor → research → audience → init → confirm profile → scan → agent writes product.json → validate → plan → brief.
 Phase 1 product understanding and planning and phase 5 review/local staging are
 implemented. Phases 2–4 and 6 remain stubs; never claim they created assets.
 
@@ -28,6 +28,13 @@ Before product planning, derive 8–15 queries from the idea: problem words,
 competitors, "I wish", "alternative to", and "why is X so". Run research fetch,
 cluster cached evidence, write pains.json, check, then report. Never invent quotes.
 See [phase0.md](references/phase0.md) for credentials and the evidence contract.
+
+## audience — phase 0b
+
+After verified pain research, run `liftoff audience prepare --json` for a community
+map, editable outreach and build-in-public drafts, and a non-submitting Kit waitlist
+preview. Review rules and exact draft hashes with the human. Never contact research
+authors or sync signup data. See [phase0b.md](references/phase0b.md).
 
 ## doctor
 

@@ -82,11 +82,12 @@ it('doctor handles missing extras and malformed config without leaking values', 
 });
 it('selftest passes all six phases and rejects invalid phase arguments', async () => {
   const report = await selftest(1);
-  expect(report.results).toHaveLength(9);
+  expect(report.results).toHaveLength(12);
   expect(report.results.every(r => r.ok)).toBe(true);
   const later = await selftest(6);
   expect(later.results.filter(r => !r.ok)).toEqual([]);
   expect(later.results.filter(r => r.phase === 6)).toHaveLength(3);
+  expect(later.results.filter(r => r.phase === '0b')).toHaveLength(3);
   expect((await selftest(0)).results.every(r => r.phase === 0 && r.ok)).toBe(true);
   await expect(selftest(-1)).rejects.toThrow('--through');
   const run = cli('selftest', '--through', '1', '--json');

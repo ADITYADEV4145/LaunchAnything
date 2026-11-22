@@ -1,0 +1,3 @@
+prohibited:
+  Vote and ranking requests are not allowed: '\b(?:up[ -]?vot\w*|down[ -]?vot\w*|(?:please |go |can you |remember to )?vote (?:for|on)\b|(?:boost|rank) (?:us|our launch)|(?:get|push) us to (?:#\s*1|number one)|vot(?:e|ing) (?:swap|ring)|(?:trade|exchange) votes)\b'
+  Bulk or unsolicited outreach is not allowed: '(?:@(everyone|here|all)\b|\b(?:mass|bulk|unsolicited|cold) (?:dms?|messages?|emails?|outreach)\b|\b(?:dm|message|email|tag) (?:everyone|every member|all (?:members|users|followers))\b|\b(?:copy[ -]paste|cross[ -]?post) (?:this |it )?(?:everywhere|in every community)\b)'

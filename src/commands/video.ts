@@ -28,7 +28,7 @@ export function register(program: Command) {
     return stylesGallery(cwd);
   });
   action(styles.command('check'),'styles check',async cwd => checkStyles(cwd));
-  action(video.command('voice').option('--dry-run', 'Print requests without contacting ElevenLabs or writing files'),'voice',async (cwd, opts) => voice(cwd, {dryRun:Boolean(opts.dryRun),formats:parseFormats(opts.format)}));
+  action(video.command('voice').option('--dry-run', 'Print ElevenLabs or local Piper requests without synthesizing or writing files'),'voice',async (cwd, opts) => voice(cwd, {dryRun:Boolean(opts.dryRun),formats:parseFormats(opts.format)}));
   action(video.command('script').option('--from-shots', 'Write a script from storyboard captures').description('Print agent brief and validate an existing script'),'script',async (cwd, opts) => {
     if (opts.fromShots) { const script = await scriptFromShots(cwd); return {script,valid:true,readcheck:readcheck(script)}; }
     const brief = {styles:(await listStyles(cwd)).map(({id,name,summary,pacing}) => ({id,name,summary,pacing})), defaultStyle:'midnight', product:await productName(cwd), shots:await shots(cwd), media:await media(cwd), capabilities:await doctor(cwd), rules:'Agent: choose optional script.style from the available styles; midnight is the unchanged default. Respect its pacing. Prefer video script --from-shots for storyboards (45–60s long, 20–35s short, hook first and at most 3s). Legacy scripts use 6–10 scenes, shot, text (1–8 words), duration, optional voiceover; total 30–60s including the 3s end card. Use real captured or polished product media. Only explicit video voice can call ElevenLabs; preview with --dry-run. Local voice files go in .launch/video/vo/<zero-based scene index>.wav or .mp3. Credit only Aditya.'};

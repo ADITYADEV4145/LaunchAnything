@@ -5,6 +5,7 @@ import { homedir, tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { maskSecrets } from '../visuals/privacy.js';
+import { piperAvailable } from '../video/piper.js';
 
 export async function doctor(cwd: string, home = homedir()) {
   if (!(await stat(cwd)).isDirectory()) throw new Error(`Not a directory: ${cwd}`);
@@ -48,6 +49,7 @@ export async function doctor(cwd: string, home = homedir()) {
         required, requiredFor, installHint }];
     }));
     tools.ttyd.required = tools.vhs.available;
+    tools.piper = { available:piperAvailable(probeDir), version:null, required:false, requiredFor:'offline narration with LIFTOFF_PIPER_MODEL (.onnx and .onnx.json)', installHint:'Optional: pip install piper-tts; set LIFTOFF_PIPER_MODEL and optionally LIFTOFF_PIPER_BIN' };
     const candidates = [...new Set([chromium.executablePath(), 'google-chrome', process.env.LIFTOFF_CHROME,
       process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, join(home,'.local/bin/google-chrome'), 'chromium', 'chromium-browser'].filter((value):value is string=>Boolean(value)))];
     let version: string | null = null;

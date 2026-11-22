@@ -13,6 +13,8 @@ import { branding, endAsset, frameLayout, sceneAssets } from './design.js';
 import { detectContent } from './crop.js';
 import { narrationFiles } from './voice.js';
 import { loadStyle, motionFilter } from './styles.js';
+import { brandVideo } from './brand.js';
+import { assertNarrationFits } from './audio.js';
 
 const exec = promisify(execFile);
 export async function run(binary: string, args: string[], cwd?: string) {
@@ -56,9 +58,9 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     const results = [];
     for (const format of selected) {
       const scenes = await Promise.all(script.scenes.map(async scene => ({ role: scene.role, caption: scene.text, source: await resolveShot(cwd, scene.shot), duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)), highlight: scene.highlight })));
-      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music, style:script.style });
+      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music, style:script.style, title:script.title, tagline:script.tagline });
       await writeFile(`${result.file}.json`, JSON.stringify({ ...result.receipt, script: JSON.stringify(script) }, null, 2));
-      await writeFile(join(dir, `captions-${format}.srt`), srt({ scenes: script.scenes.map(scene => ({ ...scene, duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)) })) }));
+      await writeFile(join(dir, `captions-${format}.srt`), srt({ ...script, scenes: script.scenes.map(scene => ({ ...scene, duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)) })) }));
       results.push(result);
     }
     return { renderer: results[0]?.receipt.renderer ?? renderer, files: results.map(result => result.file), captions: join(dir, 'captions.srt') };
@@ -76,6 +78,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
   const paths = await Promise.all(script.scenes.map(s => resolveShot(cwd, s.shot)));
   const voices = await narrationFiles(cwd,script.scenes,undefined,false);
   try {
+    await assertNarrationFits(cwd,script.scenes.map(scene=>scene.duration),voices);
     const dimensions = await Promise.all(paths.map(async path => JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','json',path])).stdout).streams[0] as {width:number;height:number}));
     let terminal = false;
     try { terminal = JSON.parse(await readFile(join(launchDir(cwd).media,'manifest.json'),'utf8')).frame === 'terminal'; } catch { /* Ordinary captures use browser or phone framing. */ }
@@ -168,20 +171,21 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
         await run('ffmpeg', ['-y','-v','error','-f','concat','-safe','0','-i',list,'-c','copy',silent]);
       }
       const output = join(dir, spec.file);
+      const branded = await brandVideo(cwd,work,silent,spec.width,spec.height,script);
       const audioArgs: string[] = [];
       const filters: string[] = [];
-      let offset = 0; let count = 0;
+      let offset = script.titleCardSeconds ?? 0; let count = 0;
       voices.forEach((voice, i) => {
         if (voice) {
           audioArgs.push('-i', voice); count++;
-          filters.push(`[${count}:a]atrim=0:${script.scenes[i].duration},asetpts=PTS-STARTPTS,adelay=${Math.round(offset * 1000)}:all=1[a${count}]`);
+          filters.push(`[${count}:a]asetpts=PTS-STARTPTS,adelay=${Math.round(offset * 1000)}:all=1[a${count}]`);
         }
         offset += script.scenes[i].duration;
       });
       if (count) {
         filters.push(`${Array.from({length:count}, (_,i) => `[a${i+1}]`).join('')}amix=inputs=${count}:normalize=0,apad,atrim=0:${totalDuration(script)},loudnorm=I=-14:TP=-1:LRA=11[a]`);
-        await run('ffmpeg', ['-y','-v','error','-i',silent,...audioArgs,'-filter_complex',filters.join(';'),'-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-metadata','artist=Aditya',output]);
-      } else await cp(silent, output);
+        await run('ffmpeg', ['-y','-v','error','-i',branded,...audioArgs,'-filter_complex',filters.join(';'),'-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-metadata','artist=Aditya',output]);
+      } else await cp(branded, output);
       await writeFile(join(dir, `${spec.file}.json`), JSON.stringify({format, captions:'burned', sha256:await fileHash(output), script:JSON.stringify(script), renderer:chosen, duration:totalDuration(script), author:'Aditya'}));
     }
     return { renderer: chosen, files: selected.map(f => join(dir, formats[f].file)), captions:join(dir,'captions.srt') };

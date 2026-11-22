@@ -6,14 +6,15 @@ import { browser, escapeHtml } from '../visuals/runtime.js';
 import { mediaBrand, homepageHost, optionalJson } from '../media/assets.js';
 import { assertClean, ocrWords } from '../media/banned.js';
 import { formats, fileHash, remotionCli, run, type Format } from './render.js';
-import { mixAudio } from './audio.js';
+import { assertNarrationFits, mixAudio } from './audio.js';
+import { brandVideo, findLogo, titleCardSeconds } from './brand.js';
 import type { SceneRole } from './script.js';
 import { contrast } from '../visuals/check.js';
 import { terminalSource, renderTerminal, type TerminalTranscript, type TerminalMetrics } from '../media/terminal.js';
 import { captionContrast, loadStyle, motionFilter } from './styles.js';
 
 export interface ClipScene { role?: SceneRole; caption: string; source: string; duration: number; highlight?: { x: number; y: number; width: number; height: number }; terminal?: TerminalTranscript }
-export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion'; style?: string }
+export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion'; style?: string; title?: string; tagline?: string }
 export interface ClipFrame { x: number; y: number; width: number; height: number; kind: string }
 export interface ClipReceipt {
   sha256: string; format: Format; captions: 'burned'; renderer: 'ffmpeg' | 'remotion'; duration: number;
@@ -21,7 +22,7 @@ export interface ClipReceipt {
   scenes: (Omit<ClipScene, 'terminal'> & { terminal?: TerminalMetrics; frame: ClipFrame; crop?: {x:number;y:number;width:number;height:number}; captionFont: number; captionContrast: number })[];
 }
 
-/** Render local footage with branded captions, music and optional indexed voice files; durations are used verbatim, plus a 3-second end card. No shots.yaml is required. */
+/** Render local footage with branded captions, optional narration, a logo title card and a 3-second end card. No shots.yaml is required. */
 export async function renderClip(cwd: string, scenes: ClipScene[], options: ClipOptions = {}): Promise<{ file: string; duration: number; receipt: ClipReceipt }> {
   if (!scenes.length || scenes.some(scene => !Number.isFinite(scene.duration) || scene.duration <= 0 || !scene.caption.trim())) throw new Error('Clip requires captioned scenes with positive finite durations');
   const format = options.format ?? '16x9';
@@ -39,10 +40,12 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
   const name = String(product.name ?? 'Product'); const host = homepageHost(product.homepage ?? product.url);
   assertClean(`${name}\n${host}\n${scenes.map(scene => scene.caption).join('\n')}`, 'clip captions');
   const work = await mkdtemp(join(dirname(file), '.clip-')); const app = await browser();
-  const duration = scenes.reduce((sum, scene) => sum + scene.duration, 3);
+  const intro = await findLogo(cwd) ? titleCardSeconds : 0;
+  const duration = scenes.reduce((sum, scene) => sum + scene.duration, 3 + intro);
   const assets: { plate: string; caption: string; ring: string; source: string; bare: boolean; terminal?: TerminalMetrics; crop?: {x:number;y:number;width:number;height:number}; highlight?: ClipScene['highlight']; frame: {x:number;y:number;width:number;height:number;kind:string} }[] = [];
   const pieces: string[] = [];
   try {
+    await assertNarrationFits(cwd,scenes.map(scene=>scene.duration),options.voice ?? []);
     const all = [...scenes, { role: 'cta' as const, caption: name, source: scenes[0].source, duration: 3 }];
     for (const [index, scene] of all.entries()) {
       const end = index === scenes.length; const card = end || scene.role === 'hook' || scene.role === 'cta';
@@ -109,7 +112,8 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
       await writeFile(join(work, 'concat.txt'), pieces.map(path => `file '${path.replaceAll("'", "'\\''")}'`).join('\n'));
       await run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', join(work, 'concat.txt'), '-c', 'copy', silent]);
     }
-    const audio = await mixAudio(cwd, work, silent, file, scenes.map(scene => scene.duration), options.voice ?? [], options.music);
+    const branded = await brandVideo(cwd,work,silent,width,height,options);
+    const audio = await mixAudio(cwd, work, branded, file, scenes.map(scene => scene.duration), options.voice ?? [], options.music,intro);
     const receipt: ClipReceipt = { sha256: await fileHash(file), format, captions: 'burned', renderer: cli ? 'remotion' : 'ffmpeg', duration, audio, author: 'Aditya', scenes: scenes.map((scene, index) => ({ ...scene, terminal: assets[index].terminal, frame: assets[index].frame, crop: assets[index].crop, highlight: assets[index].highlight, captionFont: height * (scene.role === 'hook' || scene.role === 'cta' ? .065 : .048), captionContrast: themed ? captionContrast(style) : contrast([255,255,255], [16,24,39]) })), logo: brand.logo ? 'logo' : 'wordmark' };
     await writeFile(`${file}.json`, JSON.stringify(receipt, null, 2)); return { file, duration, receipt };
   } catch (error) { await rm(file, { force: true }); await rm(`${file}.json`, { force: true }); throw error; }

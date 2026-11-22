@@ -3,8 +3,18 @@ import { launchDir } from '../core/launch-dir.js';
 import { optionalJson } from '../media/assets.js';
 import { run } from './render.js';
 
-export async function mixAudio(cwd: string, work: string, silent: string, output: string, durations: number[], voices: (string | undefined)[], music?: string) {
-  const duration = durations.reduce((sum, value) => sum + value, 3);
+export async function assertNarrationFits(cwd: string, durations: number[], voices: (string | undefined)[]) {
+  for (const [index, voice] of voices.entries()) {
+    if (!voice) continue;
+    const probe = JSON.parse((await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', resolve(cwd, voice)])).stdout);
+    const duration = Number(probe.format?.duration);
+    if (!Number.isFinite(duration) || !Number.isFinite(durations[index]) || duration > durations[index] + .05) throw new Error(`Scene ${index + 1} voiceover is ${duration.toFixed(3)}s but scene is ${durations[index]}s; extend the scene duration before rendering`);
+  }
+}
+
+export async function mixAudio(cwd: string, work: string, silent: string, output: string, durations: number[], voices: (string | undefined)[], music?: string, intro = 0) {
+  await assertNarrationFits(cwd, durations, voices);
+  const duration = durations.reduce((sum, value) => sum + value, 3 + intro);
   const config = await optionalJson(launchDir(cwd).config);
   const kit = config.brandKit ? await optionalJson(resolve(cwd, config.brandKit)) : {};
   const source = music ?? kit.music;
@@ -12,11 +22,11 @@ export async function mixAudio(cwd: string, work: string, silent: string, output
   const inputs = source ? ['-stream_loop', '-1', '-i', resolve(cwd, source)] : ['-f', 'lavfi', '-i', 'aevalsrc=0.12*(sin(2*PI*130.8128*t)+sin(2*PI*164.8138*t)+sin(2*PI*195.9977*t)):s=48000'];
   await run('ffmpeg', ['-y', '-v', 'error', ...inputs, '-t', String(duration), '-af', `lowpass=f=700,afade=t=in:d=1,afade=t=out:st=${Math.max(0, duration - 1.5)}:d=1.5,loudnorm=I=-30:TP=-6:LRA=7`, '-ar', '48000', '-ac', '2', bed]);
   const args = ['-i', silent, '-i', bed]; const filters: string[] = [];
-  let count = 0; let offset = 0;
+  let count = 0; let offset = intro;
   voices.forEach((voice, index) => {
     if (voice) {
       args.push('-i', resolve(cwd, voice)); count++;
-      filters.push(`[${count + 1}:a]atrim=0:${durations[index]},asetpts=PTS-STARTPTS,loudnorm=I=-14:TP=-2:LRA=7,adelay=${Math.round(offset * 1000)}:all=1[v${count}]`);
+      filters.push(`[${count + 1}:a]asetpts=PTS-STARTPTS,loudnorm=I=-14:TP=-2:LRA=7,adelay=${Math.round(offset * 1000)}:all=1[v${count}]`);
     }
     offset += durations[index];
   });

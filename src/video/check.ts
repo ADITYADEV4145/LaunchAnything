@@ -43,7 +43,7 @@ export async function motionGates(path: string): Promise<Gate[]> {
   ]);
 }
 export function endCardGate(script: Script, duration: number): Gate {
-  const measured = duration - script.scenes.reduce((n,s) => n + s.duration,0);
+  const measured = duration - (script.titleCardSeconds ?? 0) - script.scenes.reduce((n,s) => n + s.duration,0);
   return {id:'G5',name:'end-card',status:Number.isFinite(measured) && Math.abs(measured-endCardSeconds)<=0.25 ? 'pass':'fail',detail:`Last scene boundary to file end: ${measured.toFixed(3)}s; expected ${endCardSeconds}s ±0.25`};
 }
 export function transcriptCoverage(script: string, transcript: string) {
@@ -67,7 +67,7 @@ export async function voiceGate(cwd: string, video: string, script: Script, narr
   return gate('G6','voice-stt',async () => {
     const work = await mkdtemp(join(tmpdir(),'liftoff-stt-'));
     try {
-      let offset = 0;
+      let offset = script.titleCardSeconds ?? 0;
       for (const [index,scene] of script.scenes.entries()) {
         const start = offset; offset += scene.duration;
         if (!takes[index] || !scene.voiceover?.trim()) continue;
@@ -104,10 +104,10 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
     const path = join(dir,formats[format].file);
     const probe = JSON.parse((await run('ffprobe',['-v','error','-show_streams','-show_format','-of','json',path])).stdout);
     const modern = script.scenes.some(scene => scene.role);
-    const timedScript = {scenes:script.scenes.map(scene => ({...scene,duration:sceneDuration(scene,format,modern)}))};
+    const timedScript = {...script,scenes:script.scenes.map(scene => ({...scene,duration:sceneDuration(scene,format,modern)}))};
     const timedCaptions = modern ? await readFile(join(dir,`captions-${format}.srt`),'utf8') : captions;
     const info = checkProbe(probe, format, modern);
-    if (modern && (await readFile(join(dir, `captions-${format}.srt`), 'utf8')).trim() !== srt({ scenes: script.scenes.map(scene => ({ ...scene, duration: sceneDuration(scene, format, modern) })) }).trim()) throw new Error(`Captions SRT out of date for ${format}`);
+    if (modern && (await readFile(join(dir, `captions-${format}.srt`), 'utf8')).trim() !== srt(timedScript).trim()) throw new Error(`Captions SRT out of date for ${format}`);
     const expected = totalDuration(script, format);
     if (Math.abs(info.duration - expected) > 0.25) throw new Error(`Rendered duration differs from script: ${path}`);
     const receipt = JSON.parse(await readFile(`${path}.json`,'utf8'));

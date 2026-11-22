@@ -1,6 +1,6 @@
 ---
 name: liftoff
-description: Plan a product launch, feature release, changelog or relaunch from a repository using sourced product facts. Use when the user asks to launch, announce a release or prepare a launch kit.
+description: Plan a product launch, feature release, changelog or relaunch from a repository using sourced product facts. Use when the user asks to launch, announce a release, prepare a launch kit or make a product launch video.
 ---
 
 # Liftoff
@@ -20,6 +20,14 @@ and owned writing with `--voice PATHS...`. Demo uses prepared offline fixture
 content; it never posts. Run `liftoff init` next for the real repository.
 `liftoff estimate` reports planning estimates only. Telemetry is off by default;
 `liftoff telemetry on` enables anonymous local demo stage counts only, never uploads.
+
+## Product launch video
+
+Read [the launch-video workflow](references/launch-video.md) before planning or
+producing a launch film. Start with a sourced storyboard and one real product
+payoff. A skill edit, plan or research request is not permission to render.
+Require the original logo, spoken narration, captions and a phone-size
+readability check for the launch cut unless the user explicitly changes the brief.
 
 ## Phase 2b: founder voice
 

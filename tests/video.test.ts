@@ -77,6 +77,21 @@ it('exports standalone carousel and clip renderers without shots.yaml, with quie
   await expect(renderClip(cwd,[{caption:'Catch unknown exports',source:'absent.png',duration:2}])).rejects.toThrow();
 },120000);
 
+it('uses legacy terminal captures without transcript sidecars in carousel, clip and music-enabled legacy video rendering',async()=>{
+  const cwd=await fixture();
+  await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots:[{id:'legacy',viewport:{width:1000,height:500},commands:['node -e "console.log(\'Ready for launch\')"']}]}));
+  await takeShots(cwd);
+  const source='.launch/media/shots/legacy.png';
+  const carousel=await renderCarousel(cwd,[{role:'after',caption:'Catch unknown exports',source}],{size:'x'});
+  expect(carousel.report[0].terminal).toBeUndefined();
+  const clip=await renderClip(cwd,[{role:'after',caption:'Catch unknown exports',source,duration:1}],{renderer:'ffmpeg'});
+  expect(clip.receipt.scenes[0].terminal).toBeUndefined();
+  const script=await legacyScript(cwd);for(const scene of script.scenes)scene.shot='shots/legacy.png';
+  await writeFile(join(cwd,'.launch/video/script.json'),JSON.stringify(script));
+  await run('ffmpeg',['-y','-v','error','-f','lavfi','-i','sine=frequency=220:duration=1',join(cwd,'music.wav')]);
+  expect((await render(cwd,'ffmpeg',['1x1'],{music:'music.wav'})).files).toHaveLength(1);
+},120000);
+
 it('fits the entire highlighted window in portrait without cropping either edge',async()=>{
   const cwd=await fixture();
   const result=await renderClip(cwd,[{role:'after',caption:'Catch unknown exports',source:'.launch/media/real.png',duration:1,highlight:{x:38,y:48,width:170,height:55}}],{format:'9x16',renderer:'ffmpeg'});

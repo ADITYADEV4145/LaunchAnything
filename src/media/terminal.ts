@@ -19,7 +19,11 @@ export async function terminalSource(cwd: string, source: string): Promise<Termi
   const capture = Array.isArray(captures) ? captures.find(item => item.kind === 'terminal' && item.files.some((file: string) => resolve(media, 'shots', file) === original)) : undefined;
   if (!capture) return;
   const shot = (await storyboard(cwd))?.find(shot => shot.id === capture.id);
-  const text = typeof capture.transcript === 'string' ? capture.transcript : await readFile(join(media, 'tapes', `${capture.id}.txt`), 'utf8');
+  const text = typeof capture.transcript === 'string' ? capture.transcript : await readFile(join(media, 'tapes', `${capture.id}.txt`), 'utf8').catch(error => {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  });
+  if (text === undefined) return;
   return { text, highlight: shot?.highlight && 'text' in shot.highlight ? shot.highlight.text : undefined };
 }
 

@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { loadScript } from './script.js';
 
-export async function narrationFiles(cwd: string, scenes: { voiceover?: string }[], extensions = ['mp3','wav']): Promise<(string | undefined)[]> {
+export async function narrationFiles(cwd: string, scenes: { voiceover?: string }[], extensions = ['mp3','wav'], requireScript = true): Promise<(string | undefined)[]> {
   return Promise.all(scenes.map(async (scene, index) => {
-    if (!scene.voiceover?.trim()) return undefined;
+    if (requireScript && !scene.voiceover?.trim()) return undefined;
     for (const extension of extensions) {
       const file = join(launchDir(cwd).video, 'vo', `${index}.${extension}`);
       try { await access(file); return file; }

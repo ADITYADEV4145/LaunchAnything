@@ -53,8 +53,8 @@ export function transcriptCoverage(script: string, transcript: string) {
 export async function voiceGate(cwd: string, video: string, script: Script, narrated = true): Promise<Gate> {
   const skipped = (detail: string): Gate => ({id:'G6',name:'voice-stt',status:'skipped',detail});
   if (!narrated) return skipped('No narration in rendered audio');
-  const takes = await narrationFiles(cwd,script.scenes);
-  if (!takes.some(Boolean)) return skipped('No narration in rendered audio');
+  const takes = await narrationFiles(cwd,script.scenes,undefined,false);
+  if (!takes.some((take,index) => take && script.scenes[index].voiceover?.trim())) return skipped('No narration in rendered audio');
   let binary: string | undefined;
   for (const name of ['whisper','whisper-cli']) {
     for (const directory of (process.env.PATH ?? '').split(delimiter)) {

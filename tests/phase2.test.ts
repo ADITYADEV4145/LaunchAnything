@@ -392,6 +392,18 @@ it('loads brand voice, detects local copywriting and rejects invalid inputs', ()
   writeFileSync(configPath, '{}');
   expect(() => writeBriefs(cwd)).toThrow('config:');
 }));
+it('limits default briefs and checks to channels scheduled in plan.md', () => isolated(cwd => {
+  checks[0].run({ cwd, fixture: 'cli-tool' });
+  const config = JSON.parse(readFileSync(join(cwd, '.launch/config.json'), 'utf8'));
+  const [first, second, ...rest] = config.channels as string[];
+  expect(rest.length).toBeGreaterThan(0);
+  writeFileSync(join(cwd, '.launch/plan.md'), ['| Channel | Local date | Local time | Why | Preparation lead time |',
+    '| --- | --- | --- | --- | --- |', `| ${first} | 2026-09-25 | 09:00 | a | 1 day(s) |`,
+    `| ${second} | 2026-09-25 | 09:00 | b | 1 day(s) |`].join('\n'));
+  expect(writeBriefs(cwd).briefs.map(path => path.split('/').pop())).toEqual([first + '.md', second + '.md']);
+  const missing = checkPosts(cwd).issues.filter(i => i.rule === 'post.missing').map(i => i.channel);
+  expect(missing.every(channel => channel === first || channel === second)).toBe(true);
+}));
 it('CLI failures are JSON and exit nonzero', () => isolated(cwd => {
   for (const name of ['write','check']) {
     const result = spawnSync(process.execPath, ['--import','tsx', join(root,'src/cli.ts'), name, '--cwd', cwd, '--json'], { encoding: 'utf8' });

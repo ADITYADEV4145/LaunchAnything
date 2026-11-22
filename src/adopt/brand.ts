@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateFile } from '../core/schema.js';
+import { assertSafePath, atomicWrite } from '../copy/safe-path.js';
 
 export function parseBrand(html: string, site?: string) {
   const decode = (s: string) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -36,7 +37,9 @@ export async function importBrand(cwd: string, options: { site?: string; siteFil
   const brand = parseBrand(html, options.site);
   const checked = validateFile('brand', brand);
   if (!checked.valid) throw new Error(checked.errors.join('; '));
+  const target = join(cwd, '.launch/brand.json');
+  assertSafePath(cwd, target);
   await mkdir(join(cwd, '.launch'), { recursive: true });
-  await writeFile(join(cwd, '.launch/brand.json'), JSON.stringify(brand, null, 2) + '\n');
+  atomicWrite(cwd, target, JSON.stringify(brand, null, 2) + '\n');
   return brand;
 }

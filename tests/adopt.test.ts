@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir, rm, stat, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -45,6 +45,20 @@ describe('adoption', () => {
     expect(parseBrand('')).toMatchObject({ name: '', colors: [], fonts: [] });
     await expect(importBrand(cwd, { siteFile: join(cwd, 'missing') })).rejects.toThrow();
     await expect(importBrand(cwd, { site: 'file:///etc/passwd' })).rejects.toThrow('HTTP(S)');
+  });
+
+  it.each(['file', 'directory'])('rejects a symlinked brand output %s without changing external files', async kind => {
+    const cwd = await temp(), outside = await temp();
+    const html = join(cwd, 'site.html'), external = join(outside, 'brand.json');
+    await writeFile(html, '<title>Imported</title>');
+    await writeFile(external, 'untouched');
+    if (kind === 'directory') await symlink(outside, join(cwd, '.launch'));
+    else {
+      await mkdir(join(cwd, '.launch'));
+      await symlink(external, join(cwd, '.launch/brand.json'));
+    }
+    await expect(importBrand(cwd, { siteFile: html })).rejects.toThrow('Unsafe symlink');
+    expect(await readFile(external, 'utf8')).toBe('untouched');
   });
 
   it('estimates deterministic tokens, channel costs and scene time', async () => {

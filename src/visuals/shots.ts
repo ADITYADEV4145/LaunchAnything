@@ -4,7 +4,7 @@ import { parse } from 'yaml';
 import { PNG } from 'pngjs';
 import { launchDir } from '../core/launch-dir.js';
 import { validateFile } from '../core/schema.js';
-import { browser, runTerminal, start, escapeHtml } from './runtime.js';
+import { browser, runTerminal, start, escapeHtml, CaptureError } from './runtime.js';
 import { assertPrivate } from './privacy.js';
 import { guard, gif, ocrCheck } from './capture.js';
 interface Shot { id: string; route?: string; commands?: string[]; viewport: { width: number; height: number }; theme?: 'light' | 'dark'; record?: boolean; fullPage?: boolean; waitFor?: string; actions?: { type: string; selector: string; text?: string }[] }
@@ -26,7 +26,7 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
       if (!url) {
         let dev = false; try { dev = Boolean(JSON.parse(await readFile(join(cwd, 'package.json'), 'utf8')).scripts?.dev); } catch { /* no package */ }
         const command = options.command ?? spec.startCommand ?? (dev ? 'npm run dev' : undefined);
-        if (!command) throw new Error('Provide --url, baseUrl or a start command');
+        if (!command) throw new CaptureError('Provide --url, baseUrl or a start command');
         url = 'http://127.0.0.1:3000'; stop = start(command, cwd);
       }
       const deadline = Date.now() + (spec.readyTimeoutMs ?? 30000);
@@ -37,7 +37,7 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
           try { const response = await fetch(candidate, { signal: AbortSignal.timeout(1000) }); await response.body?.cancel(); if (response.status < 500) { ready = true; break; } } catch { /* not ready */ }
         }
         if (ready) break;
-        if (Date.now() >= deadline) throw new Error('App readiness timeout');
+        if (Date.now() >= deadline) throw new CaptureError('App readiness timeout');
         await new Promise(r => setTimeout(r, 150));
       }
     }

@@ -2,7 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { errors } from 'playwright';
 import { packageRoot } from '../src/core/package-root.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import { friends, checkFriendDraft } from '../src/launch-ops/friends.js';
@@ -15,6 +16,8 @@ import { parseTargets, retro } from '../src/results/retro.js';
 import { checks } from '../src/selftest/launch-ops.js';
 import { affected, cleanTitle, clipScenes, closedIssuesInRange, draftPosts, judge, technical, relaunch, type Change } from '../src/launch-ops/release-kit.js';
 import { progress, isoWeek } from '../src/launch-ops/progress.js';
+import * as shotCapture from '../src/visuals/shots.js';
+import { CaptureError } from '../src/visuals/runtime.js';
 
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -229,6 +232,32 @@ it('honors release channel overrides, no-shots and offline issue input with empt
   await writeLocal(join(cwd, 'docs.md'), 'Internal docs'); git(cwd, 'add', 'docs.md'); git(cwd, 'commit', '-m', 'docs: internal notes');
   const quiet = await release(cwd, { from: 'HEAD^' }); expect(quiet.channels).toEqual([]);
   expect(await readFile(join(quiet.notes, '../selection.json'), 'utf8')).toContain('No posts recommended');
+});
+it('installs dependencies before drafting releases in the workflow template', async () => {
+  const workflow = await readFile(join(packageRoot(), 'templates/github/liftoff-release.yml'), 'utf8');
+  expect(workflow).toContain('if [ -f package-lock.json ]; then\n            npm ci');
+  expect(workflow).toContain('elif [ -f package.json ]; then\n            npm install');
+  expect(workflow.indexOf('npm ci')).toBeLessThan(workflow.indexOf('npx launch-liftoff release'));
+});
+it.each([new CaptureError('App readiness timeout'), new errors.TimeoutError('page.goto: Timeout exceeded')])('continues drafting a kit after an operational capture failure: %s', async error => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    route: /\n    viewport: {width: 800, height: 500}\n');
+  const capture = vi.spyOn(shotCapture, 'takeShots').mockRejectedValue(error);
+  try {
+    const kit = await release(cwd);
+    expect(capture).toHaveBeenCalledOnce();
+    expect(kit.skipped).toContain(`Capture skipped: ${error.message}`);
+    expect(kit.skipped).toContain(`clip skipped: ${error.message}`);
+    expect(await readJson(kit.kit)).toMatchObject({ draft: true });
+    expect(await readFile(join(kit.notes, '../changelog.md'), 'utf8')).toContain('feat: useful change');
+  } finally { capture.mockRestore(); }
+});
+it.each([new TypeError('Unexpected capture implementation error'), new Error('Privacy guard failed')])('does not hide programming or privacy errors during capture: %s', async error => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    route: /\n    viewport: {width: 800, height: 500}\n');
+  const capture = vi.spyOn(shotCapture, 'takeShots').mockRejectedValue(error);
+  try { await expect(release(cwd)).rejects.toBe(error); }
+  finally { capture.mockRestore(); }
 });
 it('release uses the exact target tag rather than the requested ref label', async () => {
   const { cwd } = await workspace(); await repository(cwd);

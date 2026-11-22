@@ -4,12 +4,13 @@ import { homedir } from 'node:os';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 export const exec = promisify(execFile);
+export class CaptureError extends Error {}
 export async function browser() {
   const paths = [process.env.LIFTOFF_CHROME, process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, `${homedir()}/.local/bin/google-chrome`].filter((p): p is string => Boolean(p));
   for (const options of [{}, { channel: 'chrome' }, ...paths.filter(existsSync).map(executablePath => ({ executablePath }))]) {
     try { return await chromium.launch({ ...options, headless: true }); } catch { /* try next installation */ }
   }
-  throw new Error('Chrome unavailable. Run npx playwright install chromium or set LIFTOFF_CHROME / PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH.');
+  throw new CaptureError('Chrome unavailable. Run npx playwright install chromium or set LIFTOFF_CHROME / PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH.');
 }
 export function sanitizedEnv() {
   return Object.fromEntries(['PATH', 'HOME', 'LANG', 'TMPDIR', 'SystemRoot'].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : []));
@@ -34,8 +35,8 @@ export function runTerminal(command: string, cwd: string, timeout = 15000): Prom
     const timer = setTimeout(() => { failed = true; kill(); }, timeout);
     const collect = (chunk: Buffer) => { output += chunk.toString(); if (output.length > 1024 * 1024) { failed = true; kill(); } };
     child.stdout.on('data', collect); child.stderr.on('data', collect);
-    child.on('error', () => { clearTimeout(timer); kill(); reject(new Error('Terminal command could not start')); });
-    child.on('close', code => { clearTimeout(timer); kill(); if (failed || code !== 0) reject(new Error('Terminal command failed or timed out (output withheld)')); else resolve(output); });
+    child.on('error', () => { clearTimeout(timer); kill(); reject(new CaptureError('Terminal command could not start')); });
+    child.on('close', code => { clearTimeout(timer); kill(); if (failed || code !== 0) reject(new CaptureError('Terminal command failed or timed out (output withheld)')); else resolve(output); });
   });
 }
 export const escapeHtml = (value: string) => value.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);

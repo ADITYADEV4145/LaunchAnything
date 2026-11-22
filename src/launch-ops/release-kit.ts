@@ -2,12 +2,14 @@ import { execFileSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { parse } from 'yaml';
+import { errors } from 'playwright';
 import { launchDir } from '../core/launch-dir.js';
 import { inspectPost } from '../copy/check.js';
 import { loadPlatform } from '../copy/platforms.js';
 import type { Config } from '../product/init.js';
 import { checked, readJson, writeJson, writeLocal } from '../results/files.js';
 import { takeShots } from '../visuals/shots.js';
+import { CaptureError } from '../visuals/runtime.js';
 import { render, run } from '../video/render.js';
 import { git, optionalText, root } from './common.js';
 
@@ -132,8 +134,8 @@ export async function makeKit(cwd: string, folder: string, target: string, base:
       await mkdir(join(folder, 'media'), { recursive: true });
       for (const shot of captured) for (const file of shot.files) await cp(join(launchDir(cwd).media, 'shots', file), join(folder, 'media', file));
     } catch (error) {
-      if (!/Chrome unavailable/.test((error as Error).message)) throw error;
-      captureUnavailable = 'Chrome unavailable'; skipped.push('Capture skipped: Chrome unavailable');
+      if (!(error instanceof CaptureError || error instanceof errors.TimeoutError)) throw error;
+      captureUnavailable = error.message; skipped.push(`Capture skipped: ${captureUnavailable}`);
     }
   } else if (reshot.length) skipped.push('Capture skipped: --no-shots');
   let clipReason = captureUnavailable || (options.shots === false ? '--no-shots' : !reshot.length ? 'no changed screens' : !channels.includes('x') ? 'X not selected' : '');

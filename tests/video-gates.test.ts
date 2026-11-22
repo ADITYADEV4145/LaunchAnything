@@ -92,6 +92,25 @@ describe('video gates',() => {
     expect(await voiceGate('/does-not-exist','/does-not-exist',script,false)).toMatchObject({status:'skipped',detail:'No narration in rendered audio'});
     expect((await voiceGate('/does-not-exist','/does-not-exist',{scenes:[]})).status).toBe('skipped');
   });
+  it('trims non-hook vertical scenes for padded narration and rejects unreadable budgets',async()=>{
+    const cwd=await mkdtemp(join(tmpdir(),'video-hook-padding-')); dirs.push(cwd);
+    await mkdir(join(cwd,'.launch/media/polished'),{recursive:true});
+    const long='Keep every local change safely stored and available on your own device';
+    const roles=['hook','before','action','after','proof','proof','proof','cta'];
+    const captions=[long,long,long,'Keep work private','Keep every local change safely stored on your device','Keep every local change safely stored and available on device','Keep every local change safely stored and available on device','Keep work private'];
+    const shots=roles.map((purpose,index)=>({id:`${purpose}-${index}`,purpose,card:true,moneyMoment:purpose==='after',viewport:{width:800,height:600},caption:captions[index]}));
+    await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots}));
+    await writeFile(join(cwd,'.launch/media/polished/frame.png'),'captured image');
+    vi.spyOn(polishing,'polish').mockResolvedValue(shots.map(shot=>({id:shot.id,file:'frame.png',theme:'light'})) as never);
+    const generated=await scriptFromShots(cwd);
+    expect(generated.scenes[0].duration).toBeGreaterThanOrEqual(12/2.8+.25);
+    expect(generated.scenes[3].shortDuration).toBeLessThan(generated.scenes[3].duration*.5);
+    expect(totalDuration(generated,'9x16')).toBeCloseTo(35);
+    expect(totalDuration(generated,'16x9')).toBeLessThanOrEqual(60);
+    for(const format of ['16x9','9x16']) expect(readcheck({scenes:generated.scenes.map(scene=>({...scene,duration:sceneDuration(scene,format,true)}))}).status).toBe('pass');
+    await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots:shots.map(shot=>({...shot,caption:long}))}));
+    await expect(scriptFromShots(cwd)).rejects.toThrow('cannot fit the 35-second vertical limit at minimum reading and narration times; shorten captions or remove scenes');
+  });
   it('runs both local STT adapters, rejects poor transcripts and reports tool errors',async () => {
     const dir = await mkdtemp(join(tmpdir(),'video-stt-')); dirs.push(dir);
     const video=join(dir,'final.mp4');

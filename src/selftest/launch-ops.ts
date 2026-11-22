@@ -11,6 +11,7 @@ import { collect } from '../results/collect.js';
 import { readJson, writeJson, writeLocal } from '../results/files.js';
 import { retro } from '../results/retro.js';
 import type { Check } from './types.js';
+import { releaseGate } from './release-gate.js';
 
 export const checks: Check[] = [{
   name: 'launch operations draft locally, track approvals and extend results without network',
@@ -38,4 +39,7 @@ export const checks: Check[] = [{
     assert.equal(released.commits, 1);
     assert.ok((await readFile(released.notes, 'utf8')).includes(git(workspace, 'rev-parse', 'HEAD')));
   },
+}, {
+  name: 'tag release action pushes a review-only kit with only changed screen images',
+  async run({ cwd }) { await releaseGate(join(cwd, '.liftoff-fixture/release-gate')); },
 }];

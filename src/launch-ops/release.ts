@@ -4,6 +4,7 @@ import { loadRule } from '../core/rules.js';
 import type { Config } from '../product/init.js';
 import { checked, readJson, writeLocal } from '../results/files.js';
 import { commitNotes, commits, git, root, slug } from './common.js';
+import { makeKit, openReleasePr } from './release-kit.js';
 
 export function releaseSince(now: Date, cadence: string) {
   const since = new Date(now);
@@ -18,7 +19,8 @@ export function releaseSince(now: Date, cadence: string) {
   return since;
 }
 
-export async function release(cwd: string, options: { from?: string; to?: string; type?: string; cadence?: string; now?: Date } = {}) {
+export async function release(cwd: string, options: { from?: string; to?: string; type?: string; cadence?: string; now?: Date; issues?: string; shots?: boolean; draft?: boolean; openPr?: boolean } = {}) {
+  if (options.openPr && !options.draft) throw new Error('--open-pr requires --draft');
   const type = options.type ?? 'changelog';
   if (!['feature', 'changelog'].includes(type)) throw new Error('--type must be feature or changelog');
   if (options.cadence && !['weekly', 'monthly'].includes(options.cadence)) throw new Error('--cadence must be weekly or monthly');
@@ -26,7 +28,11 @@ export async function release(cwd: string, options: { from?: string; to?: string
   const to = options.to ?? 'HEAD';
   const target = git(cwd, 'rev-parse', '--verify', '--end-of-options', `${to}^{commit}`);
   let from = options.from;
-  if (!from && !options.cadence) from = git(cwd, 'describe', '--tags', '--abbrev=0', target);
+  if (!from && !options.cadence) {
+    let tagged = false;
+    try { git(cwd, 'describe', '--tags', '--exact-match', target); tagged = true; } catch { /* Between tags. */ }
+    from = git(cwd, 'describe', '--tags', '--abbrev=0', tagged ? `${target}^` : target);
+  }
   const base = from ? git(cwd, 'rev-parse', '--verify', '--end-of-options', `${from}^{commit}`) : undefined;
   const now = options.now ?? new Date();
   const since = releaseSince(now, options.cadence ?? 'monthly');
@@ -46,5 +52,7 @@ export async function release(cwd: string, options: { from?: string; to?: string
   const notes = join(folder, 'notes.md'), planPath = join(folder, 'plan.md');
   await writeLocal(notes, `# ${type} release\n\nRange: ${base ?? since.toISOString()}..${target}\n\n${commitNotes(rows)}`);
   await writeLocal(planPath, plan);
-  return { notes, plan: planPath, from: base, to: target, commits: rows.length };
+  const kit = await makeKit(cwd, folder, target, base, config, options, base ? undefined : [target, `--since=${since.toISOString()}`, `--until=${now.toISOString()}`]);
+  const branch = options.openPr ? openReleasePr(cwd, folder, kit.historyPath, slug(label), (await readJson(kit.kit) as { files: string[] }).files) : undefined;
+  return { notes, plan: planPath, from: base, to: target, commits: rows.length, ...kit, branch };
 }

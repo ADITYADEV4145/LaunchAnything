@@ -49,6 +49,47 @@ are used. Review every generated draft before sharing it yourself.
 
 ## Ongoing releases
 
+### Review-only release kits
+
+`release --draft [--issues file.json] [--no-shots]` generates changelog.md,
+github-release.md, selection.json, copy-check.json, kit.json, relaunch.md and
+posts/x.md, linkedin.md, email.md (devto.md only for devtools, code/API/CLI or
+performance changes). `releaseChannels` overrides that channel list.
+Closed issues are an offline array of `{number,title,state?,html_url?}`; commit
+subjects and bodies recognize fixes/closes/resolves references. With a GitHub
+origin and GITHUB_TOKEN, closed issues are optionally read from GitHub; failures
+are warnings. No network is needed for local generation.
+
+Selection is deterministic: feat/fix/perf/breaking subjects score 4; touching
+implementation rather than tests/docs scores 2; a linked issue adds 1.
+docs/chore/test/ci/refactor/build subjects score zero. The top three changes
+scoring at least 4 get drafts; otherwise no posts are recommended. Copy-check
+verdicts are advisory: source text is not silently rewritten or approved. Review
+any flagged claims, tone or channel-rule issues before posting. Evidence appears
+in source comments, with a commit link in post copy when GitHub is available.
+
+Shots accept optional `sources: [globs]` (repository-relative `*` and `**`). These
+override route inference. Without sources, app/pages routes map to page files;
+layouts, globals.css, Tailwind config and package.json affect all web shots.
+CLI src/bin/package changes affect terminal shots. Only changed captures enter
+the kit; other capture manifest entries remain intact. Clips use the existing
+FFmpeg video renderer with changed images, or a storyboard and explicit skip
+reason. Capture requires local Chrome; no placeholder images are generated.
+
+PH v2 requires at least 6 user-facing changes and cumulative score 30 since
+config.launchDate (or `lastRelaunch` in releases/history.json). HN additionally
+requires a perf/architecture/algorithm change with a number or technical writeup
+URL. These are recommendations, never submissions. History deduplicates release
+targets; cumulative scoring is recomputed from git so reruns cannot inflate it.
+
+`progress [--since ISO-date] [--now ISO-date]` defaults to seven days and writes
+`.launch/progress/<ISO-week>/` drafts with exactly one most-recent real shot, or
+states that no screenshot exists. `release --install-action` installs the bundled
+tag-push workflow. `release --draft --open-pr` uses git/gh to push a
+`liftoff/release-<tag-slug>` review branch with only the kit and history staged.
+It refuses a nonempty index. Requires an origin and configured git identity.
+Nothing is published; human approval and manual posting remain required.
+
 `release [--from tag] [--to ref] [--type feature|changelog]`
 uses latest reachable tag..HEAD by default. `--cadence weekly|monthly` instead
 selects the past seven days/calendar month (through now), and cannot combine with

@@ -2,7 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { errors } from 'playwright';
 import { packageRoot } from '../src/core/package-root.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import { friends, checkFriendDraft } from '../src/launch-ops/friends.js';
@@ -13,6 +14,10 @@ import { collect } from '../src/results/collect.js';
 import { readJson, writeJson, writeLocal } from '../src/results/files.js';
 import { parseTargets, retro } from '../src/results/retro.js';
 import { checks } from '../src/selftest/launch-ops.js';
+import { affected, cleanTitle, clipScenes, closedIssuesInRange, draftPosts, judge, technical, relaunch, type Change } from '../src/launch-ops/release-kit.js';
+import { progress, isoWeek } from '../src/launch-ops/progress.js';
+import * as shotCapture from '../src/visuals/shots.js';
+import { CaptureError } from '../src/visuals/runtime.js';
 
 const dirs: string[] = [];
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -119,6 +124,196 @@ it('monthly release cadence clamps month ends and preserves the UTC time', () =>
   expect(releaseSince(new Date('2026-03-15T12:34:56Z'), 'monthly').toISOString()).toBe('2026-02-15T12:34:56.000Z');
   expect(releaseSince(new Date('2026-03-31T12:34:56Z'), 'weekly').toISOString()).toBe('2026-03-24T12:34:56.000Z');
 });
+it('scores user-noticeable changes, technical posts and relaunch substance deterministically', () => {
+  expect(judge('feat: command help', ['bin/tool.js'], [12]).score).toBe(7);
+  expect(judge('docs: typo', ['README.md']).score).toBe(0);
+  expect(judge('chore: dependency', ['package.json']).score).toBe(0);
+  expect(judge('fix: crash', []).score).toBe(4);
+  expect(technical('indie-saas', [{ title: 'Updated copy', files: ['README.md'] }])).toBe(false);
+  expect(technical('devtool', [])).toBe(true);
+  expect(technical('indie-saas', [{ title: 'perf: query', files: [] }])).toBe(true);
+  const change = { sha: 'abc', title: 'feat: help', body: '', files: ['bin/tool.js'], issues: [], ...judge('feat: help', ['bin/tool.js']) };
+  expect(relaunch([]).ph).toBe(false);
+  expect(relaunch(Array(5).fill(change)).ph).toBe(false);
+  expect(relaunch(Array(6).fill(change))).toMatchObject({ ph: true, hn: false });
+  expect(relaunch([...Array(5).fill(change), { ...change, title: 'perf: query 30% faster' }] as Change[]).hn).toBe(true);
+});
+it.each([
+  ['feat(cli): clearer command help (#123)', 'Clearer command help'],
+  ['fix!: prevent a crash (#7)', 'Prevent a crash'],
+  ['perf(api)!: faster queries', 'Faster queries'],
+  ['already useful copy', 'Already useful copy'],
+  ['fix: échapper les caractères', 'Échapper les caractères'],
+  ['', ''],
+  ['feat: (#123)', ''],
+])('cleans user-facing subject %j without git metadata', (raw, expected) => {
+  expect(cleanTitle(raw)).toBe(expected);
+});
+it('uses cleaned selected titles in posts and clip scenes while preserving source subjects and hashes', async () => {
+  const { paths } = await workspace();
+  const changes: Change[] = [
+    { sha: 'abc123', title: 'feat(cli)!: clearer command help (#123)', body: '', files: [], issues: [], score: 4, reasons: [] },
+    { sha: 'def456', title: 'fix: prevent a crash (#124)', body: '', files: [], issues: [], score: 4, reasons: [] },
+  ];
+  await draftPosts(paths.root, ['email'], changes, c => `git show ${c.sha}`);
+  const post = await readFile(join(paths.root, 'posts/email.md'), 'utf8');
+  const [body, sources] = post.split('<!-- Sources');
+  expect(body).toContain('Clearer command help');
+  expect(body).toContain('Prevent a crash');
+  expect(body).not.toMatch(/feat\(|fix:|\(#\d+\)/);
+  expect(sources).toContain('feat(cli)!: clearer command help (#123) (abc123)');
+  expect(sources).toContain('fix: prevent a crash (#124) (def456)');
+  const scenes = clipScenes(['changed'], changes);
+  expect(scenes).toHaveLength(6);
+  expect(scenes.map(s => s.text)).toEqual(Array(3).fill(['Clearer command help', 'Prevent a crash']).flat());
+  const longTitle = 'feat: one two three four five six seven eight nine ten (#9)';
+  expect(clipScenes(['changed'], [{ title: longTitle }]).slice(0, 2).map(s => s.text)).toEqual(['One two three four five six seven eight', 'nine ten']);
+  expect(clipScenes([], changes)).toEqual([]);
+  expect(clipScenes(['changed'], [])).toEqual([]);
+});
+it('filters API issues by closure date inclusively, excluding PRs and updated-but-previously-closed issues', () => {
+  const since = '2026-01-02T00:00:00Z', until = '2026-01-09T00:00:00Z';
+  const issue = { number: 1, title: 'Command help', state: 'closed', closed_at: since };
+  const issues = [
+    issue,
+    { ...issue, number: 2, closed_at: until },
+    { ...issue, number: 3, closed_at: '2026-01-01T23:59:59Z', updated_at: until },
+    { ...issue, number: 4, closed_at: '2026-01-09T00:00:01Z' },
+    { ...issue, number: 5, pull_request: { url: 'https://api.github.com/repos/example/tool/pulls/5' } },
+    { ...issue, number: 6, state: 'open' },
+    { ...issue, number: 7, closed_at: null },
+    { ...issue, number: 8, closed_at: 'invalid' },
+    { number: 9, title: 'No closure date', state: 'closed' },
+  ];
+  expect(closedIssuesInRange(issues, since, until).map(i => i.number)).toEqual([1, 2]);
+  expect(closedIssuesInRange([], since, until)).toEqual([]);
+  expect(closedIssuesInRange(issues, 'invalid', until)).toEqual([]);
+});
+it('maps routes, explicit sources, global files and terminal changes without reshooting other screens', () => {
+  expect(affected({ route: '/settings' }, ['src/app/settings/page.tsx'])).toBe(true);
+  expect(affected({ route: '/' }, ['pages/index.tsx'])).toBe(true);
+  expect(affected({ route: '/settings' }, ['pages/other.tsx'])).toBe(false);
+  expect(affected({ route: '/settings' }, ['src/app/layout.tsx'])).toBe(true);
+  expect(affected({ sources: ['src/settings/**'] }, ['src/settings/form.tsx'])).toBe(true);
+  expect(affected({ sources: ['src/settings/*'] }, ['src/other.ts'])).toBe(false);
+  expect(affected({ commands: ['node --version'] }, ['bin/tool.js'])).toBe(true);
+  expect(affected({ commands: ['node --version'] }, ['docs/tool.md'])).toBe(false);
+});
+it.each([
+  ['src/**/*.tsx', 'src/page.tsx', true],
+  ['src/**/*.tsx', 'src/app/page.tsx', true],
+  ['src/**/*.tsx', 'src/app/settings/page.tsx', true],
+  ['src/**/*.tsx', 'src/page.ts', false],
+  ['src/**/*.tsx', 'other/src/page.tsx', false],
+  ['src/**/*.tsx', 'src/pageXtsx', false],
+  ['src/*.tsx', 'src/app/page.tsx', false],
+  ['**/page.tsx', 'page.tsx', true],
+  ['**/page.tsx', 'src/app/page.tsx', true],
+])('matches shot source glob %s against %s as %s', (glob, file, expected) => {
+  expect(affected({ sources: [glob] }, [file])).toBe(expected);
+  expect(affected({ sources: [glob] }, [])).toBe(false);
+});
+it('writes weekly drafts with no invented screenshot, one latest real image, and deterministic date errors', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  const options = { now: '2026-01-03T00:00:00Z' };
+  const empty = await progress(cwd, options);
+  expect(empty.image).toBeUndefined();
+  expect(await readFile(join(empty.folder, 'progress.md'), 'utf8')).toContain('image skipped');
+  await writeLocal(join(paths.media, 'shots', 'real.png'), 'actual fixture capture');
+  const withImage = await progress(cwd, options);
+  expect(withImage.image).toBe('real.png');
+  expect(await readFile(join(withImage.folder, 'media/real.png'), 'utf8')).toBe('actual fixture capture');
+  expect((await progress(cwd, { now: '2027-01-01' })).commits).toBe(0);
+  expect(isoWeek(new Date('2027-01-01'))).toBe('2026-W53');
+  await expect(progress(cwd, { now: 'bad' })).rejects.toThrow('Invalid');
+});
+it('honors release channel overrides, no-shots and offline issue input with empty-post fallback', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  const config = await readJson(paths.config) as Record<string, unknown>;
+  await writeJson(paths.config, { ...config, releaseChannels: ['email'] });
+  const issues = join(cwd, 'issues.json'); await writeJson(issues, [{ number: 5, title: 'Fix command help', state: 'closed', html_url: 'https://github.com/example/tool/issues/5' }, { number: 6, title: 'Offline issue without URL' }]);
+  const kit = await release(cwd, { issues, shots: false });
+  expect(kit.channels).toEqual(['email']);
+  expect(await readFile(join(kit.notes, '../github-release.md'), 'utf8')).toContain('Fix command help');
+  for (const file of ['changelog.md', 'github-release.md']) {
+    const notes = await readFile(join(kit.notes, '..', file), 'utf8');
+    expect(notes).toContain('[#5](https://github.com/example/tool/issues/5): Fix command help');
+    expect(notes).toContain('#6: Offline issue without URL');
+    expect(notes).toContain(`feat: useful change (git show ${git(cwd, 'rev-parse', 'HEAD')})`);
+  }
+  await writeJson(issues, {}); await expect(release(cwd, { issues })).rejects.toThrow('--issues');
+  await expect(release(cwd, { openPr: true })).rejects.toThrow('requires --draft');
+  await writeLocal(join(cwd, 'docs.md'), 'Internal docs'); git(cwd, 'add', 'docs.md'); git(cwd, 'commit', '-m', 'docs: internal notes');
+  const quiet = await release(cwd, { from: 'HEAD^' }); expect(quiet.channels).toEqual([]);
+  expect(await readFile(join(quiet.notes, '../selection.json'), 'utf8')).toContain('No posts recommended');
+});
+it('installs dependencies before drafting releases in the workflow template', async () => {
+  const workflow = await readFile(join(packageRoot(), 'templates/github/liftoff-release.yml'), 'utf8');
+  expect(workflow).toContain('if [ -f package-lock.json ]; then\n            npm ci');
+  expect(workflow).toContain('elif [ -f package.json ]; then\n            npm install');
+  expect(workflow.indexOf('npm ci')).toBeLessThan(workflow.indexOf('npx launch-liftoff release'));
+});
+it.each([new CaptureError('App readiness timeout'), new errors.TimeoutError('page.goto: Timeout exceeded')])('continues drafting a kit after an operational capture failure: %s', async error => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    route: /\n    viewport: {width: 800, height: 500}\n');
+  const capture = vi.spyOn(shotCapture, 'takeShots').mockRejectedValue(error);
+  try {
+    const kit = await release(cwd);
+    expect(capture).toHaveBeenCalledOnce();
+    expect(kit.skipped).toContain(`Capture skipped: ${error.message}`);
+    expect(kit.skipped).toContain(`clip skipped: ${error.message}`);
+    expect(await readJson(kit.kit)).toMatchObject({ draft: true });
+    expect(await readFile(join(kit.notes, '../changelog.md'), 'utf8')).toContain('feat: useful change');
+  } finally { capture.mockRestore(); }
+});
+it.each([new TypeError('Unexpected capture implementation error'), new Error('Privacy guard failed')])('does not hide programming or privacy errors during capture: %s', async error => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    route: /\n    viewport: {width: 800, height: 500}\n');
+  const capture = vi.spyOn(shotCapture, 'takeShots').mockRejectedValue(error);
+  try { await expect(release(cwd)).rejects.toBe(error); }
+  finally { capture.mockRestore(); }
+});
+it('skips shots and clips when the release target is not the checked-out commit', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  git(cwd, 'tag', 'v0.2.0');
+  await writeLocal(join(cwd, 'later.md'), 'Later commit'); git(cwd, 'add', 'later.md'); git(cwd, 'commit', '-m', 'docs: later work');
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    commands: ["node --version"]\n    viewport: {width: 800, height: 500}\n');
+  const capture = vi.spyOn(shotCapture, 'takeShots');
+  try {
+    const kit = await release(cwd, { from: 'v0.1.0', to: 'v0.2.0' });
+    expect(capture).not.toHaveBeenCalled();
+    expect(kit.reshot).toEqual(['changed']);
+    const reason = 'target is not the checked-out commit; check it out to re-shoot';
+    expect(kit.skipped).toContain(`Capture skipped: ${reason}`);
+    expect(kit.skipped).toContain(`clip skipped: ${reason}`);
+    expect(await readJson(kit.kit)).toMatchObject({ draft: true });
+  } finally { capture.mockRestore(); }
+});
+it.each([false, true])('skips shots for dirty tracked range files (staged: %s)', async staged => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    commands: ["node --version"]\n    viewport: {width: 800, height: 500}\n');
+  await writeLocal(join(cwd, 'CHANGELOG.md'), 'Uncommitted work');
+  if (staged) git(cwd, 'add', 'CHANGELOG.md');
+  const capture = vi.spyOn(shotCapture, 'takeShots');
+  try {
+    const kit = await release(cwd);
+    expect(capture).not.toHaveBeenCalled();
+    const reason = 'tracked files changed in this range have uncommitted changes; commit or restore them to re-shoot';
+    expect(kit.skipped).toContain(`Capture skipped: ${reason}`);
+    expect(kit.skipped).toContain(`clip skipped: ${reason}`);
+  } finally { capture.mockRestore(); }
+});
+it('does not skip capture for unrelated untracked files', async () => {
+  const { cwd, paths } = await workspace(); await repository(cwd);
+  await writeLocal(paths.shots, 'shots:\n  - id: changed\n    sources: [CHANGELOG.md]\n    commands: ["node --version"]\n    viewport: {width: 800, height: 500}\n');
+  await writeLocal(join(cwd, 'scratch.md'), 'Untracked work');
+  const capture = vi.spyOn(shotCapture, 'takeShots').mockRejectedValue(new CaptureError('Capture attempted'));
+  try {
+    const kit = await release(cwd);
+    expect(capture).toHaveBeenCalledOnce();
+    expect(kit.skipped).toContain('Capture skipped: Capture attempted');
+  } finally { capture.mockRestore(); }
+});
 it('release uses the exact target tag rather than the requested ref label', async () => {
   const { cwd } = await workspace(); await repository(cwd);
   git(cwd, 'tag', 'v0.2.0');
@@ -139,4 +334,4 @@ it.each(['warroom', 'friends', 'followup', 'retro', 'release'])('%s emits struct
 it.each(['cli-tool', 'saas-next', 'mobile-expo'])('offline launch operations selftest for %s', async fixture => {
   const { cwd } = await workspace(fixture); await repository(cwd);
   for (const check of checks) await check.run({ cwd, fixture });
-});
+}, 120000);

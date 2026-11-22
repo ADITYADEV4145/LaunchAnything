@@ -1,24 +1,28 @@
 const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const zones: Record<string, string> = { et: 'America/New_York', est: 'Etc/GMT+5', edt: 'Etc/GMT+4', pt: 'America/Los_Angeles', pst: 'Etc/GMT+8', pdt: 'Etc/GMT+7', ct: 'America/Chicago', cst: 'Etc/GMT+6', cdt: 'Etc/GMT+5', mt: 'America/Denver', mst: 'Etc/GMT+7', mdt: 'Etc/GMT+6', utc: 'UTC', gmt: 'UTC' };
+const unsupportedZones = ['cet', 'cest', 'eet', 'eest', 'ist', 'bst', 'jst', 'aest', 'aedt', 'acst', 'acdt', 'awst', 'nzst', 'nzdt', 'hkt', 'sgt', 'wet', 'west', 'ast', 'adt', 'hst', 'akst', 'akdt'];
+const zonePattern = `(?:(?:utc|gmt)[ \\t]*[+-][ \\t]*\\d+(?::\\d{2})?|[a-z_]+(?:/[a-z0-9_+-]+)+|${[...Object.keys(zones), ...unsupportedZones].join('|')})`;
 export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
   const text = rules.map(r => r.short_name + ' ' + r.description).join('\n').toLowerCase();
   const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
   if (/\bweekends?\b/.test(text)) days.push(0, 6);
   const clock = (hour: string, minute?: string, period?: string) => Number(hour) % (period ? 12 : 24) * 60 + Number(minute ?? 0) + (period === 'pm' ? 720 : 0);
-  const range = /\b(?:(?:between|from)\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:and|to|[-–])\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(text);
+  const range = [...text.matchAll(/\b(?:(?:between|from)\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:and|to|[-–])\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/g)].find(m =>
+    m[2] !== undefined || m[3] !== undefined || m[5] !== undefined || m[6] !== undefined || /^between\b/.test(m[0]) ||
+    new RegExp(`\\b${zonePattern}[ \\t]*$`).test(text.slice(0, m.index)) || new RegExp(`^[ \\t]*[(\\[]?[ \\t]*${zonePattern}\\b`).test(text.slice(m.index! + m[0].length)));
   const at = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(text);
   const start = range ? clock(range[1]!, range[2], range[3] ?? range[6]) : at ? clock(at[1]!, at[2], at[3]) : undefined;
   const end = range ? clock(range[4]!, range[5], range[6]) : start;
   const mentions = [...text.matchAll(/\b(?:e[ds]?t|p[ds]?t|c[ds]?t|m[ds]?t|utc|gmt)\b/g)].map(m => zones[m[0]]!);
   const time = range ?? at;
-  const suffix = time ? /^\s*[(\[]?\s*(?:in\s+)?([a-z][a-z0-9_+\/-]*)/.exec(text.slice(time.index + time[0].length))?.[1] : undefined;
+  const suffix = time ? /^\s*[(\[]?\s*(?:in\s+)?([a-z][a-z0-9_+\/-]*)/.exec(text.slice(time.index! + time[0].length))?.[1] : undefined;
   let manualReview: string | undefined;
   if (suffix && !zones[suffix] && !/^(?:in|on|and|or|only|every|during|for|with|please|use|post|posts|within|the|this|via|daily|weekly)$/.test(suffix)) {
     try { new Intl.DateTimeFormat('en', { timeZone: suffix }); mentions.push(suffix); }
     catch { manualReview = `Unrecognized rule timezone: ${suffix}`; }
   }
   if (/\b(?:utc|gmt)\s*[+-]\s*\d/.test(text)) manualReview = 'Rule timezone offset needs manual review';
-  const unsupported = /\b(?:cet|cest|eet|eest|ist|bst|jst|aest|aedt|acst|acdt|awst|nzst|nzdt|hkt|sgt|wet|west|ast|adt|hst|akst|akdt)\b/.exec(text);
+  const unsupported = new RegExp(`\\b(?:${unsupportedZones.join('|')})\\b`).exec(text);
   if (unsupported) manualReview = `Unrecognized rule timezone: ${unsupported[0]}`;
   if (new Set(mentions).size > 1) manualReview = 'Conflicting rule timezones';
   return { days: [...new Set(days)], megathread: /mega[- ]?thread/.test(text), start, end, timezone: mentions[0] ?? timezone, manualReview };

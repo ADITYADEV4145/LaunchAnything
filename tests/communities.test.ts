@@ -126,6 +126,29 @@ describe('communities', () => {
     const local = restrictions([], 'America/New_York');
     expect(postingSlot('2026-01-04', local, 'America/New_York')).toEqual({ date: '2026-01-04', time: undefined, timezone: 'America/New_York' });
   });
+  it.each([
+    'titles 10–50 characters; post 9am-5pm ET',
+    'titles 10-20 characters; post 09:00–17:00 ET',
+    'titles 10–50 characters; post 9-17 ET',
+    'titles 10–50 characters; post ET 9-17',
+    'titles 10-20 characters; post between 9 and 17 ET',
+  ])('ignores non-time numeric ranges in %s', description => {
+    const limit = restrictions([{ short_name: 'Self-Promo Sunday', description }], 'UTC');
+    expect(limit).toMatchObject({ start: 540, end: 1020, timezone: 'America/New_York' }); expect(limit.manualReview).toBeUndefined();
+    const slot = postingSlot('2026-01-04', limit, 'UTC'); expect(slot).toMatchObject({ date: '2026-01-04', time: '14:00' });
+    expect(postingWindow(slot.date, slot.time, slot.timezone, limit, slot.instant)).toEqual({ day: true, time: true });
+  });
+  it('leaves non-time ranges unparsed and still writes a plan with a later time window', async () => {
+    const limit = restrictions([{ short_name: 'Promo', description: 'Titles 10–50 characters; account 90-180 days old.' }], 'UTC');
+    expect(limit.start).toBeUndefined(); expect(limit.end).toBeUndefined(); expect(limit.manualReview).toBeUndefined();
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));
+    const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: 'Titles 10–50 characters; post 9am-5pm ET' }] };
+    const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify(evidence)); await importEvidence(cwd, file);
+    expect((await reportCommunities(cwd)).valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual(['builders']); expect(report.plan[0]).toMatchObject({ date: '2026-01-04', time: '14:00', timezone: 'UTC' });
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
   it.each([5, 6])('preserves the %s:30 UTC instant when New York repeats 01:30 at fall-back', async hour => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'America/New_York' }));
     const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday at ${hour}:30am UTC` }] };

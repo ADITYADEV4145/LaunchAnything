@@ -35,7 +35,7 @@ function parseRestriction(rules: { short_name: string; description: string }[], 
   const dayList = `${dayToken}(?:\\s*(?:,\\s*(?:(?:and|or)\\s+)?|(?:and|or)\\s+)${dayToken})*`;
   const dayNumbers = (value: string) => weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(value) || /\bweekends?\b/.test(value) && [0, 6].includes(i) || /\bweekdays?\b/.test(value) && i > 0 && i < 6 ? [i] : []);
   const positiveDays: number[][] = []; const excludedDays = new Set<number>();
-  for (const clause of text.split(/[.;!?\n]+/)) {
+  for (const clause of text.replace(/[*_]/g, '').split(/[.;!?\n]+/)) {
     if (!new RegExp(`\\b${dayToken}\\b`).test(clause) && !/\b(?:any|every)\s+day\b/.test(clause)) continue;
     if (new RegExp(`\\b${dayToken}\\s*(?:[-–]|to|through)\\s*${dayToken}\\b`).test(clause)) manualReview = 'Unclear posting-day polarity';
     let negativeStart: number | undefined;
@@ -77,13 +77,15 @@ function parseRestriction(rules: { short_name: string; description: string }[], 
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed || unparsedTime) manualReview ??= unknownTimeContext(source);
-  const unresolvedExclusive = [...source.matchAll(/\bonly\s+(?:allowed\s+)?(in|on)\b/gi)].some(match => {
+  const exclusiveMentions = (value: string) => [...value.matchAll(/\bonly\s+(?:allowed\s+)?(in|on)\b(?![-\u2010-\u2015])/gi)].filter(match => !/\bnot\s+$/i.test(value.slice(0, match.index)));
+  const unresolvedExclusive = exclusiveMentions(source).some(match => {
     const target = source.slice(match.index + match[0].length).trimStart();
-    const knownDay = match[1]!.toLowerCase() === 'on' && new RegExp(`^(?:the\\s+)?${dayToken}\\b`, 'i').test(target);
+    const dayTarget = target.replace(/[*_]/g, '').replace(/^(?:a|an|the)\s+/i, '');
+    const knownDay = match[1]!.toLowerCase() === 'on' && new RegExp(`^${dayToken}\\b`, 'i').test(dayTarget);
     const knownThread = /^(?:the\s+)?(?:mega[-_\s]?threads?|weekly[-_\s]+(?:posts?|threads?))\b/i.test(target);
     return !knownDay && !knownThread;
   });
-  const onlyThread = unresolvedExclusive || /\bonly\s+(?:allowed\s+)?(?:in|on)\b/i.test(tokenized) && (urls.length > 0 || /\bthis\s+(?:post|thread|megathread)\b/i.test(tokenized));
+  const onlyThread = unresolvedExclusive || exclusiveMentions(tokenized).length > 0 && (urls.length > 0 || /\bthis\s+(?:post|thread|megathread)\b/i.test(tokenized));
   const megathread = onlyThread || threadMention.test(source) || /\b(?:in|at|use|outside(?:\s+of)?|anywhere\s+but)\s*<url-\d+>/i.test(tokenized);
   const threadUrls = megathread ? [...new Set(urls)] : [];
   const authorizedUrls = urls.every((_, i) => clauses.some(clause => directsTo(clause, `<url-${i}>`)));

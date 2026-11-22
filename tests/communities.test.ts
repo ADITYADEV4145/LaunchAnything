@@ -11,6 +11,32 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['**Sundays**', '*Sundays*', '_Sundays_', '__Sundays__', 'a Sunday', 'an **Sunday**', 'the **Sunday**'])('keeps emphasized or article-prefixed days schedulable: %s', async day => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
+    const rules = [{ short_name: 'Self-promotion', description: `Follow 9:1. Only on ${day}.` }];
+    expect(restrictions(rules, 'UTC')).toMatchObject({ days: [0], megathread: false, manualReview: undefined });
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    expect((await reportCommunities(cwd)).valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual(['builders']); expect(report.plan[0]).toMatchObject({ date: '2026-01-04', destination: 'standalone post' });
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    report.plan[0].date = '2026-01-02';
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting day violates cited rule');
+  });
+  it.each(['not only in the comments', 'not only on this post', 'only on-topic', 'only on‑topic'])('does not invent an exclusive destination for %s', async phrase => {
+    const cwd = await setup(); const rules = [{ short_name: 'Self-promotion', description: `Self-promotion is allowed ${phrase}` }];
+    expect(restrictions(rules, 'UTC')).toMatchObject({ days: [], megathread: false, manualReview: undefined });
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    expect((await reportCommunities(cwd)).valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual(['builders']); expect(report.plan[0].destination).toBe('standalone post');
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it.each(['Follow 9:1. Only in our weekly post.', 'Not only in the comments. Self-promotion only in the lounge.', 'Self-promotion is allowed only on-topic. Only in the pinned post.'])('keeps real or unresolved thread restrictions fail-closed: %s', description => {
+    const limit = restrictions([{ short_name: 'Self-promotion', description }], 'UTC');
+    expect(limit.megathread).toBe(true); expect(limit.manualReview).toBeDefined();
+    expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+  });
   it.each(['only in', 'only on', 'only allowed in'].flatMap(phrase => [
     'the pinned post', 'the stickied post', 'the sticky post',
     'the pinned thread', 'the stickied thread', 'the sticky thread',

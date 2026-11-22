@@ -1,5 +1,7 @@
 kind: channel
 id: indie-hackers
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Indie Hackers
 profiles: ["indie-saas"]
 bestPostingTimes: ["09:00", "14:00"]

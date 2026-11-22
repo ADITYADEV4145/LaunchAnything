@@ -1,5 +1,7 @@
 kind: channel
 id: product-hunt
+sourceTimezone: America/Los_Angeles
+sourceTimes: ["00:01"]
 name: Product Hunt
 profiles: ["indie-saas","b2b-saas"]
 bestPostingTimes: ["09:00", "14:00"]

@@ -1,5 +1,7 @@
 kind: channel
 id: shorts
+sourceTimezone: America/New_York
+sourceTimes: ["09:00"]
 name: Shorts
 profiles: ["consumer-mobile"]
 bestPostingTimes: ["09:00", "14:00"]

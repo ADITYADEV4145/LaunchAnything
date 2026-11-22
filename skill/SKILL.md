@@ -95,6 +95,17 @@ Fix every error. Resolve commit warnings by inspecting/fetching history or repla
 the source with a verifiable one. Never invent proof, metrics or customer claims.
 Other JSON artifacts can be checked by schema name; YAML shots are supported too.
 
+## recommend
+
+Run `liftoff recommend --json` after product and community research. It reads product.json,
+research/pains.json, communities.json and channel/profile rules, then writes
+`.launch/recommendations.md` for `go`. `--history <path>` consumes learned time observations
+and names any observation that changes a choice. All table times use config.timezone.
+PH open dates are offline/unverified: check via PH MCP before submitting. Nothing posts
+or sends. Resolve skipped Reddit account eligibility before scheduling it; email and
+owned slots remain conditional on the first major post actually being live.
+Run `liftoff selftest --through B --json` for the full cumulative recommendation gate.
+
 ## plan
 
 Run `liftoff plan --json`. It uses the confirmed profile, launch type, allowed channel

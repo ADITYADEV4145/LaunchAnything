@@ -109,6 +109,7 @@ Selftest retains its per-check report in data even when some checks fail.
 | --- | --- | --- |
 | 0b | audience | Local Kit waitlist preview, community map, and audience drafts |
 | 1 | init, scan, validate, plan | Implemented |
+| B | recommend [--history path] | Deterministic ranked channels, angles, founder-local schedule and skip reasons in .launch/recommendations.md; no publishing |
 | Foundation | doctor, selftest --through N | Local dependency probes and cumulative checks through phase 7 (Part D media), plus Part I |
 | 2 | write, check, judge, pick, claims strip, blind-test | Briefs with templates, exemplars and founder voice; checks; judge gate; blind test ([scripts/blind-test.md](scripts/blind-test.md)) |
 | 3 | shots plan, shots, media polish, images, media judge | Storyboard capture, branded platform sets, safety and quality gates |

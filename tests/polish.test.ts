@@ -62,6 +62,11 @@ it('captures a real tiny CLI product, polishes it and automatically builds the b
       expect(cap, `${size} terminal label`).toBeDefined();
       expect(cap!.height).toBeGreaterThanOrEqual(platforms[size].height * .025 - 1);
     }
+    await makeImages(cwd,{size:'x'});
+    const regenerated=JSON.parse(await readFile(join(paths,'images/report.json'),'utf8'));
+    expect(regenerated).toHaveLength(entries.length);
+    expect(regenerated.find((item:{file:string})=>item.file==='product-hunt-1.png')).toEqual(entries.find((item:{file:string})=>item.file==='product-hunt-1.png'));
+    expect(regenerated.filter((item:{file:string})=>item.file==='x.png')).toHaveLength(1);
     shots[3].caption = 'foo'; await writeFile(join(cwd, '.launch/shots.yaml'), JSON.stringify({ shots }));
     await expect(polish(cwd)).rejects.toThrow('Banned content in polished after: foo');
     await expect(readFile(join(paths, 'polished/after.png'))).rejects.toMatchObject({ code: 'ENOENT' });

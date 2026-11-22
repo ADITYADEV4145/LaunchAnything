@@ -5,7 +5,7 @@ import { packageRoot } from '../core/package-root.js';
 import { browser, escapeHtml } from '../visuals/runtime.js';
 import { platforms, checkImage, contrast, type Size } from '../visuals/check.js';
 import { assertClean, ocrWords } from './banned.js';
-import { mediaBrand, dataImage, mediaHost, storyboard } from './assets.js';
+import { mediaBrand, dataImage, mediaHost, storyboard, optionalJson } from './assets.js';
 import { polish } from './polish.js';
 import { terminalSource, renderTerminal, type TerminalTranscript, type TerminalMetrics } from './terminal.js';
 export interface CarouselSlide { role: string; caption: string; source?: string; id?: string; terminal?: TerminalTranscript }
@@ -82,7 +82,9 @@ export async function storyboardImages(cwd: string, options: { size?: string; te
   if (!shots) throw new Error('Storyboard images require shots with purposes');
   if (options.size && !(options.size in platforms)) throw new Error('Unknown image size');
   if (options.template && !(options.template in platforms)) throw new Error('Unknown template');
-  const paths = launchDir(cwd); await rm(join(paths.media, 'images/report.json'), { force: true });
+  const paths = launchDir(cwd);
+  const previous = options.size ? await optionalJson(join(paths.media, 'images/report.json')) : [];
+  await rm(join(paths.media, 'images/report.json'), { force: true });
   const polished = await polish(cwd); const money = shots.find(shot => shot.moneyMoment)!;
   const slide = (shot: typeof money): CarouselSlide => {
     const capture = polished.find(item => item.id === shot.id && item.theme !== 'dark') ?? polished.find(item => item.id === shot.id);
@@ -105,5 +107,7 @@ export async function storyboardImages(cwd: string, options: { size?: string; te
       else if (size === 'product-hunt') { await writeFile(join(paths.media, 'images/product-hunt-1.png'), await readFile(result.files[0])); report.push({ ...first, file: 'product-hunt-1.png' }); }
     }
   }
-  await writeFile(join(paths.media, 'images/report.json'), JSON.stringify(report, null, 2)); return report;
+  const merged = new Map((Array.isArray(previous) ? previous : []).map(item => [item.file, item]));
+  for (const item of report) merged.set(item.file, item);
+  await writeFile(join(paths.media, 'images/report.json'), JSON.stringify([...merged.values()], null, 2)); return report;
 }

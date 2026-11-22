@@ -130,50 +130,50 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
         remaining = Date.parse(post.scheduledAt) - now().getTime();
       }
       const dispatch = async () => {
-      let receipt: PublishReceipt | undefined;
-      let unavailableReason = connectionError;
-      try {
-        if (connectionError) throw new Error(connectionError);
-        if (!options.mock) await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            if (!(await readConsent(paths.root, options.mock)).grants.some(grant => sameScope(grant, scope)))
-              throw new Error('Standing consent revoked before attempt: ' + post.channel);
-            const current = options.mock ? validate<{ approvals: typeof approvals }>('approvals',
-              JSON.parse(await readOptional(join(paths.root, 'approvals.mock.json')) ?? '{"approvals":[]}'))
-              : await decisions(paths);
-            requireApproval(post, current.approvals, config.approvers);
-            receipt = await adapter.publish({ post, connection, root: paths.root, notify: message => log('\u0007' + message) });
-            if (receipt.status !== 'published' || !receipt.url || !/^https:\/\//.test(receipt.url)) throw new Error('No live URL returned');
-            break;
-          } catch (error) {
-            if (error instanceof McpPublishingUnavailable) unavailableReason = error.message;
-            if (error instanceof PublishRequestFailure) unavailableReason = error.message;
-            receipt = undefined;
-            if (error instanceof PublishRequestFailure ? !error.retryable : !options.mock && scope.route !== 'browser') break;
+        let receipt: PublishReceipt | undefined;
+        let unavailableReason = connectionError;
+        try {
+          if (connectionError) throw new Error(connectionError);
+          if (!options.mock) await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              if (!(await readConsent(paths.root, options.mock)).grants.some(grant => sameScope(grant, scope)))
+                throw new Error('Standing consent revoked before attempt: ' + post.channel);
+              const current = options.mock ? validate<{ approvals: typeof approvals }>('approvals',
+                JSON.parse(await readOptional(join(paths.root, 'approvals.mock.json')) ?? '{"approvals":[]}'))
+                : await decisions(paths);
+              requireApproval(post, current.approvals, config.approvers);
+              receipt = await adapter.publish({ post, connection, root: paths.root, notify: message => log('\u0007' + message) });
+              if (receipt.status !== 'published' || !receipt.url || !/^https:\/\//.test(receipt.url)) throw new Error('No live URL returned');
+              break;
+            } catch (error) {
+              if (error instanceof McpPublishingUnavailable) unavailableReason = error.message;
+              if (error instanceof PublishRequestFailure) unavailableReason = error.message;
+              receipt = undefined;
+              if (error instanceof PublishRequestFailure ? !error.retryable : !options.mock && scope.route !== 'browser') break;
+            }
           }
+        } catch { receipt = undefined; }
+        if (!receipt) {
+          const reason = unavailableReason ?? (!options.mock && ['official-mcp', 'kit-mcp'].includes(scope.route)
+            ? mcpUnavailableReason(post.channel) : 'Dispatch failed after retry; no live URL was captured.');
+          const folder = join(paths.root, 'go-paste');
+          await mkdir(folder, { recursive: true });
+          const paste = join(folder, `${post.channel}-${post.hash}.md`);
+          await writeFile(paste, `# ${post.title}\n\n${post.body}\n\n${post.link ?? ''}\n\nAttachments:\n${post.media.map(m => m.path).join('\n')}\n\n${reason}\nInspect the destination for duplicates before submitting manually.\n`);
+          board.push({ channel: post.channel, status: 'failed', paste }); log(`${post.channel} | failed | ${reason} | ${paste}`);
+          return;
         }
-      } catch { receipt = undefined; }
-      if (!receipt) {
-        const reason = unavailableReason ?? (!options.mock && ['official-mcp', 'kit-mcp'].includes(scope.route)
-          ? mcpUnavailableReason(post.channel) : 'Dispatch failed after retry; no live URL was captured.');
-        const folder = join(paths.root, 'go-paste');
-        await mkdir(folder, { recursive: true });
-        const paste = join(folder, `${post.channel}-${post.hash}.md`);
-        await writeFile(paste, `# ${post.title}\n\n${post.body}\n\n${post.link ?? ''}\n\nAttachments:\n${post.media.map(m => m.path).join('\n')}\n\n${reason}\nInspect the destination for duplicates before submitting manually.\n`);
-        board.push({ channel: post.channel, status: 'failed', paste }); log(`${post.channel} | failed | ${reason} | ${paste}`);
-        return;
-      }
-      receipt.id = identity;
-      const live = receipt;
-      await serial(async () => {
-        receipts.push(live);
-        validate('published', { posts: receipts });
-        await writeFile(publishedPath, JSON.stringify({ posts: receipts }, null, 2) + '\n');
-        if (options.mock) await writeFile(paths.published, JSON.stringify({ posts: receipts }, null, 2) + '\n');
-        await warroom(cwd, { readStatus: async () => ({ status: 'published' }) });
-      });
-      board.push({ channel: post.channel, status: 'live', url: receipt.url }); log(`${post.channel} | live | ${receipt.url}`);
+        receipt.id = identity;
+        const live = receipt;
+        await serial(async () => {
+          receipts.push(live);
+          validate('published', { posts: receipts });
+          await writeFile(publishedPath, JSON.stringify({ posts: receipts }, null, 2) + '\n');
+          if (options.mock) await writeFile(paths.published, JSON.stringify({ posts: receipts }, null, 2) + '\n');
+          await warroom(cwd, { readStatus: async () => ({ status: 'published' }) });
+        });
+        board.push({ channel: post.channel, status: 'live', url: receipt.url }); log(`${post.channel} | live | ${receipt.url}`);
       };
       return scope.route === 'browser' ? withProfile(connection.profile ?? 'mock-default', dispatch) : dispatch();
     }));

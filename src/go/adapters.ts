@@ -31,34 +31,43 @@ export class PublishRequestFailure extends Error {
   constructor(message: string, public retryable = false) { super(message); }
 }
 const unknownOutcome = 'Publication outcome is unknown; check the destination for an existing post before using the paste file. No automatic retry.';
+async function browserSubmission({ post, root, notify }: Pick<DispatchContext, 'post' | 'root' | 'notify'>,
+  driver: BrowserDriver, message: string, fill = fillForm) {
+  let cleanup: (() => Promise<void>) | undefined;
+  try {
+    cleanup = await fill(driver, post, root);
+    notify(post.channel + message);
+    return await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, 600000);
+  } finally {
+    try { await driver.close(); }
+    catch { notify(post.channel + ': warning: browser close failed; any captured receipt is retained.'); }
+    finally {
+      try { await cleanup?.(); }
+      catch { notify(post.channel + ': warning: staged upload cleanup failed; any captured receipt is retained.'); }
+    }
+  }
+}
 export function mockAdapter(browser?: (channel: string) => BrowserDriver): GoAdapter {
   return { async publish({ post, root, notify }) {
     let url = `https://example.test/${post.channel}/${post.hash}`;
     if (routeFor(post.channel) === 'browser') {
       url = post.channel === 'reddit' ? 'https://www.reddit.com/r/test/comments/123/mock/' : 'https://news.ycombinator.com/item?id=123';
       const driver = browser?.(post.channel) ?? new MockBrowser(url);
-      const cleanup = await fillForm(driver, post, root);
-      try { notify(post.channel + ': prefilled; founder must press Submit'); url = await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, 600000); }
-      finally { await driver.close(); await cleanup(); }
+      url = await browserSubmission({ post, root, notify }, driver, ': prefilled; founder must press Submit');
     }
     return { channel: post.channel, id: `go-mock:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
   } };
 }
 
 export function liveAdapter(options: { keychain?: Keychain; request?: typeof fetch;
-  browser?: (profile: string) => Promise<BrowserDriver> } = {}): GoAdapter {
+  browser?: (profile: string) => Promise<BrowserDriver>; fill?: typeof fillForm } = {}): GoAdapter {
   const request = options.request ?? fetch;
   return { async publish({ post, connection, root, notify }) {
     const route = routeFor(post.channel);
     if (route === 'browser') {
       const driver = await (options.browser ?? chromeBrowser)(connection.profile!);
-      let cleanup: (() => Promise<void>) | undefined;
-      try {
-        cleanup = await fillForm(driver, post, root);
-        notify(post.channel + ': prefilled; press Submit in your browser');
-        const url = await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, 600000);
-        return { channel: post.channel, id: `go:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
-      } finally { await driver.close(); await cleanup?.(); }
+      const url = await browserSubmission({ post, root, notify }, driver, ': prefilled; press Submit in your browser', options.fill);
+      return { channel: post.channel, id: `go:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
     }
     if (route === 'official-mcp' || route === 'kit-mcp')
       throw new McpPublishingUnavailable(post.channel);

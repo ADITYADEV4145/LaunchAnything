@@ -112,10 +112,13 @@ it('a founder taking time to submit a form does not block API routes', async () 
   const adapter = mockAdapter();
   await go(work, { mock: true, confirm: true, yes: true, noWait: true, adapter: { async publish(context) {
     if (context.post.channel === 'show-hn') await founder;
-    else { published.push(context.post.channel); if (published.length === 4) finish(); }
+    else {
+      published.push(context.post.channel);
+      if (['x', 'devto', 'github-release'].every(channel => published.includes(channel))) finish();
+    }
     return adapter.publish(context);
   } } });
-  expect(published).toContain('devto');
+  expect(published).toEqual(expect.arrayContaining(['x', 'devto', 'github-release']));
 }, 30000);
 it('HTTP adapters use connected keychain credentials and require live IDs/URLs', async () => {
   const { work } = await fixture();
@@ -293,6 +296,40 @@ it.each([false, true])('serializes shared browser profiles, keeps APIs concurren
   if (!('board' in result) || !result.board) throw new Error('Missing board');
   expect(result.board.find(row => row.channel === 'reddit')?.status).toBe('live');
   expect(result.board.find(row => row.channel === 'show-hn')?.status).toBe(fail ? 'failed' : 'live');
+}, 30000);
+it.each(['close', 'cleanup', 'both'])('keeps one browser receipt without retry when %s fails', async failure => {
+  const { work, paths } = await fixture(), lines: string[] = [];
+  const driver = new MockBrowser();
+  const close = vi.spyOn(driver, 'close').mockImplementation(async () => {
+    if (failure !== 'cleanup') throw new Error('Close failed');
+  });
+  const cleanup = vi.fn(async () => { if (failure !== 'close') throw new Error('Cleanup failed'); });
+  const fill = vi.fn(async () => cleanup), browser = vi.fn(async () => driver);
+  const live = liveAdapter({ browser, fill }), mock = mockAdapter();
+  const result = await go(work, { mock: true, confirm: true, yes: true, noWait: true, log: line => lines.push(line),
+    adapter: { publish: context => context.post.channel === 'show-hn' ? live.publish(context) : mock.publish(context) } });
+  expect(browser).toHaveBeenCalledTimes(1);
+  expect(fill).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(cleanup).toHaveBeenCalledTimes(1);
+  expect(lines.some(line => line.includes('warning:') && line.includes('receipt is retained'))).toBe(true);
+  expect('board' in result && result.board?.find(row => row.channel === 'show-hn')?.status).toBe('live');
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts.filter((post: any) => post.channel === 'show-hn')).toHaveLength(1);
+}, 30000);
+it.each(['fill', 'wait'])('always closes and attempts available cleanup when browser %s fails', async failure => {
+  const { work, paths } = await fixture();
+  const post = (await loadReview(work)).posts.find(post => post.channel === 'show-hn')!;
+  const driver = new MockBrowser(), cleanup = vi.fn(async () => { throw new Error('Cleanup failed'); });
+  const close = vi.spyOn(driver, 'close').mockRejectedValue(new Error('Close failed'));
+  vi.spyOn(driver, 'waitForUrl').mockRejectedValue(new Error('Wait failed'));
+  const fill = vi.fn(async () => { if (failure === 'fill') throw new Error('Fill failed'); return cleanup; });
+  const notify = vi.fn();
+  await expect(liveAdapter({ browser: async () => driver, fill }).publish({ post, root: paths.root,
+    connection: { platform: post.channel, route: 'browser', profile: '/fixture', account: 'fixture', connectedAt: '' }, notify
+  })).rejects.toThrow(failure === 'fill' ? 'Fill failed' : 'Wait failed');
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(cleanup).toHaveBeenCalledTimes(failure === 'fill' ? 0 : 1);
+  expect(notify).toHaveBeenCalledWith(expect.stringContaining('warning: browser close failed'));
 }, 30000);
 it('GroundWork CLI mock --confirm covers every route after chat approval and PH confirmation', async () => {
   const { work } = await groundworkFixture();

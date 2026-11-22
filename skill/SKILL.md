@@ -130,6 +130,20 @@ never display fixture/tmp paths, pipes, credentials or debug output. Capture wit
 `liftoff shots` (`--url` for a running web app), then `liftoff media polish` and
 `liftoff images` (which also polishes). Do not invent UI or product claims.
 
+For store listings, add a `claim` to each shot: a sourced product.json claims[].id
+or `features/<exact feature name>` (uses that feature's sourced description).
+Write a benefit-led `caption` of 1–6 words, faithfully entailed by the reference.
+Benefit-led wording and semantic grounding are the agent's responsibility, not a
+CLI rewrite. Omit the caption only when the referenced text already fits 1–6 words;
+otherwise export deliberately fails asking you to write it. Never invent UI.
+Run `liftoff shots export` (all six targets) or `--targets appstore-6.9,play,og`;
+optional `--style <id>` defaults to midnight's tokens and reuses branded media
+frames. Review `.launch/media/store/manifest.json` and the exported PNGs; run
+`liftoff shots check --json` for the persisted size/RGB/grounding/safe-area/contrast,
+gallery, source-hash and OCR gates. OCR is skipped only when Tesseract is absent.
+Re-export stale captures or copy; never weaken receipts. App Store Connect/Google
+Play upload is out of scope and manual, after human review.
+
 Polished media and platform images use corner logo/wordmark branding. Set a local
 config.brandKit file (logo/colors/music), or media/logo.*; otherwise the product
 name is used. Images use the polished money moment; PH gets a gallery and IG gets

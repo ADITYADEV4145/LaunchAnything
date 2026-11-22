@@ -14,6 +14,7 @@
           "sources": { "type": "array", "items": { "type": "string", "minLength": 1 } },
           "purpose": { "enum": ["hook", "before", "action", "after", "proof", "cta"] },
           "caption": { "type": "string", "pattern": "^\\s*(?:\\S+\\s+){0,11}\\S*\\s*$" },
+          "claim": { "type": "string", "minLength": 1 },
           "moneyMoment": { "type": "boolean" },
           "element": { "type": "string", "minLength": 1 },
           "highlight": {

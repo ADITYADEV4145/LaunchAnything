@@ -158,6 +158,8 @@ liftoff shots plan                 # reads product.json money_moment; --force re
 liftoff shots                     # add --url http://127.0.0.1:3000 for a running web app
 liftoff media polish
 liftoff images                    # automatically polishes storyboards
+liftoff shots export --targets appstore-6.9,play,product-hunt
+liftoff shots check --json
 liftoff media judge --json
 liftoff video script --from-shots
 liftoff video voice --dry-run
@@ -171,6 +173,36 @@ may be an object with summary/before/after/proof, commands/setup or route, and
 highlight; strings and missing values fall back to verified product copy. Planning
 is a scaffold, not permission to invent claims or execute unreviewed commands.
 Legacy shots without new fields retain their original rendering path.
+
+### Store-ready screenshots
+
+`shots export` uses the real capture manifest and storyboard, shares media polish's
+phone/browser/terminal frames, and puts the money moment first. It defaults to all
+six targets: `appstore-6.9` (1290×2796), `appstore-6.5` (1242×2688), `play`
+(1080×1920), `product-hunt` (1270×760), `og` (1200×630), and `x` (1600×900).
+Select a comma list with `--targets`; `--style midnight` is the default video-style
+palette and typography. Brand colors/logo apply to the shared device frame.
+Portrait exports use phone frames; landscape exports use browser/terminal frames.
+Captures are scaled to fit without inventing, cropping, or rebuilding product UI.
+
+Each shots.yaml entry needs `claim: <product.claims[].id>` (or
+`claim: features/<exact feature name>`) resolving to a sourced product.json claim.
+Add a benefit-led `caption` of 1–6 words. If omitted, the claim text (feature
+description) is used only when it already fits; long claims fail with an instruction
+to write a caption. The agent writes the benefit-led wording; the CLI cannot prove
+semantic entailment and never auto-shortens or fabricates copy.
+
+Exports live in `.launch/media/store/<target>/<NN>-<id>.png` with a shared manifest
+recording captions, claim references, geometry, source capture hashes and output
+hashes. Export automatically runs `shots check`: exact dimensions, RGB PNG color
+type (no alpha), grounded caption length, ≥6% safe margins, clearance above the
+device, ≥4.5:1 rendered-pixel contrast and visible caption ink, unchanged captures,
+unchanged exported files, complete gallery order, and the banned-content OCR guard.
+OCR is reported skipped if Tesseract is unavailable. Check writes `store/check.json`
+with pass/fail/skipped gates and fails on any failed gate. Re-export after changing
+captures or caption/claim references. Receipts are local provenance checks, not
+tamper-proof signatures. **App Store Connect and Google Play upload are out of
+scope: review screenshots and upload manually.**
 
 Storyboards use scale-2 web capture and light/dark variants, or VHS CLI tapes with
 hidden setup. If VHS is absent, an HTML terminal plus ffmpeg is used. Tesseract is

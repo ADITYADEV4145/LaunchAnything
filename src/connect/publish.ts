@@ -9,8 +9,11 @@ import { chromeBrowser, type BrowserDriver } from './browser.js';
 import { forms, fillForm, frontMatter, type BrowserPlatform } from './forms.js';
 import { reserveCap } from './caps.js';
 import { assistedReminder, instagramPayload } from './payloads.js';
+import { HttpMcpClient, mcpDraft, type McpClient, type McpPlatform } from './mcp.js';
+import { osKeychain, type Keychain } from './keychain.js';
 
-export interface AssistOptions { channel?: string; account?: string; home?: string; browser?: (profile: string) => Promise<BrowserDriver>; now?: Date; timeout?: number }
+export interface AssistOptions { channel?: string; account?: string; home?: string; browser?: (profile: string) => Promise<BrowserDriver>; now?: Date; timeout?: number;
+  keychain?: Keychain; mcp?: (platform: McpPlatform, token: string) => Promise<McpClient> }
 export async function assistedPublish(cwd: string | undefined, options: AssistOptions = {}) {
   const { paths, config, posts } = await loadReview(cwd);
   const { approvals, skips } = await decisions(paths);
@@ -27,10 +30,12 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
     requireApproval(post, approvals, config.approvers);
     const connection = await requireConnection(post.channel, options.account, options.home);
     const route = connection.route === 'api' ? post.channel : connection.route;
-    const adapter = connection.route === 'browser' ? undefined : getAdapter(post.channel, route + ':');
+    const adapter = ['browser', 'mcp'].includes(connection.route) ? undefined : getAdapter(post.channel, route + ':');
     if (adapter) {
       if (adapter.name !== route) throw new Error(`${post.channel}: unsupported connected route ${connection.route}`);
       adapter.validate(post);
+    } else if (connection.route === 'mcp') {
+      if (post.channel === 'product-hunt' && !/^https?:\/\//i.test(post.link ?? '')) throw new Error('Product Hunt MCP requires a product link');
     } else if (!Object.hasOwn(forms, post.channel)) throw new Error(`${post.channel}: no browser form available`);
     let instagram;
     if (post.channel === 'instagram') {
@@ -48,7 +53,13 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
   for (const { post, connection, adapter, instagram } of queue) {
     await reserveCap(paths.root, post.channel, connection.account, options.now);
     let receipt: PublishReceipt;
-    if (adapter) {
+    if (connection.route === 'mcp') {
+      const token = await (options.keychain ?? osKeychain()).get(`${post.channel}:${connection.account}`);
+      if (!token) throw new Error('MCP token unavailable; reconnect your own account');
+      const platform = post.channel as McpPlatform;
+      const client = await (options.mcp?.(platform, token) ?? Promise.resolve(new HttpMcpClient(platform, token)));
+      receipt = await mcpDraft(platform, client, post, paths.root);
+    } else if (adapter) {
       receipt = await adapter.schedule(post, cwd);
       if (instagram) await writeFile(new URL('instagram-payload.json', receipt.url), JSON.stringify(instagram, null, 2) + '\n');
     } else {

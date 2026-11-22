@@ -5,13 +5,21 @@ import { join, resolve } from 'node:path';
 import { readOptional } from '../review/posts.js';
 import type { Keychain } from './keychain.js';
 import { tryLock } from './lock.js';
+import { officialServers } from './mcp.js';
 
-export type Route = 'postiz' | 'buffer' | 'api' | 'browser';
-export interface Connection { platform: string; route: Route; account: string; connectedAt: string; profile?: string }
+export type Route = 'postiz' | 'buffer' | 'api' | 'browser' | 'mcp';
+export interface Connection { platform: string; route: Route; account: string; connectedAt: string; profile?: string; server?: string }
 const social = ['x', 'linkedin', 'instagram', 'facebook', 'tiktok', 'youtube', 'threads', 'bluesky', 'reels', 'shorts'];
 export const platforms = [...social, 'devto', 'github-release', 'show-hn', 'reddit', 'product-hunt'];
 export function routes(platform: string): Route[] {
+  if (platform === 'product-hunt') return ['mcp', 'browser'];
+  if (platform === 'x') return ['mcp', 'postiz', 'buffer'];
   return social.includes(platform) ? ['postiz', 'buffer'] : ['devto', 'github-release'].includes(platform) ? ['api'] : ['show-hn', 'reddit', 'product-hunt'].includes(platform) ? ['browser'] : [];
+}
+export function validateConnection(input: Pick<Connection, 'platform' | 'route' | 'server'>) {
+  if (!routes(input.platform).includes(input.route)) throw new Error(`Unsupported route ${input.route} for ${input.platform}`);
+  if (input.route === 'mcp' && input.server !== undefined && input.server !== officialServers[input.platform as keyof typeof officialServers])
+    throw new Error('Only the official platform MCP server is allowed');
 }
 export const connectionHome = () => process.env.LIFTOFF_HOME ?? join(homedir(), '.config', 'liftoff');
 export async function connections(home = connectionHome()): Promise<Connection[]> {
@@ -35,12 +43,13 @@ async function withRegistryLock<T>(home: string, action: () => Promise<T>): Prom
   }
   throw new Error('Connection registry busy; inspect connections.lock before retrying');
 }
-export async function connect(input: Omit<Connection, 'connectedAt'>, token: string | undefined, keychain: Keychain, home = connectionHome()) {
-  if (!routes(input.platform).includes(input.route)) throw new Error(`Unsupported route ${input.route} for ${input.platform}`);
+export async function connect(input: Omit<Connection, 'connectedAt' | 'route'> & { route?: Route }, token: string | undefined, keychain: Keychain, home = connectionHome()) {
+  const route = input.route ?? routes(input.platform)[0];
+  validateConnection({ ...input, route });
   if (!input.account.trim() || /[\r\n]/.test(input.account)) throw new Error('A connected account handle is required');
-  if (input.route === 'browser' && !input.profile) throw new Error('Browser connections require --profile pointing to your Chrome user data directory');
-  if (input.route !== 'browser' && !token?.trim()) throw new Error('Token required via --token-env or stdin');
-  const record: Connection = { platform: input.platform, route: input.route, account: input.account,
+  if (route === 'browser' && !input.profile) throw new Error('Browser connections require --profile pointing to your Chrome user data directory');
+  if (route !== 'browser' && !token?.trim()) throw new Error('Token required via --token-env or stdin');
+  const record: Connection = { platform: input.platform, route, account: input.account,
     connectedAt: new Date().toISOString(), ...(input.profile ? { profile: resolve(input.profile) } : {}) };
   await withRegistryLock(home, async () => {
     if (token) await keychain.set(`${input.platform}:${input.account}`, token);
@@ -60,5 +69,6 @@ export async function removeConnection(platform: string, account: string, keycha
 export async function requireConnection(platform: string, account?: string, home = connectionHome()) {
   const found = (await connections(home)).filter(r => r.platform === platform && (!account || r.account === account));
   if (found.length !== 1) throw new Error(`${platform}: connect your own account first with liftoff connect; use --account to disambiguate`);
+  validateConnection(found[0]);
   return found[0];
 }

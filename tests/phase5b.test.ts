@@ -17,10 +17,76 @@ import { dailyCaps, reserveCap } from '../src/connect/caps.js';
 import { lockTimeout, recoveryTimeout, tryLock } from '../src/connect/lock.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import type { Route } from '../src/connect/registry.js';
+import { HttpMcpClient, MockMcpClient, mcpDraft, officialServers, productHuntTools } from '../src/connect/mcp.js';
 
 const temp: string[] = [];
 async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-5b-')); temp.push(path); return path; }
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(temp.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
+
+it('defaults PH to official MCP draft, readiness and preview without submission', async () => {
+  const { cwd, paths, home } = await approvedPost('product-hunt', [], { link: 'https://example.test', name: 'Own product' });
+  const keys = new MemoryKeychain();
+  expect((await connect({ platform: 'product-hunt', account: 'owner' }, 'private-token', keys, home)).route).toBe('mcp');
+  const client = new MockMcpClient('product-hunt');
+  const result = await assistedPublish(cwd, { home, keychain: keys, mcp: async (platform, token) => {
+    expect(platform).toBe('product-hunt'); expect(token).toBe('private-token'); return client;
+  } });
+  expect(client.calls.map(call => call.name)).toEqual(productHuntTools);
+  expect(client.calls[0].args).toMatchObject({ url: 'https://example.test', values: { name: 'Own product', description: 'Caption.' } });
+  expect(result.posts[0]).toMatchObject({ status: 'manual', url: 'https://www.producthunt.com/posts/new' });
+  const { posts: [post] } = await loadReview(cwd);
+  const preview = await readFile(join(paths.review, 'mcp', post.hash, 'product-hunt-preview.json'), 'utf8');
+  expect(preview).toContain('Draft preview');
+  expect(preview).not.toContain('private-token');
+});
+it.each(['submit_launch', 'publish_post', 'launch', 'update_launch', 'prepare_launch_asset', 'unrecognized'])('real and mock MCP refuse %s before any request', async name => {
+  const request = vi.fn();
+  const real = new HttpMcpClient('product-hunt', 'token', request);
+  const mock = new MockMcpClient('product-hunt');
+  await expect(real.callTool(name, {})).rejects.toThrow('MCP tool refused');
+  await expect(mock.callTool(name, {})).rejects.toThrow('MCP tool refused');
+  expect(request).not.toHaveBeenCalled(); expect(mock.calls).toEqual([]);
+});
+it.each(['empty', 'error', 'malformed', 'blocked'])('handles %s official PH capabilities or readiness safely', async state => {
+  const { cwd, paths } = await approvedPost('product-hunt', [], { link: 'https://example.test' });
+  const { posts: [post] } = await loadReview(cwd);
+  const client = new MockMcpClient('product-hunt', state === 'empty' ? [] : productHuntTools.map(name => ({ name })));
+  if (state === 'error') client.respond = () => ({ isError: true });
+  if (state === 'malformed') client.respond = () => ({ status: 'ok', data: {} });
+  if (state === 'blocked') {
+    const respond = client.respond;
+    client.respond = (name, args) => name === 'get_launch' ? { status: 'ok', data: { status: 'draft',
+      url: 'https://www.producthunt.com/posts/new', assessment: { submission: 'blocked' } } } : respond(name, args);
+    expect((await mcpDraft('product-hunt', client, post, paths.root)).status).toBe('manual');
+  } else await expect(mcpDraft('product-hunt', client, post, paths.root)).rejects.toThrow();
+  expect(client.calls.every(call => productHuntTools.includes(call.name as typeof productHuntTools[number]))).toBe(true);
+});
+it('discovers official X capabilities without trusting an advertised unverified write tool', async () => {
+  const { cwd, paths } = await approvedPost('x');
+  const { posts: [post] } = await loadReview(cwd);
+  const client = new MockMcpClient('x', [{ name: 'create_tweet' }]);
+  await expect(mcpDraft('x', client, post, paths.root)).rejects.toThrow('No verified official X post-create tool');
+  expect(client.discoveries).toBe(1); expect(client.calls).toEqual([]);
+});
+it.each(['json', 'sse'])('uses initialized official HTTP MCP with keychain bearer and %s responses', async format => {
+  const methods: string[] = [];
+  const request = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    expect(url).toBe(officialServers['product-hunt']);
+    expect(init?.redirect).toBe('error');
+    expect(init?.headers).toMatchObject({ Authorization: 'Bearer secret' });
+    const body = JSON.parse(String(init?.body)); methods.push(body.method);
+    if (body.method === 'notifications/initialized') return new Response(null, { status: 202 });
+    const result = body.method === 'tools/list' ? { tools: [{ name: 'get_launch' }] } : {};
+    const message = JSON.stringify({ jsonrpc: '2.0', id: body.id, result });
+    return new Response(format === 'sse' ? `data: ${message}\n\n` : message,
+      { headers: { 'Content-Type': format === 'sse' ? 'text/event-stream' : 'application/json', 'mcp-session-id': 'session' } });
+  });
+  const client = new HttpMcpClient('product-hunt', 'secret', request);
+  expect(await client.listTools()).toEqual([{ name: 'get_launch' }]);
+  await client.callTool('get_launch', { launch_id: 'draft' });
+  expect(methods).toEqual(['initialize', 'notifications/initialized', 'tools/list', 'tools/call']);
+  expect(request.mock.calls[2][1]?.headers).toMatchObject({ 'Mcp-Session-Id': 'session' });
+});
 
 async function approvedPost(channel: string, media: string[] = [], extra = {}) {
   const cwd = await workspace();

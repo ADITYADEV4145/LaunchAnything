@@ -6,7 +6,7 @@ import { osKeychain, MemoryKeychain } from '../connect/keychain.js';
 
 export function register(program: Command) {
   program.command('connect [platform]').description('Connect your own account; tokens go only to the OS keychain')
-    .option('--route <route>', 'postiz, buffer, api or browser').option('--account <handle>', 'Your account handle')
+    .option('--route <route>', 'mcp (default for PH/X), postiz, buffer, api or browser').option('--account <handle>', 'Your account handle')
     .option('--token-env <name>', 'Read token from this environment variable, never argv')
     .option('--profile <path>', 'Your Chrome user data directory').option('--list', 'List connected accounts')
     .option('--remove', 'Remove the selected connection and keychain token')
@@ -20,7 +20,7 @@ export function register(program: Command) {
         const account = options.account ?? await prompt?.question('Your account handle: ');
         if (!account) throw new Error('--account is required');
         const existing = options.remove ? (await connections()).find(r => r.platform === platform && r.account === account) : undefined;
-        const route = existing?.route ?? options.route ?? await prompt?.question(`Route (${routes(platform).join(', ')}): `) as Route;
+        const route = existing?.route ?? options.route ?? ((await prompt?.question(`Route (${routes(platform).join(', ')}; Enter for default): `)) || routes(platform)[0]) as Route;
         const keychain = route === 'browser' ? new MemoryKeychain() : osKeychain();
         if (options.remove) { await removeConnection(platform, account, keychain); output('connect', { removed: true }, json); return; }
         let token = options.tokenEnv ? process.env[options.tokenEnv] : undefined;

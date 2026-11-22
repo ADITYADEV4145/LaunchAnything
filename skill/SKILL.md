@@ -29,6 +29,10 @@ payoff. A skill edit, plan or research request is not permission to render.
 Require the original logo, spoken narration, captions and a phone-size
 readability check for the launch cut unless the user explicitly changes the brief.
 
+## Communities (Part E)
+
+Run `liftoff communities fetch` after pains.json exists. If REDDIT_ACCESS_TOKEN is absent, open the returned needsBrowser URLs in the agent browser, record community-evidence JSON (including exact rules and observed posts), and run `liftoff communities import <file>`. Never scrape Reddit from the CLI. Run `liftoff communities report` and `liftoff communities check`. Edit the local reply/post drafts; never post or send automatically, never ask for votes, and keep manual replies to 10/day and posting to one subreddit/day.
+
 ## Phase 2b: founder voice
 
 See [phase2b](references/phase2b.md). Learn from 20–50 owned samples with

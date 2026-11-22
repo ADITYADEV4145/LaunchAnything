@@ -6,6 +6,7 @@ import { packageRoot } from '../core/package-root.js';
 import type { Phase } from './types.js';
 import { checks as phase0 } from './phase0.js';
 import { checks as phase0b } from './phase0b.js';
+import { checks as phaseE } from './phaseE.js';
 import { checks as phase1 } from './phase1.js';
 import { checks as phase1b } from './phase1b.js';
 import { checks as phase2 } from './phase2.js';
@@ -23,6 +24,7 @@ import { checks as partD } from './part-d.js';
 export const phases: Phase[] = [{ phase: 0, checks: phase0 }, { phase: '0b', checks: phase0b }, { phase: 1, checks: phase1 }, { phase: '1b', checks: phase1b }, { phase: 2, checks: phase2 }, { phase: '2b', checks: phase2b }, { phase: 3, checks: phase3 }, { phase: 4, checks: phase4 }, { phase: 5, checks: phase5 }, { phase: '5b', checks: phase5b }, { phase: 6, checks: phase6 }, { phase: 7, checks: partD }];
 phases.push({ phase: 'I', checks: adoption });
 phases.push({ phase: 'F', checks: phaseF });
+phases.splice(2, 0, { phase: 'E', checks: phaseE });
 phases.find(phase => phase.phase === 6)!.checks = [{
   name: 'phase 6 results and launch operations',
   async run(context) {

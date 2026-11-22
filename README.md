@@ -1,5 +1,9 @@
 # Liftoff
 
+## Community distribution
+
+`liftoff communities fetch [queries...]`, `liftoff communities import <file>`, `liftoff communities report` (or `liftoff communities`), and `liftoff communities check` discover evidence-backed communities and create local, manual-only drafts. Outputs: `.launch/communities.json` and `.launch/communities.md`. Optional founder account fallback: `.launch/communities/founder.json` with `{ "reddit": { "karma": 100, "accountAgeDays": 90 } }`. No posting or sending is performed.
+
 Repo in, launch kit out — with grounded claims and human approval.
 TypeScript CLI and agent skill for Node.js 22+. No server, database or LLM API calls.
 

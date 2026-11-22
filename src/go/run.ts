@@ -33,7 +33,7 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
     const slot = schedule.find(slot => slot.channel === channel);
     if (!slot) throw new Error(channel + ': missing schedule row');
     return slot.scheduledAt;
-  });
+  }, recommendations === undefined ? undefined : new Set(schedule.map(slot => slot.channel)));
   const { approvals, skips } = await decisions(paths);
   const active = posts.filter(post => skips[post.channel] !== post.hash);
   if (!active.length) throw new Error('No posts to publish');

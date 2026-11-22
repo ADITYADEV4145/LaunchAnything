@@ -128,7 +128,7 @@ export function mediaType(path: string) {
   return types[extname(path).toLowerCase()];
 }
 
-export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>, scheduled?: (channel: string) => string) {
+export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>, scheduled?: (channel: string) => string, selected?: ReadonlySet<string>) {
   const paths = launchDir(cwd);
   const config = validate<Config>('config', JSON.parse(await readFile(paths.config, 'utf8')));
   for (const id of (config as Config & { channels: string[] }).channels) loadRule('channels', id, cwd);
@@ -144,6 +144,7 @@ export async function loadReview(cwd?: string, unavailable?: ReadonlySet<string>
   const posts: ReviewPost[] = [];
   for (const filename of filenames) {
     const channel = filename.slice(0, -3);
+    if (selected && !selected.has(channel)) continue;
     const rule = loadRule('channels', channel, cwd);
     let raw: Buffer;
     try { raw = await readLocalFile(root, join(root, 'posts', filename)); }

@@ -281,3 +281,15 @@ it('ignores judge scores given for older evidence', project((cwd, posts) => {
   writeFileSync(path, JSON.stringify(product));
   expect(judgePosts(cwd, ['x']).verdicts[0].source).toBe('local');
 }));
+
+it('ignores fenced code when counting sentences and feedback asks', project((cwd, posts) => {
+  const fence = '\n\n```bash\n# Does it work? Yes. It does. Run it. Then check. Done.\ntasklight add "Write docs"\n```\n';
+  edit(posts, 'show-hn', s => s.replace(/\n## First comment outline/, fence + '\n## First comment outline'));
+  expect(rulesFor(cwd, 'show-hn')).not.toContain('template.sentences');
+}));
+
+it('needs a feedback ask in maker comment prose, not in code', project(cwd => {
+  edit(join(cwd, '.launch/posts'), 'product-hunt', s => s.replace(/## Maker comment\n([\s\S]*?)(?=\n## )/, (_, c: string) =>
+    '## Maker comment\n' + c.replaceAll('?', '.') + '\n```js\nconst ok = ready ? 1 : 0;\n```\n'));
+  expect(rulesFor(cwd, 'product-hunt')).toContain('template.section-ask');
+}, 'saas-next'));

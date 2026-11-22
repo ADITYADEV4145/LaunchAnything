@@ -59,7 +59,7 @@ export function templateIssues(post: DraftPost, rules: Platform, product: Produc
     if (!title.toLowerCase().includes(product.name.toLowerCase())) add('template.title-name', 'Title does not name ' + product.name, 'Put the product name right after the prefix.');
   }
   if (t.sentences) {
-    const count = proseSentences(post.channel === 'reddit' ? body : lead).length;
+    const count = proseSentences(codeless(post.channel === 'reddit' ? body : lead)).length;
     if (count < t.sentences.min || count > t.sentences.max) add('template.sentences', 'Description has ' + count + ' sentences',
       'Write ' + t.sentences.min + '–' + t.sentences.max + ' sentences: problem, what it does, proof, how it runs, link.');
   }
@@ -80,11 +80,11 @@ export function templateIssues(post: DraftPost, rules: Platform, product: Produc
   for (const section of t.sections ?? []) {
     const content = sections.get(section.heading);
     if (content === undefined || !content.trim()) { add('template.section', 'Missing section ' + section.heading, 'Add ' + section.heading + ' with content.'); continue; }
-    const words = wordCount(content), items = content.split(/\r?\n/).filter(l => listItem.test(l)).length;
+    const prose = codeless(content), words = wordCount(content), items = prose.split(/\r?\n/).filter(l => listItem.test(l)).length;
     if (section.minWords && words < section.minWords) add('template.section-short', section.heading + ' has ' + words + ' words', 'Write at least ' + section.minWords + ' words.');
     if (section.maxWords && words > section.maxWords) add('template.section-long', section.heading + ' has ' + words + ' words', 'Keep it under ' + (section.maxWords + 1) + ' words.');
     if (section.minItems && items < section.minItems) add('template.section-items', section.heading + ' has ' + items + ' list items', 'List at least ' + section.minItems + ' items.');
-    if (section.ask && !content.includes('?')) add('template.section-ask', section.heading + ' does not ask for feedback', 'Ask one specific question.');
+    if (section.ask && !prose.includes('?')) add('template.section-ask', section.heading + ' does not ask for feedback', 'Ask one specific question.');
   }
   for (const heading of t.headings ?? []) {
     if (!new RegExp(heading.pattern, 'im').test(codeless(body))) add('template.heading', 'Missing a section on ' + heading.label, 'Add a ## heading for ' + heading.label + '.');

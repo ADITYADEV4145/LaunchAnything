@@ -184,6 +184,24 @@ describe('communities', () => {
     expect(result.valid).toBe(true); expect(result.markdown).toContain('Unrecognized rule timezone or place: Singapore');
     expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
   });
+  it.each([
+    'in r/builders', 'for u/Somebody', 'r/builders and u/Singapore', '/r/builders and /u/Somebody',
+    'https://www.reddit.com/r/builders/about/rules.json', '[rules](https://example.org/Europe/Paris?at=6pm)',
+    'www.example.org/Europe/Paris?at=6pm', 'example.org/Europe/Paris?at=6pm',
+  ])('ignores references rather than treating them as rule times or zones: %s', async reference => {
+    const description = `Only on Sunday at 9am ET ${reference}`; const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
+    expect(limit.manualReview).toBeUndefined(); expect(limit.timezone).toBe('America/New_York'); expect(postingSlot('2026-01-04', limit, 'UTC').time).toBe('14:00');
+    const cwd = await setup(); const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, file);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(result.markdown).toContain(description); expect(report.recommended).toEqual(['builders']);
+    expect(report.plan).toHaveLength(1); expect(report.plan[0].time).toBe('14:00'); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it('does not infer restrictions from reference contents or erase actual unknown places', () => {
+    const rules = (description: string) => [{ short_name: 'Self-Promo Sunday', description }];
+    expect(restrictions(rules('r/builders u/Singapore https://example.org/?at=9am&zone=IST'), 'UTC')).toMatchObject({ start: undefined, end: undefined, timezone: 'UTC', manualReview: undefined });
+    expect(restrictions(rules('at 9am Singapore in r/builders'), 'UTC').manualReview).toContain('Singapore');
+    expect(restrictions(rules('at 9am Europe/Imaginary in r/builders'), 'UTC').manualReview).toContain('europe/imaginary');
+  });
   it.each([5, 6])('preserves the %s:30 UTC instant when New York repeats 01:30 at fall-back', async hour => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'America/New_York' }));
     const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday at ${hour}:30am UTC` }] };

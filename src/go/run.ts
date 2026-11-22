@@ -11,6 +11,7 @@ import { reserveCap } from '../connect/caps.js';
 import { tryLock } from '../connect/lock.js';
 import { readReceipts, type PublishReceipt } from '../adapters/index.js';
 import { isLiveReceiptFor } from '../adapters/receipts.js';
+import { frontMatter } from '../connect/forms.js';
 import { checkPosts } from '../copy/check.js';
 import { judgeWithHistory } from '../copy/judge.js';
 import { warroom } from '../launch-ops/warroom.js';
@@ -62,8 +63,13 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
   const previous = options.mock ? JSON.parse(await readOptional(join(paths.root, 'published.mock.json')) ?? '{"posts":[]}') as { posts: PublishReceipt[] } : diskReceipts;
   const receipts = [...previous.posts];
   const confirmedReceipts = [...receipts];
-  const isLiveReceipt = (receipt: PublishReceipt, { post, scope }: typeof queue[number]) =>
-    isLiveReceiptFor(receipt, post, identityFor(post.hash, scope));
+  const isLiveReceipt = (receipt: PublishReceipt, { post, scope }: typeof queue[number]) => {
+    const subreddit = post.channel === 'reddit' ? frontMatter(post).subreddit : undefined;
+    const destination = post.channel === 'github-release' ? `https://github.com/${scope.account}/releases/` :
+      typeof subreddit === 'string' ? `https://www.reddit.com/r/${subreddit.replace(/^\/?r\//i, '')}/comments/` :
+        scope.route === 'postiz' ? null : undefined;
+    return isLiveReceiptFor(receipt, post, identityFor(post.hash, scope), destination);
+  };
   const firstBigLive = () => firstBig && confirmedReceipts.some(receipt => isLiveReceipt(receipt, firstBig));
   const heldReason = firstBig ? 'Waiting for a live receipt of ' + firstBig.post.channel : 'No big post is scheduled; owned follow-ups are held';
   const timeline = queue.map(({ post, scope }) => ({ channel: post.channel, route: scope.route,

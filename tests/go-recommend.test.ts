@@ -30,7 +30,8 @@ it.each([['mcp', 'product-hunt'], ['browser', 'product-hunt'], ['browser', 'show
     account: 'fixture-founder', profile: '/fixture/chrome', connectedAt: ''
   }))));
   const receipt = { channel, id: `${producer}:${channel}:${hash}`,
-    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : 'https://news.ycombinator.com/item?id=123' };
+    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : channel === 'reddit'
+      ? 'https://www.reddit.com/r/SideProject/comments/123/launch/' : 'https://news.ycombinator.com/item?id=123' };
   await writeFile(paths.published, JSON.stringify({ posts: [receipt] }));
   const preview = await go(work);
   expect('timeline' in preview && preview.timeline.find(row => row.channel === 'github-release')?.status).toBe('queued');
@@ -100,6 +101,29 @@ it('a missing plan schedule row remains an error without recommendations', async
   await rm(join(paths.root, 'recommendations.md'));
   await writeFile(paths.plan, '| Channel | Local date | Local time |\n| --- | --- | --- |\n| show-hn | 2026-09-25 | 09:00 |\n');
   await expect(go(work)).rejects.toThrow('missing schedule row');
+}, 30000);
+
+it('dispatches the requested GitHub repo despite matching copy published to another repo', async () => {
+  const { work, paths } = await fixture();
+  const { posts } = await loadReview(work, undefined, () => '2026-09-25T13:00:00.000Z');
+  await writeFile(join(paths.root, 'recommendations.md'), '| Channel | Local date | Local time |\n| --- | --- | --- |\n' +
+    '| show-hn | 2026-09-25 | 09:00 |\n| github-release | 2026-09-25 | 10:00 |\n');
+  await writeFile(join(paths.root, 'connections.json'), JSON.stringify([
+    { platform: 'show-hn', route: 'browser', account: 'founder', profile: '/fixture/chrome', connectedAt: '' },
+    { platform: 'github-release', route: 'api', account: 'owner/new-repo', connectedAt: '' }
+  ]));
+  await writeFile(paths.published, JSON.stringify({ posts: ['show-hn', 'github-release'].map(channel => ({
+    channel, id: `manual:${channel}:${posts.find(post => post.channel === channel)!.hash}`, status: 'published',
+    url: channel === 'show-hn' ? 'https://news.ycombinator.com/item?id=123' : 'https://github.com/owner/old-repo/releases/tag/v1'
+  })) }));
+  const mock = mockAdapter();
+  const publish = vi.fn(async (context: Parameters<typeof mock.publish>[0]) => {
+    expect(context.connection.account).toBe('owner/new-repo');
+    return { ...await mock.publish(context), url: 'https://github.com/owner/new-repo/releases/tag/v1' };
+  });
+  const result = await go(work, { confirm: true, yes: true, home: paths.root, now: () => new Date('2027-01-01T00:00:00Z'), adapter: { publish } });
+  expect(publish.mock.calls.map(([context]) => context.post.channel)).toEqual(['github-release']);
+  expect('board' in result && result.board?.find(row => row.channel === 'github-release')?.url).toBe('https://github.com/owner/new-repo/releases/tag/v1');
 }, 30000);
 
 it('dry run holds owned follow-ups without a live receipt of the first big post', async () => {

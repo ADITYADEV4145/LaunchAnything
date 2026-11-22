@@ -44,10 +44,26 @@ it.each(['go', 'go-mock'])('recognizes a normalized %s approval identity without
   expect(isLiveReceiptFor(receipt, post, identity)).toBe(true);
   expect(isLiveReceiptFor(receipt, post, `${prefix}:${'c'.repeat(64)}`)).toBe(false);
   expect(isLiveReceiptFor({ ...receipt, channel: 'reddit' }, post, identity)).toBe(false);
+  expect(isLiveReceiptFor(receipt, post, identity, null)).toBe(true);
+  expect(isLiveReceiptFor({ ...receipt, id: `manual:${post.channel}:${post.hash}` }, post, identity, null)).toBe(false);
   for (const url of [undefined, '', 'https://', 'http://example.test/live', 'file:///draft']) {
     expect(isLiveReceiptFor({ ...receipt, url }, post, identity)).toBe(false);
   }
   for (const status of ['manual', 'scheduled', 'failed', 'cancelled'] as const) {
     expect(isLiveReceiptFor({ ...receipt, status }, post, identity)).toBe(false);
+  }
+});
+
+it.each([
+  ['github-release', 'https://github.com/owner/new-repo/releases/', 'https://github.com/owner/old-repo/releases/tag/v1'],
+  ['reddit', 'https://www.reddit.com/r/newsub/comments/', 'https://www.reddit.com/r/oldsub/comments/123/post/']
+])('requires the requested %s destination for a content-hash receipt', (channel, destination, oldUrl) => {
+  const post = { channel, hash: 'a'.repeat(64) };
+  const receipt: PublishReceipt = { channel, id: `manual:${channel}:${post.hash}`, status: 'published', url: oldUrl };
+  expect(isLiveReceiptFor(receipt, post, 'unrelated', destination)).toBe(false);
+  expect(isLiveReceiptFor({ ...receipt, url: destination + 'current' }, post, 'unrelated', destination)).toBe(true);
+  for (const url of [undefined, 'https://example.test/' + new URL(destination).pathname,
+    destination.replace('/releases/', '-other/releases/').replace('/comments/', '-other/comments/')]) {
+    expect(isLiveReceiptFor({ ...receipt, url }, post, 'unrelated', destination)).toBe(false);
   }
 });

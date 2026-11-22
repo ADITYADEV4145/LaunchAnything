@@ -2,11 +2,23 @@ import { afterEach, expect, it } from 'vitest';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { judge, type JudgeReport } from '../src/media/judge.js';
+import { judge, sampleVideoFrames, type JudgeReport } from '../src/media/judge.js';
+import { PNG } from 'pngjs';
 import { browser, exec } from '../src/visuals/runtime.js';
 import { buildReview } from '../src/review/page.js';
 
 const dirs: string[] = [];
+it('samples the reported integer second rather than a later scene at fractional boundaries',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'judge-sampling-')); dirs.push(dir);
+  const frames=join(dir,'frames'); await mkdir(frames);
+  const video=join(dir,'cut.mp4');
+  await exec('ffmpeg',['-y','-v','error','-f','lavfi','-i','color=red:s=96x64:r=12:d=1.5','-f','lavfi','-i','color=blue:s=96x64:r=12:d=1.5','-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0[out]','-map','[out]','-c:v','libx264','-threads','1',video]);
+  await sampleVideoFrames(video,frames);
+  const atOne=PNG.sync.read(await readFile(join(frames,'000002.png'))).data;
+  const atTwo=PNG.sync.read(await readFile(join(frames,'000003.png'))).data;
+  expect(atOne[0]).toBeGreaterThan(200); expect(atOne[2]).toBeLessThan(30);
+  expect(atTwo[2]).toBeGreaterThan(200); expect(atTwo[0]).toBeLessThan(30);
+},30000);
 const logo='<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" rx="10" fill="#77e5b3"/><path d="M10 27V13h20v14H10zm6-5h8v-4h-8z" fill="#101827" fill-rule="evenodd"/></svg>';
 afterEach(async()=>{ await Promise.all(dirs.splice(0).map(dir=>rm(dir,{recursive:true,force:true}))); });
 async function picture(path: string, text='Catch unknown exports', color='#ffffff', bg='#101827', branded=true, logoOnly=false) {

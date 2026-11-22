@@ -8,6 +8,7 @@ import { go } from '../src/go/run.js';
 import { mockAdapter } from '../src/go/adapters.js';
 import { groundworkGoFixture } from '../src/selftest/groundwork-go.js';
 import { loadReview } from '../src/review/posts.js';
+import { criteria, judgeKeys } from '../src/copy/judge.js';
 
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -43,6 +44,42 @@ it.each(['product-hunt', 'show-hn'])('recognizes a manually published %s receipt
     const held = await go(work);
     expect('timeline' in held && held.timeline.find(row => row.channel === 'github-release')?.status).toBe('held');
   }
+}, 30000);
+
+it.each(['show-hn', 'product-hunt'])('does not reuse an old %s receipt for different launch content', async channel => {
+  const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-stale-')); temporary.push(cwd);
+  const { work, paths } = await groundworkGoFixture(cwd);
+  const scheduled = () => '2026-01-06T15:00:00.000Z';
+  const previous = (await loadReview(work, undefined, scheduled)).posts.find(post => post.channel === channel)!;
+  const file = join(paths.posts, channel + '.md');
+  await writeFile(file, await readFile(file, 'utf8') + '\n\nImplementation notes for this launch.\n');
+  await writeFile(join(paths.posts, 'judge', channel + '.scores.json'), JSON.stringify({ ...judgeKeys(work, channel),
+    judge: 'Deterministic fixture reviewer', scores: Object.fromEntries(criteria.map(key => [key, 9])), reasons: [] }));
+  const current = (await loadReview(work, undefined, scheduled)).posts.find(post => post.channel === channel)!;
+  expect(current.hash).not.toBe(previous.hash);
+  await writeFile(join(paths.root, 'recommendations.md'), '| Channel | Local date | Local time |\n| --- | --- | --- |\n' +
+    `| ${channel} | 2026-01-06 | 09:00 |\n| github-release | 2026-01-06 | 10:00 |\n`);
+  await writeFile(join(paths.root, 'connections.json'), JSON.stringify([channel, 'github-release'].map(platform => ({
+    platform, route: platform === 'product-hunt' ? 'mcp' : platform === 'show-hn' ? 'browser' : 'api',
+    account: 'fixture-founder', profile: '/fixture/chrome', connectedAt: ''
+  }))));
+  const receipt = { channel, id: `${channel === 'product-hunt' ? 'mcp' : 'browser'}:${channel}:${previous.hash}`,
+    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/old-launch' : 'https://news.ycombinator.com/item?id=123' };
+  await writeFile(paths.published, JSON.stringify({ posts: [receipt] }));
+  const preview = await go(work);
+  expect('timeline' in preview && preview.timeline.find(row => row.channel === 'github-release')?.status).toBe('held');
+  const publish = vi.fn(async () => { throw new Error('New post not submitted'); });
+  const options = { confirm: true, yes: true, now: () => new Date('2027-01-01T00:00:00Z'), home: paths.root, adapter: { publish } };
+  if (channel === 'product-hunt') await expect(go(work, options)).rejects.toThrow('PH final submission needs founder confirmation');
+  const result = await go(work, { ...options, phSubmit: true });
+  expect(publish).toHaveBeenCalledTimes(channel === 'product-hunt' ? 1 : 2);
+  expect('board' in result && result.board?.find(row => row.channel === channel)?.status).toBe('failed');
+  expect('board' in result && result.board?.find(row => row.channel === 'github-release')?.status).toBe('held');
+  const mock = mockAdapter(), submit = vi.fn(mock.publish);
+  const launched = await go(work, { ...options, phSubmit: true, now: () => new Date('2027-01-02T00:00:00Z'), adapter: { publish: submit } });
+  expect(submit.mock.calls.map(([context]) => context.post.channel)).toEqual([channel, 'github-release']);
+  expect(submit.mock.calls[0][0].post.hash).toBe(current.hash);
+  expect('board' in launched && launched.board?.every(row => row.status === 'live')).toBe(true);
 }, 30000);
 
 it('a Reddit draft omitted by recommend does not block scheduled channels in go', async () => {

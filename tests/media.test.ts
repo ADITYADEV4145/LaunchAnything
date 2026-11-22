@@ -104,6 +104,17 @@ it('detects web frameworks or existing routes, preserves legacy validation and e
     expect((await planShots(cwd, { force: true })).kind).toBe('web');
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
+it('uses Part A before/action/after copy without executing the narrative action', async () => {
+  const cwd = await repo({ ...product, money_moment: { before: 'An import references a missing export', action: 'Run the grounding check', after: 'BLOCK names the missing export' } });
+  try {
+    const { storyboard } = await planShots(cwd);
+    expect(storyboard.shots[0].caption).toBe('An import references a missing export');
+    expect(storyboard.shots[2].caption).toBe('Run the grounding check');
+    expect(storyboard.shots[3]).toMatchObject({ caption: 'BLOCK names the missing export', moneyMoment: true, commands: ['TODO'] });
+    await writeFile(join(cwd, '.launch/product.json'), JSON.stringify({ ...product, problem: { summary: 'Imports escape review' } }));
+    expect((await planShots(cwd, { force: true })).storyboard.shots[0].caption).toBe('Imports escape review');
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
 it('reports absent product input', async () => {
   const cwd = await repo(product);
   try { await rm(join(cwd, '.launch/product.json')); await expect(planShots(cwd)).rejects.toThrow('ENOENT'); }

@@ -23,8 +23,8 @@ export async function planShots(cwd: string, options: { force?: boolean } = {}) 
   const raw = product.money_moment;
   const moment = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const feature = product.features?.[0];
-  const summary = text(typeof raw === 'string' ? raw : '', moment.summary, moment.headline, moment.moment, moment.description, product.oneLiner, product.problem, product.proofPoints?.[0], typeof feature === 'string' ? feature : feature?.description, feature?.name, product.name);
-  const pain = text(moment.before, product.problem, summary);
+  const summary = text(typeof raw === 'string' ? raw : '', moment.summary, moment.headline, moment.moment, moment.description, moment.after, product.oneLiner, product.problem, product.proofPoints?.[0], typeof feature === 'string' ? feature : feature?.description, feature?.name, product.name);
+  const pain = text(moment.before, product.problem?.summary, product.problem, summary);
   const after = text(moment.after, summary);
   const proof = text(moment.proof, product.proofPoints?.[0], typeof feature === 'string' ? feature : feature?.description, feature?.name, summary);
   const web = existing.shots?.some((shot: { route?: string }) => shot.route) ||
@@ -34,7 +34,7 @@ export async function planShots(cwd: string, options: { force?: boolean } = {}) 
   const route = text(moment.route, existing.shots?.find((shot: { route?: string }) => shot.route)?.route, 'TODO');
   const highlight = moment.highlight && typeof moment.highlight === 'object' ? moment.highlight :
     web ? { selector: text(moment.highlight, moment.selector, moment.element, 'body') } : { text: text(moment.highlight, after).split(/\s+/)[0] };
-  const captions = [pain, pain, summary, after, proof, text(product.oneLiner, summary)];
+  const captions = [pain, pain, text(moment.action, summary), after, proof, text(product.oneLiner, summary)];
   const shots = purposes.map((purpose, index) => ({
     id: purpose, purpose, caption: captions[index].split(/\s+/).slice(0, 12).join(' '),
     ...(purpose === 'after' ? { moneyMoment: true } : {}),

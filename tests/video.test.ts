@@ -51,6 +51,14 @@ it('exports standalone carousel and clip renderers without shots.yaml, with quie
   await expect(renderClip(cwd,[{caption:'Catch unknown exports',source:'absent.png',duration:2}])).rejects.toThrow();
 },120000);
 
+it('keeps portrait margins and trims a focus-anchored inset for wide highlighted stills',async()=>{
+  const cwd=await fixture();
+  const result=await renderClip(cwd,[{role:'after',caption:'Catch unknown exports',source:'.launch/media/real.png',duration:1,highlight:{x:38,y:48,width:170,height:55}}],{format:'9x16',renderer:'ffmpeg'});
+  expect(result.receipt.scenes[0].crop).toEqual({x:0,y:0,width:900,height:360});
+  expect(result.receipt.scenes[0].frame.width).toBe(676);
+  expect(result.receipt.scenes[0].highlight!.x).toBeGreaterThanOrEqual(0);
+});
+
 it('plans voice without writes, reports missing keys, mocks ElevenLabs and mixes VO to -14 ±2 LUFS',async()=>{
   const cwd=await fixture(); await legacyScript(cwd);
   const fetch=vi.fn(); vi.stubGlobal('fetch',fetch); vi.stubEnv('ELEVENLABS_API_KEY','local-unit-key'); vi.stubEnv('ELEVENLABS_VOICE_ID','local-voice');

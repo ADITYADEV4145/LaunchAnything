@@ -21,6 +21,9 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
   if (options.ids || options.only) {
     try { previous = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
     previous = previous.filter(s => spec.shots.some(shot => shot.id === s.id) && !selected.some(shot => shot.id === s.id));
+    await writeFile(join(dir,'manifest.json'),JSON.stringify(previous,null,2));
+  } else {
+    await rm(join(dir,'manifest.json'),{force:true});
   }
   let stop = () => {}; let url = options.url ?? spec.baseUrl;
   const app = await browser(); const manifest = [];

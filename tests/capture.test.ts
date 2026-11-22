@@ -48,6 +48,22 @@ for (const renderer of ['vhs', 'html']) it(`captures a CLI storyboard with ${ren
   } finally { process.env.PATH = path; await rm(root, { recursive: true, force: true }); }
 }, 240000);
 
+it('highlights code identifiers adjacent to punctuation without matching identifier prefixes', async () => {
+  const shot = { id: 'signature', commands: ['cat money.ts'], fontSize: 40, highlight: { text: 'formatPrice' }, viewport: { width: 1600, height: 900 } };
+  const { root, cwd, dir } = await repo({ shots: [shot] });
+  const path = process.env.PATH;
+  try {
+    await writeFile(join(cwd, 'money.ts'), 'export function formatPrice(cents: number): string {}\n');
+    const bin = join(root, 'bin'); await mkdir(bin);
+    for (const name of ['bash', 'cat', 'ffmpeg', 'ffprobe', 'tesseract']) await symlink(`/usr/bin/${name}`, join(bin, name));
+    process.env.PATH = bin;
+    expect((await takeShots(cwd))[0]).toHaveProperty('highlight.width', expect.any(Number));
+    await writeFile(join(cwd, '.launch/shots.yaml'), JSON.stringify({ shots: [{ ...shot, highlight: { text: 'format' } }] }));
+    await expect(takeShots(cwd)).rejects.toThrow('highlight text not found by OCR');
+    expect(await readdir(dir)).toEqual([]);
+  } finally { process.env.PATH = path; await rm(root, { recursive: true, force: true }); }
+}, 60000);
+
 it('rejects visible shell pipes before execution, removes stale shot files and its tape', async () => {
   const { cwd, root, dir } = await repo({ shots: [{ id: 'unsafe', commands: ['cat notes.txt | sed -n 1p'], fontSize: 32, viewport: { width: 800, height: 450 } }] });
   try {

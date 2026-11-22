@@ -42,10 +42,12 @@ function typeCommand(command: string): string[] {
   ]), 'Sleep 500ms', 'Wait+Line@30s /\\$$/'];
 }
 function wordBox(words: OcrWord[], text: string): Box | undefined {
-  const wanted = text.toLowerCase().trim().split(/\s+/);
-  const index = words.findIndex((_, index) => wanted.every((word, offset) => words[index + offset]?.text.toLowerCase() === word));
+  const tokenize = (value: string) => value.toLowerCase().match(/[\p{L}\p{N}_$]+/gu) ?? [value.toLowerCase().trim()];
+  const wanted = tokenize(text);
+  const tokens = words.flatMap(box => tokenize(box.text).map(value => ({ value, box })));
+  const index = tokens.findIndex((_, index) => wanted.every((word, offset) => tokens[index + offset]?.value === word));
   if (index < 0) return;
-  const matches = words.slice(index, index + wanted.length);
+  const matches = tokens.slice(index, index + wanted.length).map(token => token.box);
   const x = Math.min(...matches.map(word => word.x)), y = Math.min(...matches.map(word => word.y));
   return { x, y, width: Math.max(...matches.map(word => word.x + word.width)) - x, height: Math.max(...matches.map(word => word.y + word.height)) - y };
 }

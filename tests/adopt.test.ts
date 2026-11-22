@@ -153,14 +153,18 @@ describe('adoption', () => {
     expect(result.stages.map(s => s.stage)).toEqual(['init', 'scan', 'product', 'validate', 'plan', 'brief', 'write', 'check', 'shots', 'images', 'video', 'review']);
     expect(result.stages.every(s => s.status === 'completed' || s.status.startsWith('skipped:'))).toBe(true);
     expect(result.estimate.formats).toBe(1);
+    if(result.stages.find(s=>s.stage==='video')?.status==='completed') {
+      expect(JSON.parse(await readFile(join(dir,'.launch/media/judge/report.json'),'utf8'))).toMatchObject({ok:true,errors:[]});
+    }
     expect(checkPosts(dir)).toMatchObject({ passed: true, issues: [] });
     const product = JSON.parse(await readFile(join(dir, '.launch/product.json'), 'utf8'));
     expect(product.claims.some((claim: { id: string }) => claim.id === 'interface')).toBe(true);
     await expect(demo({ dir })).rejects.toThrow();
   }, 300000);
 
-  it('appends phase I without changing through-6 ordering', () => {
+  it('preserves through-6 ordering before the Part D and adoption gates', () => {
     const order = phases.map(p => String(p.phase));
-    expect(order.slice(order.indexOf('6'))).toEqual(['6', 'I', 'F']);
+    expect(order.slice(0, order.indexOf('6') + 1)).toEqual(['0', '0b', '1', '1b', '2', '2b', '3', '4', '5', '5b', '6']);
+    expect(order.slice(order.indexOf('6'))).toEqual(['6', '7', 'I', 'F']);
   });
 });

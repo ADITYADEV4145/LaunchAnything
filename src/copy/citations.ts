@@ -25,13 +25,13 @@ export function pains(product: Product): { text: string; quotes: string[]; urls:
   const value = (product as Product & { problem?: unknown }).problem;
   const named = value && typeof value === 'object' && !Array.isArray(value) ? (value as { pains?: unknown; summary?: unknown }) : undefined;
   const list = Array.isArray(value) ? value : named && Array.isArray(named.pains) && named.pains.length
-    ? [...(named.pains as unknown[]).map(p => p && typeof p === 'object' ? { ...(p as object), text: (p as { name?: unknown }).name } : p), ...(named.summary ? [named.summary] : [])]
+    ? [...(named.summary ? [named.summary] : []), ...(named.pains as unknown[]).map(p => p && typeof p === 'object' ? { ...(p as object), text: (p as { name?: unknown }).name } : p)]
     : value ? [value] : [];
   return list.map(item => ({ text: asText(item), quotes: quoteTexts(item), urls: quoteUrls(item) })).filter(p => p.text);
 }
 export const proofText = (p: Proof) => (/^\d+$/.test(p.metric) ? [String(p.value)] : [p.metric, String(p.value), p.unit, p.context]).filter(Boolean).join(' ');
 
-/** Product claims plus proof metrics and pains as citable, sourced claims. */
+/** Product claims plus proof metrics and pains as citable claims. pain:1 is always the problem summary; researched pains follow, so adding one never renumbers. */
 export function groundedClaims(product: Product): Claim[] {
   const proofClaims = proofs(product).map(p => ({ id: 'proof:' + p.metric, text: proofText(p),
     sources: p.source_file ? [{ type: 'file', ref: p.source_file }] : [] }));

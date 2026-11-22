@@ -270,6 +270,6 @@ it('cites Part A pains by number with their quote URLs as sources', () => {
   const product = { name: 'P', features: [], claims: [], problem: { summary: 'Setup is slow.', pains: [
     { name: 'Launch posts take a day', pain_index: 7, quotes: [{ text: 'took me all day', url: 'https://a.test/1' }, { text: 'hate writing these', url: 'https://a.test/2' }] }] } };
   const claims = groundedClaims(product as never);
-  expect(claims.find(c => c.id === 'pain:1')).toMatchObject({ text: expect.stringContaining('Launch posts take a day'), sources: [{ type: 'url', ref: 'https://a.test/1' }, { type: 'url', ref: 'https://a.test/2' }] });
-  expect(claims.find(c => c.id === 'pain:2')?.text).toBe('Setup is slow.');
+  expect(claims.find(c => c.id === 'pain:2')).toMatchObject({ text: expect.stringContaining('Launch posts take a day'), sources: [{ type: 'url', ref: 'https://a.test/1' }, { type: 'url', ref: 'https://a.test/2' }] });
+  expect(claims.find(c => c.id === 'pain:1')?.text).toBe('Setup is slow.');
 });

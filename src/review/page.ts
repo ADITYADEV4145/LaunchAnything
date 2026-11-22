@@ -13,6 +13,13 @@ const escape = (value: string) => value.replace(/[&<>"']/g, char =>
 const safeLink = (value: string) => /^https?:\/\//i.test(value);
 const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
 
+function citedText(value: string) {
+  return value.split(/(\[claim:[^\]]+\])/g).map(part => {
+    const claim = /^\[claim:([^\]]+)\]$/.exec(part);
+    return claim ? `<sup class="claim" title="Source claim: ${escape(claim[1])}">${escape(claim[1])}</sup>` : escape(part);
+  }).join('');
+}
+
 function checkMarkup(verdict?: CopyVerdict) {
   if (!verdict) return 'Not checked — run <code>liftoff check</code>';
   if (verdict.sourceHash !== null && !verdict.issues.length) return 'Pass';
@@ -35,8 +42,8 @@ function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyV
     .format(new Date(post.scheduledAt));
   return `<article data-channel="${post.channel}">
   <header><strong>${escape(post.label)}</strong><span class="state">${escape(state)}</span></header>
-  <h2>${escape(post.title)}</h2>
-  <div class="body">${escape(post.body)}</div>
+  <h2>${citedText(post.title)}</h2>
+  <div class="body">${citedText(post.body)}</div>
   ${post.link ? `<p>${post.linkFirstComment ? 'First comment: ' : ''}${safeLink(post.link) ? `<a href="${escape(post.link)}" target="_blank" rel="noopener noreferrer">${escape(post.link)}</a>`
     : escape(post.link)}</p>` : ''}
   ${media}
@@ -178,6 +185,7 @@ article{background:#fff;border:1px solid #ccd7e4;border-radius:16px;margin:22px 
 header,.actions,dl{display:flex;gap:12px;flex-wrap:wrap}header{justify-content:space-between;margin-bottom:12px}
 .state{border-radius:20px;background:#e6f0ff;padding:2px 12px;font-size:.85rem}
 .body{white-space:pre-wrap}img,video{display:block;max-width:100%;max-height:420px;margin:16px 0;border-radius:8px}
+.claim{font-size:.7em;background:#e6f0ff;color:#1b4faf;border-radius:4px;padding:1px 4px}
 dl{border-block:1px solid #e0e8f1;padding:12px 0;gap:12px 28px}dt{font-size:.8rem;font-weight:700}dd{margin:0}
 button,input,select,textarea{font:inherit;padding:6px 12px;border:1px solid #7587a0;border-radius:6px}
 button{cursor:pointer;background:white;color:inherit}button[data-action=approve]{background:#1b4faf;color:white;border-color:#1b4faf}

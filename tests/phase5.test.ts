@@ -38,6 +38,29 @@ async function project(enterprise = false) {
 const cli = (cwd: string, ...args: string[]) => spawnSync(process.execPath,
   ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args, '--cwd', cwd, '--json'], { encoding: 'utf8' });
 
+it.each(['A sourced statement [claim:scan]', 'No citations here', '', '<script>bad</script> [claim:<img src=x onerror=bad>]'])
+('renders review citations as escaped badges without changing approval inputs: %s', async body => {
+  const { cwd, paths } = await project();
+  const source = `---\ntitle: Launch [claim:scan]\nmedia: []\nclaims: [scan]\n---\n${body}\n`;
+  await writeFile(join(paths.posts, 'show-hn.md'), source);
+  if (!body) {
+    await expect(buildReview(cwd)).rejects.toThrow('/body must NOT have fewer than 1 characters');
+    return;
+  }
+  const { path, posts } = await buildReview(cwd);
+  const html = await readFile(path, 'utf8');
+  const card = html.split('<article data-channel="show-hn">')[1].split('</article>')[0];
+  expect(card).toContain('<sup class="claim" title="Source claim: scan">scan</sup>');
+  expect(card).not.toContain('[claim:');
+  expect(card).not.toContain('<script>bad</script>');
+  expect(card).not.toContain('<img src=x');
+  if (body.includes('<img')) expect(card).toContain('Source claim: &lt;img src=x onerror=bad&gt;');
+  const snapshot = JSON.parse(html.match(/<script id="snapshot" type="application\/json">([\s\S]*?)<\/script>/)![1]);
+  expect(snapshot.posts['show-hn'].source).toBe(source);
+  const bytes = Buffer.from(source);
+  expect(posts[0].hash).toBe(createHash('sha256').update(String(bytes.length) + ':').update(bytes).digest('hex'));
+});
+
 it('builds a review page and defaults the CLI to an approval-gated dry run', async () => {
   const { cwd, paths } = await project();
   const review = cli(cwd, 'review');

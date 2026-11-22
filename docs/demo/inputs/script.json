@@ -1,0 +1,13 @@
+{
+  "scenes": [
+    {"shot":"problem","text":"Liftoff: start with the problem","duration":6},
+    {"shot":"sources","text":"Ground product claims in real source files","duration":6},
+    {"shot":"plan","text":"Plan channels before writing the announcement","duration":6},
+    {"shot":"copy","text":"Write your draft. Check the evidence.","duration":6},
+    {"shot":"capture","text":"Capture the product you actually built","duration":6},
+    {"shot":"render","text":"Render real footage with readable captions","duration":6},
+    {"shot":"review","text":"Review the exact draft before approval","duration":7},
+    {"shot":"guard","text":"Approval locks the exact post and media","duration":6},
+    {"shot":"day","text":"Track launch day. Learn when results arrive.","duration":5}
+  ]
+}

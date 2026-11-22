@@ -1,0 +1,157 @@
+{
+  "name": "Liftoff",
+  "oneLiner": "Grounded launch kits from your repository, reviewed locally",
+  "audience": "Developers and coding agents preparing repository-backed launches",
+  "problem": "Turning repository facts into launch assets while retaining sources and human review",
+  "proofPoints": [
+    "Scan a local repository",
+    "Validate claims against source files",
+    "Capture terminal commands as real demo footage",
+    "Render captioned videos locally",
+    "Build a local review page"
+  ],
+  "features": [
+    {
+      "name": "Repository scan",
+      "description": "Read local README, package metadata and Git history",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/product/scan.ts"
+        }
+      ]
+    },
+    {
+      "name": "Terminal capture",
+      "description": "Execute local commands and capture their actual output as PNG and GIF",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/visuals/shots.ts"
+        }
+      ]
+    },
+    {
+      "name": "Demo rendering",
+      "description": "Render captured media with captions using ffmpeg or optional Remotion",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/video/render.ts"
+        }
+      ]
+    },
+    {
+      "name": "Local review",
+      "description": "Build a local approval page for launch posts and media",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/commands/review.ts"
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "scan",
+      "text": "Scan a local repository",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/product/scan.ts"
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "text": "Validate claims against source files",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/commands/validate.ts"
+        }
+      ]
+    },
+    {
+      "id": "capture",
+      "text": "Capture terminal commands as real demo footage",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/visuals/shots.ts"
+        }
+      ]
+    },
+    {
+      "id": "render",
+      "text": "Render captioned videos locally",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/video/render.ts"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "text": "Build a local review page",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/commands/review.ts"
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "text": "Plan profile-appropriate channels and local posting times",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/planning/plan.ts"
+        }
+      ]
+    },
+    {
+      "id": "brief",
+      "text": "Export a sourced Launch Brief as local HTML",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/brief/index.ts"
+        }
+      ]
+    },
+    {
+      "id": "copy",
+      "text": "Prepare grounded writing briefs and check local drafts",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/copy/write.ts"
+        }
+      ]
+    },
+    {
+      "id": "approval",
+      "text": "Require approval matching the exact post and media hash",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/review/approvals.ts"
+        }
+      ]
+    },
+    {
+      "id": "warroom",
+      "text": "Prepare a local launch-day warroom without sending replies",
+      "sources": [
+        {
+          "type": "file",
+          "ref": "src/launch-ops/warroom.ts"
+        }
+      ]
+    }
+  ]
+}

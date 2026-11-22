@@ -13,12 +13,15 @@ const greeting = /^(?:(?:hi|hey|hello)(?: there)?,?\s*(?:hn|everyone|all|folks|f
 const codeless = (text: string) => text.replace(/```[\s\S]*?```/g, '');
 const listItem = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\S/;
 
+/** Splits on ## headings outside code fences; fenced blocks stay in their section. */
 export function sectionsOf(body: string) {
-  const parts = codeless(body).split(/^(?=## )/m);
-  const lead = parts[0].startsWith('## ') ? '' : parts.shift()!.trim();
+  const blocks: string[] = [];
+  const restore = (text: string) => text.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[Number(i)]);
+  const parts = body.replace(/```[\s\S]*?```/g, block => '\u0000' + (blocks.push(block) - 1) + '\u0000').split(/^(?=## )/m);
+  const lead = parts[0].startsWith('## ') ? '' : restore(parts.shift()!).trim();
   return { lead, sections: new Map(parts.map(part => {
     const [heading, ...rest] = part.split(/\r?\n/);
-    return [heading.trim(), rest.join('\n').trim()];
+    return [heading.trim(), restore(rest.join('\n')).trim()];
   })) };
 }
 export const threadPosts = (body: string) => body.split(/\r?\n---\r?\n/).map(p => p.trim()).filter(Boolean);

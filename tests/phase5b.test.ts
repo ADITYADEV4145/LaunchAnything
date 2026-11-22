@@ -28,13 +28,13 @@ async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(temp.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
 it('sends the PH description and maker comment sections separately', async () => {
-  const body = 'Teams lose the weekly plan.\n\n## Maker comment\n\nI made this. What is missing?\n\n## Gallery order\n\n1. Hero\n2. Pricing';
+  const body = 'Teams lose the weekly plan.\n\n## Maker comment\n\nI made this. What is missing?\n\n```\n## not a heading\n```\n\n## Gallery order\n\n1. Hero\n2. Pricing';
   const { cwd, home } = await approvedPost('product-hunt', [], { link: 'https://example.test' }, body);
   const keys = new MemoryKeychain();
   await connect({ platform: 'product-hunt', account: 'owner' }, 'private-token', keys, home);
   const client = new MockMcpClient('product-hunt');
   await assistedPublish(cwd, { home, keychain: keys, mcp: async () => client });
-  expect(client.calls[0].args).toMatchObject({ values: { description: 'Teams lose the weekly plan.', commentBody: 'I made this. What is missing?' } });
+  expect(client.calls[0].args).toMatchObject({ values: { description: 'Teams lose the weekly plan.', commentBody: 'I made this. What is missing?\n\n```\n## not a heading\n```' } });
 });
 
 it('defaults PH to official MCP draft, readiness and preview without submission', async () => {

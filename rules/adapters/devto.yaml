@@ -9,3 +9,4 @@ mcpAliases:
   - devto
   - devto-mcp
   - mcp-devto
+connectionRoute: api

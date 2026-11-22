@@ -3,37 +3,81 @@
     "label": "Show HN",
     "goal": "Invite hands-on feedback from technical peers with a tryable demo",
     "submitUrl": "https://news.ycombinator.com/submit",
-    "route": "manual"
+    "route": "manual",
+    "assisted": {
+      "routes": [
+        "browser"
+      ],
+      "dailyCap": 1,
+      "browserResult": "^https://news\\.ycombinator\\.com/item\\?id=\\d+"
+    }
   },
   "product-hunt": {
     "label": "Product Hunt",
     "goal": "Present the product demo and maker story to product discovery readers",
     "submitUrl": "https://www.producthunt.com/posts/new",
-    "route": "manual"
+    "route": "manual",
+    "assisted": {
+      "routes": [
+        "mcp",
+        "browser"
+      ],
+      "dailyCap": 1,
+      "browserResult": "^https://www\\.producthunt\\.com/posts/(?!new(?:$|[/?#]))[^/?#]+",
+      "mcpServer": "https://mcp.producthunt.com/mcp"
+    }
   },
   "x": {
     "label": "X",
     "goal": "Share a concise update and invite direct conversation",
     "submitUrl": "https://x.com/compose/post",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "mcp",
+        "postiz",
+        "buffer"
+      ],
+      "dailyCap": 5,
+      "mcpServer": "https://api.x.com/mcp"
+    }
   },
   "linkedin": {
     "label": "LinkedIn",
     "goal": "Explain the customer problem in a professional context",
     "submitUrl": "https://www.linkedin.com/feed/",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer",
+        "api"
+      ]
+    }
   },
   "reddit": {
     "label": "Reddit",
     "goal": "Invite relevant community feedback with a manual, subreddit-appropriate submission",
     "submitUrl": "https://www.reddit.com/submit",
-    "route": "manual"
+    "route": "manual",
+    "assisted": {
+      "routes": [
+        "browser"
+      ],
+      "dailyCap": 1,
+      "browserResult": "^https://(?:www\\.)?reddit\\.com/r/[^/]+/comments/"
+    }
   },
   "devto": {
     "label": "DEV",
     "goal": "Explain the implementation with a technical walkthrough",
     "submitUrl": "https://dev.to/new",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "api"
+      ]
+    }
   },
   "indie-hackers": {
     "label": "Indie Hackers",
@@ -43,27 +87,56 @@
   "github-release": {
     "label": "GitHub release",
     "goal": "Give repository users a durable release note tied to the code",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "api"
+      ]
+    }
   },
   "tiktok": {
     "label": "TikTok",
     "goal": "Demonstrate the core mobile workflow with a short vertical clip",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
   },
   "reels": {
     "label": "Reels",
     "goal": "Show the product in use with a visual, vertical demonstration",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
   },
   "shorts": {
     "label": "Shorts",
     "goal": "Make the central workflow understandable in a short video",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
   },
   "instagram": {
     "label": "Instagram",
     "goal": "Show real product screens with a focused visual story",
-    "route": "integration"
+    "route": "integration",
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
   },
   "email": {
     "label": "Email",
@@ -79,5 +152,37 @@
     "label": "Press release",
     "goal": "Prepare a brand-reviewed announcement for press distribution",
     "route": "manual"
+  },
+  "facebook": {
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
+  },
+  "youtube": {
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
+  },
+  "threads": {
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
+  },
+  "bluesky": {
+    "assisted": {
+      "routes": [
+        "postiz",
+        "buffer"
+      ]
+    }
   }
 }

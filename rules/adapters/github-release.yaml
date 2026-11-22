@@ -10,3 +10,4 @@ mcpAliases:
   - github-release
   - github-release-mcp
   - mcp-github-release
+connectionRoute: api

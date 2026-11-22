@@ -14,3 +14,15 @@ mcpAliases:
   - postiz
   - postiz-mcp
   - mcp-postiz
+connectionRoute: postiz
+connectionChannels:
+  - x
+  - linkedin
+  - instagram
+  - facebook
+  - tiktok
+  - youtube
+  - threads
+  - bluesky
+  - reels
+  - shorts

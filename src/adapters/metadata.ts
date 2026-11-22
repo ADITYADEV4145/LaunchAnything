@@ -5,9 +5,10 @@ import { packageRoot } from '../core/package-root.js';
 import { validateFile } from '../core/schema.js';
 import type { AdapterName } from './index.js';
 
-interface Metadata {
+export interface Metadata {
   id: AdapterName; name: string; priority: number;
   channels: string[]; envKeys: string[]; mcpAliases: string[];
+  connectionRoute?: 'postiz' | 'buffer' | 'api'; connectionChannels?: string[]; requestUrl?: string;
 }
 
 export function loadAdapterMetadata(directory = join(packageRoot(), 'rules/adapters')): Metadata[] {
@@ -21,3 +22,5 @@ export function loadAdapterMetadata(directory = join(packageRoot(), 'rules/adapt
     return data as Metadata;
   }).sort((a, b) => a.priority - b.priority);
 }
+
+export const adapterMetadata = loadAdapterMetadata();

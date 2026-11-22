@@ -5,8 +5,13 @@ import { parse } from 'yaml';
 import { packageRoot } from './package-root.js';
 import { validateFile } from './schema.js';
 
+export interface AssistedSite {
+  routes: ('postiz' | 'buffer' | 'api' | 'browser' | 'mcp')[];
+  dailyCap?: number; browserResult?: string; mcpServer?: string;
+}
 export interface Site {
   custom?: boolean;
+  assisted?: AssistedSite;
   id: string; name: string; label?: string; goal?: string;
   route: 'manual' | 'integration'; adapters?: string[]; submitUrl?: string;
   channel: Record<string, unknown>; copy: Record<string, unknown>;
@@ -16,12 +21,16 @@ const cache = new Map<string, Map<string, Site>>();
 const reservedIds = new Set(['fix-list']);
 const files = (dir: string) => existsSync(dir) ? readdirSync(dir).filter(f => /\.ya?ml$/.test(f)).sort().map(f => join(dir, f)) : [];
 const read = (path: string) => parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+let builtins: Record<string, Partial<Site>> | undefined;
+export function builtinSiteMetadata() {
+  return builtins ??= read(join(packageRoot(), 'rules/sites.yaml')) as Record<string, Partial<Site>>;
+}
 export function registry(cwd = process.cwd()) {
   const key = resolve(cwd);
   const cached = cache.get(key);
   if (cached) return cached;
   const sites = new Map<string, Site>();
-  const metadata = read(join(packageRoot(), 'rules/sites.yaml')) as Record<string, Partial<Site>>;
+  const metadata = builtinSiteMetadata();
   for (const path of files(join(packageRoot(), 'rules/channels'))) {
     const channel = read(path);
     const result = validateFile('rules', channel);

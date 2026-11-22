@@ -1,12 +1,14 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { ReviewPost } from '../review/posts.js';
 import type { PublishReceipt } from '../adapters/index.js';
 import { frontMatter } from './forms.js';
 import { productHuntDate } from './payloads.js';
+import { builtinSiteMetadata, site } from '../core/registry.js';
 
 export type McpPlatform = 'product-hunt' | 'x';
-export const officialServers = { 'product-hunt': 'https://mcp.producthunt.com/mcp', x: 'https://api.x.com/mcp' } as const;
+export const officialServers = Object.fromEntries(Object.entries(builtinSiteMetadata())
+  .filter(([, site]) => site.assisted?.mcpServer).map(([id, site]) => [id, site.assisted!.mcpServer!])) as Record<McpPlatform, string>;
 // Verified with the official tools/list: start_launch creates an unsubmitted draft only.
 export const productHuntTools = ['start_launch', 'get_launch', 'get_launch_preview_view'] as const;
 export interface McpTool { name: string }
@@ -107,7 +109,7 @@ export class MockMcpClient implements McpClient {
   constructor(public platform: McpPlatform, public tools: McpTool[] = productHuntTools.map(name => ({ name })),
     public respond: (name: string, args: Record<string, unknown>) => unknown = name => ({ status: 'ok', data: name === 'get_launch_preview_view'
       ? { composer: { title: 'Draft preview' } }
-      : { launch_id: 'draft-1', status: 'draft', url: 'https://www.producthunt.com/posts/new', assessment: { submission: 'no_known_blockers' } } })) {}
+      : { launch_id: 'draft-1', status: 'draft', url: builtinSiteMetadata()['product-hunt'].submitUrl, assessment: { submission: 'no_known_blockers' } } })) {}
   async listTools() { this.discoveries++; return this.tools; }
   async callTool(name: string, args: Record<string, unknown>) {
     allowTool(this.platform, name);
@@ -125,6 +127,9 @@ function data(result: any) {
 }
 
 export async function mcpDraft(platform: McpPlatform, client: McpClient, post: ReviewPost, root: string): Promise<PublishReceipt> {
+  const target = site(post.channel, dirname(root));
+  if (target.custom || post.channel !== platform || !target.assisted?.routes.includes('mcp'))
+    throw new Error(post.channel + ': no built-in MCP publishing route available');
   const tools = await client.listTools();
   // No ordinary post-create tool is verified in https://docs.x.com/tools/mcp.
   // Discovery alone never authorizes an unfamiliar write tool.

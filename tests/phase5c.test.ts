@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { stringify } from 'yaml';
-import { registry, site } from '../src/core/registry.js';
+import { builtinSiteMetadata, registry, site } from '../src/core/registry.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { adapterSelection } from '../src/adapters/index.js';
 import { loadAdapterMetadata } from '../src/adapters/metadata.js';
@@ -14,6 +14,13 @@ import { checkPosts } from '../src/copy/check.js';
 import { createPlan } from '../src/planning/plan.js';
 import { buildReview } from '../src/review/page.js';
 import { validate } from '../src/product/validate.js';
+import { assistedPublish } from '../src/connect/publish.js';
+import { connect, routes } from '../src/connect/registry.js';
+import { MockBrowser } from '../src/connect/browser.js';
+import { fillForm, forms } from '../src/connect/forms.js';
+import { mcpDraft, officialServers } from '../src/connect/mcp.js';
+import { loadReview } from '../src/review/posts.js';
+import { dailyCaps } from '../src/connect/caps.js';
 
 const dirs: string[] = [];
 const temp = () => { const dir = mkdtempSync(join(tmpdir(), 'liftoff-5c-')); dirs.push(dir); return dir; };
@@ -35,7 +42,7 @@ const cli = (cwd: string, ...args: string[]) => spawnSync(process.execPath,
 
 it('loads validated adapter display names and accepts an empty metadata directory', () => {
   expect(loadAdapterMetadata().map(adapter => adapter.name)).toEqual([
-    'Postiz', 'Buffer', 'Ayrshare', 'GitHub Releases', 'DEV', 'Email', 'Manual',
+    'Postiz', 'Buffer', 'Ayrshare', 'GitHub Releases', 'DEV', 'Email', 'Manual', 'LinkedIn API',
   ]);
   expect(loadAdapterMetadata(temp())).toEqual([]);
 });
@@ -168,4 +175,55 @@ it('validates config channels against the registry for the config cwd', async ()
     error: expect.stringContaining('Unknown channel: typo. Known ids:') });
   writeFileSync(path, JSON.stringify({ ...config, channels: [] }));
   expect(await validate(cwd, 'config')).toMatchObject({ valid: false });
+});
+
+it('uses built-in registry metadata for assisted routes, caps and browser destinations', () => {
+  const cwd = temp();
+  expect(routes('product-hunt', cwd)).toEqual(['mcp', 'browser']);
+  expect(routes('x', cwd)).toEqual(['mcp', 'postiz', 'buffer']);
+  expect(routes('linkedin', cwd)).toEqual(['postiz', 'buffer', 'api']);
+  expect(routes('facebook', cwd)).toEqual(['postiz', 'buffer']);
+  expect(routes('devto', cwd)).toEqual(['api']);
+  expect(routes('blog', cwd)).toEqual([]);
+  expect(routes('typo', cwd)).toEqual([]);
+  expect(dailyCaps).toEqual({ 'show-hn': 1, reddit: 1, 'product-hunt': 1, x: 5 });
+  for (const [id, form] of Object.entries(forms)) {
+    expect(form.url).toBe(site(id, cwd).submitUrl);
+    expect(form.result.source).toBe(new RegExp(builtinSiteMetadata()[id].assisted!.browserResult!).source);
+  }
+  expect(officialServers.x).toBe(builtinSiteMetadata().x.assisted!.mcpServer);
+});
+
+it.each([
+  { id: 'betalist', integration: false, persistedRoute: 'browser' },
+  { id: 'betalist', integration: true, persistedRoute: 'mcp' },
+  { id: 'facebook', integration: true, persistedRoute: 'postiz' },
+])('keeps custom $id offline despite a persisted $persistedRoute connection', async ({ id, integration, persistedRoute }) => {
+  const cwd = temp(), home = temp();
+  add(cwd, { ...definition(id), ...(integration ? { route: 'integration', adapters: ['buffer'] } : {}) });
+  mkdirSync(join(cwd, '.launch/posts'), { recursive: true });
+  writeFileSync(join(cwd, '.launch/config.json'), JSON.stringify({ profile: 'devtool',
+    launchType: 'new-product', channels: [id], timezone: 'UTC', launchDate: '2026-07-14', profileConfirmed: true }));
+  writeFileSync(join(cwd, '.launch/posts', id + '.md'), `---\nchannel: ${id}\ntitle: Local draft\nmedia: []\nclaims: []\n---\nOnly local staging.\n`);
+  const { paths, posts: [post] } = await loadReview(cwd);
+  writeFileSync(paths.approvals, JSON.stringify({ approvals: [{ channel: id, hash: post.hash, name: 'Owner', time: '2026-07-13T09:00:00Z' }] }));
+  writeFileSync(join(home, 'connections.json'), JSON.stringify([{ platform: id, route: persistedRoute,
+    account: 'owner', profile: cwd, connectedAt: '2026-07-13T09:00:00Z' }]));
+  const browser = vi.fn(), mcp = vi.fn();
+  const keychain = { get: vi.fn(), set: vi.fn(), delete: vi.fn() };
+  expect(routes(id, cwd)).toEqual([]);
+  await expect(connect({ platform: id, route: 'buffer', account: 'owner' }, 'fixture', keychain, home, cwd)).rejects.toThrow('Unsupported route');
+  await expect(assistedPublish(cwd, { home, browser, mcp, keychain })).rejects.toThrow('custom sites only support offline staging');
+  expect(browser).not.toHaveBeenCalled(); expect(mcp).not.toHaveBeenCalled(); expect(keychain.get).not.toHaveBeenCalled();
+  expect(keychain.set).not.toHaveBeenCalled();
+  const driver = new MockBrowser();
+  await expect(fillForm(driver, post, paths.root)).rejects.toThrow('no built-in browser form');
+  expect(driver.actions).toEqual([]);
+  const client = { listTools: vi.fn(), callTool: vi.fn() };
+  await expect(mcpDraft('product-hunt', client, post, paths.root)).rejects.toThrow('no built-in MCP');
+  expect(client.listTools).not.toHaveBeenCalled(); expect(client.callTool).not.toHaveBeenCalled();
+  const staged = await publish(cwd, true, { BUFFER_API_KEY: 'fixture' });
+  expect(staged.mode).toBe('offline-staging');
+  expect(staged.posts[0].id).toMatch(integration ? /^buffer:/ : /^manual:/);
+  expect(staged.posts[0].url).toMatch(/^file:/);
 });

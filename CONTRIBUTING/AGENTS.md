@@ -13,12 +13,8 @@ Coordinate changes to those with the lead rather than editing them concurrently.
 | 3 | shots, images | src/visuals/, templates/images/, src/selftest/phase3.ts, tests/phase3.test.ts |
 | 4 | video | src/video/, templates/video/, src/selftest/phase4.ts, tests/phase4.test.ts |
 | 5 | review, publish | src/review/, src/adapters/, src/selftest/phase5.ts, tests/phase5.test.ts |
-<<<<<<< HEAD
 | 5b | connect | src/connect/, src/selftest/phase5b.ts, tests/phase5b.test.ts, skill/references/phase5b.md |
-||||||| parent of a275c1c (Cover custom site workflows and document Phase 5c)
-=======
 | 5c | adapters | src/core/registry.ts, rules/adapters/, schemas/site.schema.json, tests/phase5c.test.ts, skill/references/phase5c.md |
->>>>>>> a275c1c (Cover custom site workflows and document Phase 5c)
 | 6 | results, learn, receipt | src/results/, src/selftest/phase6.ts, tests/phase6.test.ts |
 | Launch ops | warroom, friends, followup, retro, release | src/launch-ops/, src/results/retro.ts, src/selftest/launch-ops.ts, tests/launch-ops.test.ts, skill/references/launch-ops.md |
 

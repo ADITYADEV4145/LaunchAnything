@@ -2,9 +2,12 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readOptional } from '../review/posts.js';
 import { tryLock } from './lock.js';
+import { builtinSiteMetadata } from '../core/registry.js';
 
 interface Entry { platform: string; day: string; account: string }
-export const dailyCaps: Record<string, number> = { 'show-hn': 1, reddit: 1, 'product-hunt': 1, x: 5 };
+export const dailyCaps: Record<string, number> = Object.fromEntries(
+  Object.entries(builtinSiteMetadata()).filter(([, site]) => site.assisted?.dailyCap !== undefined)
+    .map(([id, site]) => [id, site.assisted!.dailyCap!]));
 export async function reserveCap(root: string, platform: string, account: string, now = new Date()) {
   const lockPath = join(root, 'publish-caps.lock');
   const release = await tryLock(lockPath);

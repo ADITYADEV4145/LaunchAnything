@@ -1,4 +1,4 @@
-import { loadAdapterMetadata } from './metadata.js';
+import { adapterMetadata as metadata } from './metadata.js';
 import { site } from '../core/registry.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -32,7 +32,6 @@ export interface PublishAdapter {
   cancel(channel: string, id: string, cwd?: string): Promise<AdapterStatus | undefined>;
 }
 
-const metadata = loadAdapterMetadata();
 const integrations = metadata.filter(m => m.id !== 'manual').map(m => m.id);
 const accepts = (name: AdapterName, channel: string, cwd?: string) => {
   const target = site(channel, cwd);
@@ -81,7 +80,7 @@ export async function readReceipts(cwd?: string) {
 }
 
 function reminder(id: string, post: ReviewPost, url: string, cwd?: string) {
-  if (!site(post.channel, cwd).custom && site(post.channel, cwd).route === 'manual') return assistedReminder(post.channel, post.scheduledAt);
+  if (!site(post.channel, cwd).custom && site(post.channel, cwd).assisted?.routes.includes('browser')) return assistedReminder(post.channel, post.scheduledAt);
   const icsDate = (date: string) => date.replaceAll(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Liftoff//Launch reminder//EN',
     'BEGIN:VEVENT', `UID:${id}@liftoff.local`, `DTSTAMP:${icsDate(new Date().toISOString())}`,

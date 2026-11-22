@@ -1,0 +1,9 @@
+id: linkedin-api
+name: LinkedIn API
+priority: 7
+channels:
+  - linkedin
+envKeys: []
+mcpAliases: []
+connectionRoute: api
+requestUrl: https://api.linkedin.com/rest/posts

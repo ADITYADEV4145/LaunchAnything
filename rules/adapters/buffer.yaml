@@ -15,3 +15,15 @@ mcpAliases:
   - buffer
   - buffer-mcp
   - mcp-buffer
+connectionRoute: buffer
+connectionChannels:
+  - x
+  - linkedin
+  - instagram
+  - facebook
+  - tiktok
+  - youtube
+  - threads
+  - bluesky
+  - reels
+  - shorts

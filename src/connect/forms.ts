@@ -1,21 +1,23 @@
 import { parse } from 'yaml';
-import { extname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { ReviewPost } from '../review/posts.js';
 import type { BrowserDriver } from './browser.js';
 import { productHuntDate, productHuntPayload } from './payloads.js';
+import { builtinSiteMetadata, site } from '../core/registry.js';
 
-export const forms = {
-  'show-hn': { url: 'https://news.ycombinator.com/submit', result: /^https:\/\/news\.ycombinator\.com\/item\?id=\d+/ },
-  reddit: { url: 'https://www.reddit.com/submit', result: /^https:\/\/(?:www\.)?reddit\.com\/r\/[^/]+\/comments\// },
-  'product-hunt': { url: 'https://www.producthunt.com/posts/new', result: /^https:\/\/www\.producthunt\.com\/posts\/(?!new(?:$|[/?#]))[^/?#]+/ },
-};
-export type BrowserPlatform = keyof typeof forms;
+export type BrowserPlatform = 'show-hn' | 'reddit' | 'product-hunt';
+export const forms = Object.fromEntries(Object.entries(builtinSiteMetadata())
+  .filter(([, site]) => site.assisted?.browserResult)
+  .map(([id, site]) => [id, { url: site.submitUrl!, result: new RegExp(site.assisted!.browserResult!) }])) as Record<BrowserPlatform, { url: string; result: RegExp }>;
 export function frontMatter(post: ReviewPost): Record<string, unknown> {
   return parse(/^---\s*\n([\s\S]*?)\n---/.exec(post.source)?.[1] ?? '') ?? {};
 }
-export async function fillForm(driver: BrowserDriver, post: ReviewPost, _root: string) {
+export async function fillForm(driver: BrowserDriver, post: ReviewPost, root: string) {
+  const target = site(post.channel, dirname(root));
+  if (target.custom || !target.assisted?.routes.includes('browser') || !Object.hasOwn(forms, post.channel))
+    throw new Error(post.channel + ': no built-in browser form available');
   const staging = await mkdtemp(join(tmpdir(), 'liftoff-upload-'));
   const cleanup = () => rm(staging, { recursive: true, force: true });
   try {

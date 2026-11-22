@@ -1,6 +1,7 @@
 import { readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
+import { assertSafePath } from '../copy/safe-path.js';
 import { checked, missing, readJson, withWriteLock, writeJson, writeLocal } from './files.js';
 import { githubStarsDelta } from './github.js';
 import { manualObservations, normalizeObservation, postKey, record, summarize, type ManualObservation, type ObservedPost,
@@ -12,6 +13,7 @@ import { feedbackDrafts, mineFeedback } from './feedback.js';
 import { followupDrafts, shippedFix } from './followup.js';
 import { linkJudgeEvidence } from './judge-evidence.js';
 import { repurpose, type RepurposeMedia } from './repurpose.js';
+import { renderRepurposeMedia } from './repurpose-media.js';
 import { localDate } from './time.js';
 
 export type ReadStatus = (post: PublishedPost) => Promise<unknown>;
@@ -30,7 +32,7 @@ export function checkpointPaths(cwd: string, launchDate: string, checkpoint: str
 
 export async function collect(cwd: string, options: {
   now?: Date; metricsPath?: string; github?: boolean; readStatus?: ReadStatus; replies?: boolean;
-  repurposeMedia?: RepurposeMedia;
+  repurposeMedia?: RepurposeMedia; repurposeMediaPath?: string;
 } = {}) {
   const paths = launchDir(cwd);
   const now = options.now ?? new Date();
@@ -90,7 +92,13 @@ export async function collect(cwd: string, options: {
   const report = renderReport(results, attribution.posts, checkpoint, attribution.unmatched);
   const replies = options.replies ? renderReplies(posts, checkpoint) : undefined;
   const repliesPath = replies && join(paths.root, 'replies.md');
-  await withWriteLock(paths.results, async () => {
+  if (options.repurposeMediaPath !== undefined) assertSafePath(cwd, drafts);
+  const rendered = await withWriteLock(paths.results, async () => {
+    let assets;
+    if (options.repurposeMediaPath !== undefined) {
+      if (!adaptation.brief) throw new Error('No repurposing brief to render. Run liftoff results and supply published copy for the selected post.');
+      assets = await renderRepurposeMedia(cwd, drafts, adaptation.brief, options.repurposeMediaPath);
+    }
     await writeJson(details, { observedAt: results.observedAt, profile: config.profile, timezone: config.timezone,
       posts: attribution.posts.map(({ channel, id, hook, angle, judge, metrics, scheduledAt, utmContent, attribution }) =>
       ({ channel, id, hook, angle, judge, metrics, scheduledAt, utmContent, attribution })),
@@ -103,16 +111,17 @@ export async function collect(cwd: string, options: {
     for (const { filename, body } of followups) await writeLocal(join(drafts, filename), body);
     await writeLocal(join(drafts, 'repurpose.md'), adaptation.markdown);
     const mediaBrief = join(drafts, 'repurpose-media.json');
-    if (adaptation.brief) await writeJson(mediaBrief, adaptation.brief);
+    if (adaptation.brief) await writeJson(mediaBrief, { ...adaptation.brief, ...(assets && { artifacts: assets }) });
     else await rm(mediaBrief, { force: true });
     const calibrationPath = join(drafts, 'judge-calibration.json');
     if (calibration) await writeJson(calibrationPath, calibration);
     else await rm(calibrationPath, { force: true });
     if (replies && repliesPath) await writeLocal(repliesPath, replies.markdown);
     await writeJson(paths.results, results);
+    return assets;
   });
   return { path: paths.results, snapshot, checkpoint, results, report: paths.report, warnings,
-    drafts, feedback: feedback.counts, media: adaptation.artifacts,
+    drafts, feedback: feedback.counts, media: rendered ?? adaptation.artifacts,
     ...(calibration && { calibration: join(drafts, 'judge-calibration.json') }),
     ...(replies && { replies: { path: repliesPath, count: replies.count } }),
   };

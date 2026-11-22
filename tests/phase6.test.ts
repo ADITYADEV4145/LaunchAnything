@@ -1,8 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
+import { PNG } from 'pngjs';
 import { launchDir } from '../src/core/launch-dir.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { checkpointAt, collect } from '../src/results/collect.js';
@@ -11,6 +12,7 @@ import { githubStarsDelta } from '../src/results/github.js';
 import { learn, loadJudgeWeights, loadPlanLessons } from '../src/results/history.js';
 import { receipt } from '../src/results/receipt.js';
 import { checks } from '../src/selftest/phase6.js';
+import { pngSize } from '../src/visuals/check.js';
 
 const dirs: string[] = [];
 const config = { profile: 'devtool', launchType: 'relaunch', timezone: 'America/Los_Angeles',
@@ -42,6 +44,85 @@ it('selects checkpoints by launch calendar date across DST', () => {
   expect(checkpointAt(config, new Date('2026-03-14T07:00:00Z'))).toBe('T+7');
   expect(checkpointAt(config, new Date('2026-04-06T06:59:00Z'))).toBe('T+7');
   expect(checkpointAt(config, new Date('2026-04-06T07:00:00Z'))).toBe('T+30');
+});
+
+async function repurposeFixture() {
+  const { cwd, paths } = await workspace();
+  await writeJson(paths.config, { ...config, launchDate: '2020-03-07' });
+  await writeJson(paths.product, { name: 'Fixture Linter' });
+  await writeJson(join(paths.root, 'metrics.json'), { posts: [
+    { channel: 'x', id: 'one', copy: 'Find missing exports. Check the output.', metrics: { signups: 2 } },
+  ] });
+  const sourcesPath = join(cwd, 'sources.json');
+  const source = { channel: 'x', postId: 'one', frames: [{ image: 'fixture.png' }, { image: 'fixture.png' }] };
+  return { cwd, paths, source, sourcesPath };
+}
+
+it('renders an opt-in carousel and portrait clip from fixture media without changing launch assets or receipts', async () => {
+  const { cwd, paths, source, sourcesPath } = await repurposeFixture();
+  await writeJson(sourcesPath, source);
+  await mkdir(paths.media);
+  const still = PNG.sync.write(new PNG({ width: 64, height: 36, fill: true }));
+  const fixturePath = join(paths.media, 'fixture.png');
+  await writeFile(fixturePath, still);
+  const published = await readFile(paths.published, 'utf8');
+  const initial = await collect(cwd);
+  const briefPath = join(initial.drafts, 'repurpose-media.json');
+  const brief = await readJson(briefPath);
+  expect(brief).toMatchObject({ frames: ['Find missing exports.', 'Check the output.'] });
+  expect((await readdir(initial.drafts)).some(name => name.startsWith('repurpose-assets-'))).toBe(false);
+
+  const result = spawnSync(process.execPath,
+    ['--import', 'tsx', 'src/cli.ts', 'results', '--repurpose-media', 'sources.json', '--cwd', cwd, '--json'],
+    { cwd: packageRoot(), encoding: 'utf8', timeout: 90_000 });
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const { drafts, media } = JSON.parse(result.stdout).data;
+  expect(drafts).toBe(initial.drafts);
+  expect(await readJson(briefPath)).toEqual({ ...(brief as object), artifacts: media });
+  expect(media.carousel.files).toHaveLength(2);
+  for (const path of [...media.carousel.files, media.carousel.report, media.vertical.file, media.vertical.receipt]) {
+    const folder = dirname(resolve(cwd, path));
+    expect(dirname(folder)).toBe(drafts);
+    expect(basename(folder)).toMatch(/^repurpose-assets-/);
+  }
+  for (const path of media.carousel.files)
+    expect(pngSize(await readFile(join(cwd, path)))).toEqual({ width: 1080, height: 1350 });
+  expect(await readJson(join(cwd, media.carousel.report))).toMatchObject([
+    { ok: true, source: fixturePath }, { ok: true, source: fixturePath },
+  ]);
+  expect(await readJson(join(cwd, media.vertical.receipt))).toMatchObject({ format: '9x16', duration: 11,
+    scenes: [{ caption: 'Find missing exports.' }, { caption: 'Check the output.' }] });
+  const probe = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height',
+    '-of', 'json', join(cwd, media.vertical.file)], { encoding: 'utf8' });
+  const [{ width, height }] = JSON.parse(probe).streams;
+  expect(width * 16).toBe(height * 9);
+  expect(await readdir(paths.media)).toEqual(['fixture.png']);
+  expect(await readFile(fixturePath)).toEqual(still);
+  expect(await readFile(paths.published, 'utf8')).toBe(published);
+}, 100_000);
+
+it('rejects stale post selections, missing mappings and media outside the local asset tree', async () => {
+  const { cwd, paths, source, sourcesPath } = await repurposeFixture();
+  const initial = await collect(cwd);
+  const briefPath = join(initial.drafts, 'repurpose-media.json');
+  const brief = await readFile(briefPath, 'utf8');
+  const run = async (manifest: unknown) => {
+    await writeJson(sourcesPath, manifest);
+    return collect(cwd, { repurposeMediaPath: sourcesPath });
+  };
+  await expect(run({ ...source, postId: 'two' })).rejects.toThrow('selected post');
+  await expect(run({ ...source, frames: [] })).rejects.toThrow('one media source per caption');
+  await expect(run({ ...source, frames: [{ image: '../outside.png' }, source.frames[1]] })).rejects.toThrow('local file');
+  await mkdir(paths.media);
+  await writeFile(join(paths.media, 'fixture.png'), 'not an image');
+  await expect(run(source)).rejects.toThrow('local file');
+  await writeFile(join(paths.media, 'fixture.png'), PNG.sync.write(new PNG({ width: 64, height: 36 })));
+  await expect(run({ ...source, frames: [{ image: 'fixture.png', clip: 'https://example.test/remote.mp4' }, source.frames[1]] }))
+    .rejects.toThrow('clip must be a supported local file');
+  await symlink(join(paths.media, 'fixture.png'), join(paths.media, 'linked.png'), 'file');
+  await expect(run({ ...source, frames: [{ image: 'linked.png' }, { image: 'linked.png' }] })).rejects.toThrow('Unsafe symlink');
+  expect(await readFile(briefPath, 'utf8')).toBe(brief);
+  expect((await readdir(initial.drafts)).some(name => name.startsWith('repurpose-assets-'))).toBe(false);
 });
 
 it('joins by channel and id; overlays imported fields without counting missing as zero', async () => {

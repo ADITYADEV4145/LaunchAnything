@@ -13,12 +13,17 @@ import { criteria, judgeKeys } from '../src/copy/judge.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { loadReview } from '../src/review/posts.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
+import { groundworkGoFixture, groundworkGoGate } from '../src/selftest/groundwork-go.js';
 
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
 async function fixture() {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-')); temporary.push(cwd);
   return goFixture(cwd);
+}
+async function groundworkFixture() {
+  const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-groundwork-')); temporary.push(cwd);
+  return groundworkGoFixture(cwd);
 }
 const table = '| Why | Local time | Channel | Local date |\n| --- | --- | --- | --- |\n| Demo | 09:00 | x | 2026-09-25 |\n';
 it('parses reordered table headers and displays wall-clock dates in the founder timezone', () => {
@@ -146,12 +151,47 @@ it('maps the requested platforms without silently using another route', () => {
   expect(routeFor('email')).toBe('kit-mcp'); expect(routeFor('product-hunt')).toBe('official-mcp');
   expect(() => routeFor('unknown')).toThrow();
 });
-it('CLI dry run is the default and mock --confirm works noninteractively after chat approval', async () => {
-  const { work } = await fixture();
+it('GroundWork mock gate publishes all route types, confirms PH once, never submits forms and converts Chicago time', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-groundwork-gate-')); temporary.push(cwd);
+  const lines: string[] = [];
+  const { result, channels, receipts, questions, browsers } = await groundworkGoGate(cwd, line => lines.push(line));
+  expect(new Set(result.timeline.map(row => row.route))).toEqual(new Set(['official-mcp', 'postiz', 'devto-api', 'github-api', 'kit-mcp', 'browser']));
+  expect(result.board).toHaveLength(8);
+  expect(receipts.every(post => post.status === 'published' && post.url)).toBe(true);
+  expect(questions).toHaveLength(1);
+  expect([...browsers.keys()].sort()).toEqual(['reddit', 'show-hn']);
+  for (const channel of channels) {
+    expect(lines.some(line => line.includes(`| ${channel} |`) && line.includes('America/Chicago') && line.endsWith('queued'))).toBe(true);
+    expect(lines.some(line => line.startsWith(`${channel} | live | https://`))).toBe(true);
+  }
+}, 30000);
+it('unverified PH/X/Kit publishing fails closed with the reason in the board and paste file', async () => {
+  const { work, paths } = await groundworkFixture(), lines: string[] = [];
+  const live = liveAdapter({ request: vi.fn(async () => { throw new Error('No network allowed'); }) });
+  const mock = mockAdapter();
+  const result = await go(work, { mock: true, confirm: true, yes: true, noWait: true, phSubmit: true,
+    log: line => lines.push(line), adapter: { publish: context =>
+      ['product-hunt', 'x', 'email'].includes(context.post.channel) ? live.publish(context) : mock.publish(context) } });
+  if (!('board' in result) || !result.board) throw new Error('Missing board');
+  for (const channel of ['product-hunt', 'x', 'email']) {
+    const row = result.board.find(row => row.channel === channel)!;
+    expect(row.status).toBe('failed');
+    const paste = await readFile(row.paste!, 'utf8');
+    expect(paste).toContain(`${channel}: no verified official publish tool contract is available; publishing is disabled.`);
+    expect(lines.some(line => line.startsWith(`${channel} | failed |`) && line.includes('no verified official publish tool contract'))).toBe(true);
+    if (channel === 'product-hunt') expect(paste).toContain('only create and preview drafts');
+  }
+  const receipts = JSON.parse(await readFile(paths.published, 'utf8')).posts;
+  expect(receipts.some((post: any) => ['product-hunt', 'x', 'email'].includes(post.channel))).toBe(false);
+}, 30000);
+it('GroundWork CLI mock --confirm covers every route after chat approval and PH confirmation', async () => {
+  const { work } = await groundworkFixture();
   const cli = (...args: string[]) => spawnSync(process.execPath,
     ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), 'go', '--cwd', work, '--json', ...args], { encoding: 'utf8' });
   const preview = cli(); expect(preview.status, preview.stderr).toBe(0);
   expect(JSON.parse(preview.stdout).data.mode).toBe('dry-run');
-  const publish = cli('--mock', '--confirm', '--yes', '--no-wait'); expect(publish.status, publish.stderr).toBe(0);
+  const publish = cli('--mock', '--confirm', '--yes', '--no-wait', '--ph-submit'); expect(publish.status, publish.stdout + publish.stderr).toBe(0);
+  expect(JSON.parse(publish.stdout).data.board).toHaveLength(8);
   expect(JSON.parse(publish.stdout).data.board.every((row: any) => row.status === 'live')).toBe(true);
+  const repeat = cli('--mock', '--confirm', '--no-wait'); expect(repeat.status, repeat.stdout + repeat.stderr).toBe(0);
 }, 30000);

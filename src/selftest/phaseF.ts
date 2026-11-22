@@ -6,6 +6,7 @@ import { launchDir } from '../core/launch-dir.js';
 import { criteria, judgeKeys } from '../copy/judge.js';
 import { go } from '../go/run.js';
 import type { Check } from './types.js';
+import { groundworkGoGate } from './groundwork-go.js';
 
 export async function goFixture(cwd: string) {
   const work = join(cwd, '.liftoff-fixture', 'phaseF'), paths = launchDir(work);
@@ -41,15 +42,6 @@ export const checks: Check[] = [{ name: 'Part F timezone timeline and mock one-g
   equal(JSON.parse(await readFile(paths.published, 'utf8')).posts.length, channels.length);
   const center = await readFile(join(paths.root, 'warroom.md'), 'utf8');
   ok(channels.every(channel => center.includes(channel)));
-} }, { name: 'Part F GroundWork read-only full timeline', async run({ cwd }) {
-  const work = join(cwd, '.liftoff-fixture', 'phaseF-groundwork'), paths = launchDir(work);
-  await mkdir(work, { recursive: true });
-  await cp(join(packageRoot(), 'showcase/groundwork'), paths.root, { recursive: true });
-  const channels = ['show-hn', 'reddit', 'x', 'devto'];
-  await writeFile(join(paths.root, 'recommendations.md'), '| Channel | Local date | Local time |\n| --- | --- | --- |\n' +
-    channels.map(channel => `| ${channel} | 2026-12-01 | 09:00 |`).join('\n') + '\n');
-  const result = await go(work);
-  if (result.mode !== 'dry-run') throw new Error('Expected dry run');
-  equal(result.timeline.length, channels.length);
-  ok(result.timeline.every(row => row.at.includes('UTC')));
+} }, { name: 'Part F GroundWork all-route mock publishing, manual Submit and Chicago timeline', async run({ cwd }) {
+  await groundworkGoGate(cwd);
 } }];

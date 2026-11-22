@@ -20,6 +20,13 @@ export interface DispatchContext {
   notify: (message: string) => void;
 }
 export interface GoAdapter { publish(context: DispatchContext): Promise<PublishReceipt> }
+export function mcpUnavailableReason(channel: string) {
+  return `${channel}: no verified official publish tool contract is available; publishing is disabled.` +
+    (channel === 'product-hunt' ? ' Verified PH tools only create and preview drafts; they do not authorize final submission.' : ' Tool discovery alone does not authorize an unfamiliar write tool.');
+}
+export class McpPublishingUnavailable extends Error {
+  constructor(channel: string) { super(mcpUnavailableReason(channel)); }
+}
 export function mockAdapter(browser?: (channel: string) => BrowserDriver): GoAdapter {
   return { async publish({ post, root, notify }) {
     let url = `https://example.test/${post.channel}/${post.hash}`;
@@ -50,7 +57,7 @@ export function liveAdapter(options: { keychain?: Keychain; request?: typeof fet
       } finally { await driver.close(); await cleanup?.(); }
     }
     if (route === 'official-mcp' || route === 'kit-mcp')
-      throw new Error(post.channel + ': no verified official publish tool available; inspect the paste file. PH draft tools never authorize final submission.');
+      throw new McpPublishingUnavailable(post.channel);
     const token = await (options.keychain ?? osKeychain()).get(`${connection.platform}:${connection.account}`);
     if (!token) throw new Error('Connected account token unavailable');
     if (post.media.length) throw new Error('Live media upload is not supported by this adapter; use the paste file with the approved attachments');

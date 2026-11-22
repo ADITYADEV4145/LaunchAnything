@@ -15,7 +15,7 @@ import { judgePosts } from '../copy/judge.js';
 import { warroom } from '../launch-ops/warroom.js';
 import { parseSchedule } from './schedule.js';
 import { readConsent, revokeConsent, sameScope, saveConsent, type Scope } from './consent.js';
-import { liveAdapter, mockAdapter, routeFor, type GoAdapter } from './adapters.js';
+import { liveAdapter, mockAdapter, routeFor, mcpUnavailableReason, McpPublishingUnavailable, type GoAdapter } from './adapters.js';
 
 export interface GoOptions {
   confirm?: boolean; yes?: boolean; by?: string; mock?: boolean; noWait?: boolean; revoke?: boolean; phSubmit?: boolean;
@@ -44,7 +44,8 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       : options.confirm ? await requireConnection(post.channel === 'email' ? 'kit' : post.channel, options.account, options.home, cwd)
         : { platform: post.channel, route: route === 'browser' ? 'browser' : route === 'postiz' ? 'postiz' : route.endsWith('api') ? 'api' : 'mcp', account: options.account ?? '(connected account)', connectedAt: '' };
     const expected = route === 'browser' ? 'browser' : route === 'postiz' ? 'postiz' : route.endsWith('api') ? 'api' : 'mcp';
-    if (connection.route !== expected) throw new Error(`${post.channel}: go requires ${expected}, connected route is ${connection.route}`);
+    if (connection.route !== expected) throw new Error(expected === 'mcp' ? mcpUnavailableReason(post.channel)
+      : `${post.channel}: go requires ${expected}, connected route is ${connection.route}`);
     const scope: Scope = { channel: post.channel, route, account: connection.account };
     return { post, connection, scope };
   }));
@@ -120,6 +121,7 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       if (!(await readConsent(paths.root, options.mock)).grants.some(grant => sameScope(grant, scope)))
         throw new Error('Standing consent revoked before dispatch: ' + post.channel);
       let receipt: PublishReceipt | undefined;
+      let unavailableReason: string | undefined;
       try {
         if (!options.mock) await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -127,15 +129,20 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
             receipt = await adapter.publish({ post, connection, root: paths.root, notify: message => log('\u0007' + message) });
             if (receipt.status !== 'published' || !receipt.url || !/^https:\/\//.test(receipt.url)) throw new Error('No live URL returned');
             break;
-          } catch { receipt = undefined; }
+          } catch (error) {
+            if (error instanceof McpPublishingUnavailable) unavailableReason = error.message;
+            receipt = undefined;
+          }
         }
       } catch { receipt = undefined; }
       if (!receipt) {
+        const reason = unavailableReason ?? (!options.mock && ['official-mcp', 'kit-mcp'].includes(scope.route)
+          ? mcpUnavailableReason(post.channel) : 'Dispatch failed after retry; no live URL was captured.');
         const folder = join(paths.root, 'go-paste');
         await mkdir(folder, { recursive: true });
         const paste = join(folder, `${post.channel}-${post.hash}.md`);
-        await writeFile(paste, `# ${post.title}\n\n${post.body}\n\n${post.link ?? ''}\n\nAttachments:\n${post.media.map(m => m.path).join('\n')}\n\nDispatch failed. Inspect the destination for duplicates before submitting manually.\n`);
-        board.push({ channel: post.channel, status: 'failed', paste }); log(`${post.channel} | failed | ${paste}`);
+        await writeFile(paste, `# ${post.title}\n\n${post.body}\n\n${post.link ?? ''}\n\nAttachments:\n${post.media.map(m => m.path).join('\n')}\n\n${reason}\nInspect the destination for duplicates before submitting manually.\n`);
+        board.push({ channel: post.channel, status: 'failed', paste }); log(`${post.channel} | failed | ${reason} | ${paste}`);
         return;
       }
       receipt.id = identity;

@@ -1,345 +1,211 @@
 # Liftoff
 
-## Community distribution
+## From real user complaints to a launched product, from your coding agent.
 
-`liftoff communities fetch [queries...]`, `liftoff communities import <file>`, `liftoff communities report` (or `liftoff communities`), and `liftoff communities check` discover evidence-backed communities and create local, manual-only drafts. Outputs: `.launch/communities.json` and `.launch/communities.md`. Optional founder account fallback: `.launch/communities/founder.json` with `{ "reddit": { "karma": 100, "accountAgeDays": 90 } }`. No posting or sending is performed.
+**Pain → product → assets → approval → posting → launch day → lessons. Run from your repo. Keep the receipts.**
 
-Repo in, launch kit out — with grounded claims and human approval.
-TypeScript CLI and agent skill for Node.js 22+. No server, database or LLM API calls.
+Your agent knows what you built. Give it a workflow that asks what people need,
+checks what the code can prove, captures the actual product, and puts you—not an
+unattended bot—in charge of what goes public.
 
-Includes grounded planning, local media production, human review/local staging,
-doctor and cumulative fixture checks.
+[![Liftoff's captured self-demo](docs/demo/poster.png)](docs/demo/demo-16x9.mp4)
 
-## Install
+[Watch the demo](docs/demo/demo-16x9.mp4) · [Vertical cut](docs/demo/short-9x16.mp4) · [Square cut](docs/demo/square-1x1.mp4) · [Reproduce it](docs/demo/README.md)
+
+The **57-second** self-demo ends with an approval refusal and an empty launch-day
+view, not a pretend launch. Nothing was posted, staged or approved.
+
+### The combination is the product
+
+No single feature here is claimed to be unique. Keeping the evidence connected
+across the workflow is the point. Here is what is implemented today:
+
+| Piece | What you get—and the boundary |
+| --- | --- |
+| **Pain research feeds the copy** | Fetch and cache discussions; check quotes word for word against cached text. Product pains reference that research; writing briefs carry the community's words into pain-led openings. Your agent clusters evidence and writes posts. [Research](src/research/index.ts), [product checks](src/product/validate.ts), [writing briefs](src/copy/write.ts). |
+| **Claims have a paper trail** | Feature and claim records require file, commit or URL sources. Local files are checked; unresolved commits warn. Copy citations connect sentences to evidence. Provenance is not proof that every sentence is true. [Validation](src/product/validate.ts), [copy checks](src/copy/check.ts). |
+| **Capture, don't conjure** | Capture a running web app or real terminal commands, then build images and captioned video from those assets. No invented product UI. [Capture](src/commands/shots.ts), [media guide](skill/references/phase3.md). |
+| **One approval page, exact hashes** | Review posts, sources and media locally. Approval binds the exact post-and-media hash; edits require re-approval before staging or assisted publishing. [Review](src/review/page.ts), [approval gate](src/review/approvals.ts). |
+| **A launch-day desk** | `warroom` combines post status, reported counts, new comments and local reply drafts. Replies are human-paste only. **Incident monitoring, site-health checks and automatic post pausing are not implemented in this view.** [Warroom](src/launch-ops/warroom.ts). |
+| **Memory for the next launch** | `learn` saves profile-specific observations; `plan` loads lessons that can change later time slots. `retro` compares reported results with targets. Not a promise of better results. [History](src/results/history.ts), [planning](src/planning/plan.ts), [retrospective](src/results/retro.ts). |
+
+## Why not just ask for a launch post?
+
+Because the hard part isn't another paragraph. It's the gap between “sounds good”
+and “we can stand behind this.” A catchy claim without a source. A beautiful
+mockup of a screen that doesn't exist. A last-minute edit nobody approved.
+
+Liftoff gives your agent a folder contract, channel rules and checks. The agent
+supplies judgment and copy; the CLI validates, captures, renders and assembles.
+It does not build your product or call an LLM to write your launch.
+
+## Proof you can open
+
+These are committed artifacts from real local runs, **not successful public
+launches**. Both showcase products belong to Aditya. Neither was launched by these
+runs; there are no launch outcomes to report.
+
+### GroundWork: show the lookup, not a promise
+
+![Real GroundWork symbol lookup](showcase/groundwork/media/shots/source-lookup.gif)
+
+A real symbol lookup against GroundWork's own indexed source, followed by checked
+drafts, social assets and a **33-second** terminal walkthrough. The verifier scene
+shows command help, not a verifier run. The operator still wrote product facts,
+posts and shot directions. Pain research was not fetched.
+
+[Browse the kit](showcase/groundwork/README.md) · [Watch the square video](showcase/groundwork/video/square-1x1.mp4) · [Case study and limits](docs/case-studies/groundwork.md)
+
+### Agent Linux: say what actually ran
+
+![Captured Agent Linux CLI help](showcase/agentlinux/media/shots/cli-overview.gif)
+
+The CLI was built on Linux; captures show help output. No Mac VM was booted and
+no guest agent ran. That boundary belongs in the launch kit, not the fine print.
+
+[Browse the kit](showcase/agentlinux/README.md) · [Watch the square video](showcase/agentlinux/video/square-1x1.mp4) · [Case study](docs/case-studies/agentlinux.md)
+
+Clone the repo to open the included review HTML locally; GitHub shows HTML source,
+not the approval interface. Exported pages are inspection copies, not permission
+to publish. See the [showcase submission rules](showcase/README.md) to contribute
+your own authorized kit and real results.
+
+### A benchmark without a made-up victory
+
+[LaunchBench](bench/launchbench/README.md) provides a blind human-comparison protocol
+for **20** public open-source products, comparing Liftoff-assisted and plain-model
+Show HN/X drafts. **Win rate: not yet measured; human votes pending.** The committed
+files contain the product list and protocol, not votes or winning posts.
+
+## Where Liftoff fits
+
+Different tools solve different parts of launch. This is a scope comparison, not
+a quality ranking. “Not documented” means the linked description does not establish
+that capability—not that the tool could never do it. External products can change.
+
+| Tool | What it is good for | Boundary relative to this workflow |
+| --- | --- | --- |
+| **Liftoff** | Research-linked briefs, repository-grounded facts, captured assets, hash-bound review, local staging, reply drafts and learned scheduling. | Agent/human input required. No demonstrated public launch outcomes here; no incident-triggered pause system. Publishing limits below. |
+| [Ship Plainly](https://peerlist.io/markafan_dev/project/ship-plainly) | Product Hunt, Show HN, X and Reddit drafts checked against platform rules. | The described focus is compliant drafts; a repo-to-capture-to-hash-approval-to-lessons chain is not documented. |
+| [Agentic Product Launch](https://www.producthunt.com/posts/1191555) | Community mapping, refusal of vote-request/spam tactics, a reply bank and recap. | Useful launch coordination; code-linked claims, real-app capture and exact-media hash approval are not established by that description. |
+| [aaron-marketing-skills: launch-monitor](https://claudeskills.info/skills/aaron-he-zhu/aaron-marketing-skills/launch-monitor/) | Tracking HN rank, Product Hunt votes and store charts against targets. | Monitoring is its focus, not the upstream evidence/asset/review chain. Liftoff's warroom is not a replacement for all of that tracking. |
+| [marketingskills: launch](https://claudeskills.info/skills/coreyhaines31/marketingskills/launch/) | Launch strategy and planning guidance. | A strategy skill, not a documented capture/render/hash-approval runtime. Can complement Liftoff. |
+| [Ayrshare](https://www.ayrshare.com/), [Postiz](https://postiz.com/), [Buffer](https://buffer.com/) | Social publishing and scheduling infrastructure. | Delivery does not itself establish research-backed facts or source-captured assets. Liftoff's Postiz/Buffer routes only stage locally today. |
+| [Official Product Hunt MCP](https://www.producthunt.com/mcp/install?client=claude) and [X MCP](https://docs.x.com/tools/mcp) | Platform-native agent access; capabilities depend on the platform, account and available tools. | Platform access is not the whole launch workflow. Liftoff restricts its own use: PH draft/readiness/preview only; X discovery with manual fallback. |
+
+## Try it before connecting anything
+
+Requirements: **Node.js 22+**, npm and git. For full media production, install
+Chrome/Chromium and FFmpeg/ffprobe. Playwright is a package dependency; `doctor`
+reports browser/tool availability. Tesseract is needed for storyboard safety
+checks. VHS is optional; if installed, it also needs ttyd.
+See the [media guide](skill/references/phase3.md).
 
 ```sh
+# Add the agent skill; select liftoff when prompted.
 npx skills add ADITYADEV4145/LaunchAnything
 npm i -g launch-liftoff
 liftoff setup
+liftoff doctor
+liftoff demo --open
 ```
 
-For development: `npm ci`, `npm run dev -- doctor`. Build with `npm run build`;
-test with `npm test`; check types with `npm run typecheck`.
+`demo` creates a fresh sample repository and opens its local review page. It uses
+prepared fixture copy, not research about your product. No accounts, network
+requests, LLM calls or publishing. Missing Chrome/FFmpeg skips their assets with
+a note. Use `--dir ./my-demo` to choose a directory that does not exist.
 
-The skill is in `skill/SKILL.md` with a YAML name/description; the skills CLI
-discovers SKILL.md files in repository subdirectories. Select `liftoff` when prompted.
+### Bring your own repo
 
-### First kit (offline demo)
-
-Run `liftoff demo` for a bundled Tasklight repository in a fresh temporary directory,
-or `liftoff demo --dir ./my-demo --open` (the directory must not exist).
-Each stage and total elapsed time are reported, ending at `.launch/review/index.html`.
-Prepared fixture copy stands in for agent-written product facts and posts. No accounts,
-network requests, LLM calls, publishing or posting are involved. Chrome and FFmpeg are
-optional: missing tools skip their assets with a note. A local file opener is only
-launched with `--open`. The sample kit is not approved launch copy for your product.
-
-For your repository, `liftoff setup --yes --json` reports tools, fix commands and
-PH/X/Kit/Postiz/GitHub connection commands without prompting or changing accounts.
-Interactive setup connects one account at a time through the existing OS keychain;
-tokens are read from environment variables, not recorded in configuration.
-`liftoff setup --site https://example.com` explicitly fetches HTML only (no linked
-resources); `--site-file ./site.html` imports offline. The imported `.launch/brand.json`
-contains best-effort name, description, icon/logo URL, OG image, inline theme colors and
-font families. `.launch/brand-kit.json` adapts the first color to the image accent
-and first font to heading/body fonts. Import updates `config.brandKit` when initialized;
-otherwise the next `init` discovers it. Remote logo URLs remain metadata (no logo is
-downloaded). Missing fields retain image defaults; external CSS and JavaScript are not run.
-`--voice ./samples/*.md` delegates to `voice learn`. Next run `liftoff init`.
-
-`liftoff estimate [--stage write|video|publish|demo]` estimates agent input tokens
-(chars/4), output tokens per planned channel, direct X API costs and render time.
-These are deterministic planning heuristics, not bills or performance guarantees.
-Write/video/publish/demo print a short estimate before running (suppressed in JSON).
-
-### Privacy
-
-Telemetry is **off by default**. `liftoff telemetry on|off|status` controls a local
-`~/.liftoff/telemetry.json` file (`LIFTOFF_HOME` overrides the directory).
-When on, demo records only allowlisted stage, completion, rounded durationMs and
-CLI version in `telemetry-events.jsonl` beside the config. No content, paths, repo
-names or handles are stored. **Local only; nothing is uploaded.** `DO_NOT_TRACK=1`
-or `LIFTOFF_TELEMETRY=0` overrides opt-in. Delete these files to erase the data.
-
-## Every release is a small launch
-
-`liftoff release --draft` reads the new tag's commits since the previous tag and
-writes a review-only kit under `.launch/releases/<tag>/`: changelog, GitHub notes,
-scored selection, channel drafts, changed-screen captures and a relaunch plan.
-Use `--issues closed-issues.json` for offline issue evidence, `--no-shots` to list
-captures without taking them, and `releaseChannels` in config to select from x,
-linkedin, email and devto. No LLM or publish adapter is called.
-
-`liftoff progress [--since ISO-date] [--now ISO-date]` writes weekly X/LinkedIn
-drafts with one latest real screenshot, or explicitly reports that none exists.
-`liftoff release --install-action` installs the tag-push workflow. It runs
-`liftoff release --draft --open-pr --json`, pushes only the kit and release history
-and opens a review PR. GitHub Actions must be permitted to create PRs. Nothing
-publishes; approve and post manually. See [release rules](skill/references/launch-ops.md).
-
-## Proof: two repos, nothing posted
-
-- [Showcase: full GroundWork and Agent Linux kits, media and review pages](showcase/README.md) — real pipeline runs; launch results and three outside-owner permissions are pending.
-- [GroundWork: from a symbol lookup to a launch kit](docs/case-studies/groundwork.md)
-- [Agent Linux: a launch kit without booting the Mac-only VM](docs/case-studies/agentlinux.md)
-
-See what Liftoff produced, what still took judgment, and where the approval gate stopped each dry run.
-
-## Commands
-
-See the [channel guides](docs/channels/README.md) for rules, timing, formats,
-automation boundaries and route-specific troubleshooting for all 15 channels.
-
-## LaunchBench
-
-**Liftoff win rate: not yet measured, pending human votes.**
-LaunchBench compares agent-written Liftoff and plain-model posts for 20 real public
-open-source products on Show HN and X. No votes, preferred posts or results are
-fabricated; the CLI never calls an LLM. `liftoff bench prepare`, `bench pair`,
-`bench record --votes FILE`, `bench score` and `bench run` support a reproducible
-blind human comparison. See the [protocol and rerun instructions](bench/launchbench/README.md).
-
-## Command reference
-
-All commands accept `--json` and `--cwd <repository>`. JSON is one object:
-`{ok, command, data}` on success, `{ok, command, error}` on failure.
-Selftest retains its per-check report in data even when some checks fail.
-
-| Phase | Commands | Status |
-| --- | --- | --- |
-| 0b | audience | Local Kit waitlist preview, community map, and audience drafts |
-| 1 | init, scan, validate, plan | Implemented |
-| B | recommend [--history path] | Deterministic ranked channels, angles, founder-local schedule and skip reasons in .launch/recommendations.md; no publishing |
-| Foundation | doctor, selftest --through N | Local dependency probes and cumulative checks through phase 7 (Part D media), plus Part I |
-| 2 | write, check, judge, pick, claims strip, blind-test | Briefs with templates, exemplars and founder voice; checks; judge gate; blind test ([scripts/blind-test.md](scripts/blind-test.md)) |
-| 3 | shots plan, shots, media polish, images, media judge | Storyboard capture, branded platform sets, safety and quality gates |
-| 4 | video script, video voice, video, video check | Branded long/short cuts, optional voice, local music and ffmpeg fallback |
-| 5 | review, publish | Local approval and staging; no external posting |
-| 5b | connect, publish --confirm --assist | Own accounts; official PH draft MCP, X discovery/manual fallback, browser-assisted HN/Reddit |
-| 6 | results, learn, receipt | Stubs |
-
-`liftoff video check --json` retains resolution, platform duration, SRT and receipt
-checks, then reports G0 moves (clean decode and differing sampled frames), G1
-no-black, G2 no-freeze (>3 seconds), G3 readcheck (reading/voiceover pace and cue
-map), G4 no-page-chrome, G5 end-card (3 seconds ±0.25), G6 voice-stt (80% word
-coverage of scene-aligned audio extracted from the exported cut when narration
-and Whisper are available), and loudness (-14 ±2 LUFS
-with voice, music-only quieter than -20 LUFS).
-Per-format gates have `id`, `name`, `status` and `detail` and are saved to
-`.launch/video/check.json` before gate failures throw. Optional missing STT or
-audio is skipped, not failed. `video script` includes an informational `readcheck`.
-
-Doctor lists skill names, MCP server names (never configuration values), and executable
-availability, versions, stage requirements and install hints. Missing extras never
-fail doctor itself. CLI detection uses PATH; Chrome also checks the bundled
-Playwright browser and configured executable paths. Probes never download packages.
-
-## Media workflow (local/offline)
-
-### Video style presets
-
-`liftoff video styles --json` lists **midnight**, **paper**, **neon**,
-**brutalist**, **warm**, and **mono**, and writes `.launch/video/styles.html`.
-The gallery uses real plate/caption SVG stills, not rendered videos. Set optional
-`"style": "paper"` in `script.json`; omission or explicit `midnight` preserves
-the existing default look. The script brief includes the available styles.
-
-Each `templates/video/styles/<id>/STYLE.md` contains YAML tokens for palette,
-typography, scene pacing bounds, transition, camera, and caption position, plus
-agent direction for story and rhythm. Scene durations must respect the selected
-style's bounds; they are never silently retimed. Caption colors require ≥7:1
-contrast. The automatic three-second end card is not constrained by scene pacing.
-
-Fork with `liftoff video styles --fork midnight --as my-style`, then edit
-`.launch/video/styles/my-style/STYLE.md` and set `"style": "my-style"`.
-Local ids override built-ins, including an explicitly forked `midnight`.
-`liftoff video styles check` requires custom styles to differ from their declared
-built-in base on at least four of the six axes; renaming or editing prose does not
-count. A fresh fork intentionally fails until meaningfully customized.
-`video check` adds the `style-distinct` gate when a local style is selected.
+Run inside your product repository. Have your agent follow the
+[skill](skill/SKILL.md) and [product manifest guide](skill/references/product-json.md):
 
 ```sh
-liftoff shots plan                 # reads product.json money_moment; --force replaces a plan
-# Review captions/actions against the repository; replace every TODO before capture.
-liftoff shots                     # add --url http://127.0.0.1:3000 for a running web app
-liftoff media polish
-liftoff images                    # automatically polishes storyboards
-liftoff shots export --targets appstore-6.9,play,product-hunt
-liftoff shots check --json
-liftoff media judge --json
+liftoff init
+liftoff scan
+liftoff research "the problem your product addresses"
+# Agent: cluster cached evidence into .launch/research/pains.json.
+liftoff research check
+liftoff research report
+# Agent: write .launch/product.json from code and checked evidence.
+liftoff validate product
+liftoff plan
+liftoff brief
+liftoff write
+# Agent: write actual posts from the generated writing briefs.
+liftoff check
+liftoff shots plan
+# Review/edit shots.yaml: real routes or commands; replace every TODO.
+liftoff shots
+liftoff images
 liftoff video script --from-shots
-liftoff video voice --dry-run
-liftoff video --renderer ffmpeg --format 16x9,9x16
-liftoff video check --format 16x9,9x16
-liftoff media judge --json        # includes the rendered videos
+liftoff video --renderer ffmpeg
+liftoff review
+# Human: approve exact post + media hashes in the local review page.
+liftoff publish --dry-run
 ```
 
-The director makes 4–8 ordered shots with exactly one money moment. `money_moment`
-may be an object with summary/before/after/proof, commands/setup or route, and
-highlight; strings and missing values fall back to verified product copy. Planning
-is a scaffold, not permission to invent claims or execute unreviewed commands.
-Legacy shots without new fields retain their original rendering path.
+Research fetch uses network sources; source access and credentials can limit
+availability. The CLI does not invent missing evidence. For a running web app,
+use `shots --url http://127.0.0.1:3000`; CLI products use reviewed terminal commands.
+This is collaboration, not a promise of finished copy without edits.
 
-### Store-ready screenshots
+### What “publish” actually means today
 
-`shots export` uses the real capture manifest and storyboard, shares media polish's
-phone/browser/terminal frames, and puts the money moment first. It defaults to all
-six targets: `appstore-6.9` (1320×2868), `appstore-6.5` (1242×2688), `play`
-(1080×1920), `product-hunt` (1270×760), `og` (1200×630), and `x` (1600×900).
-Select a comma list with `--targets`; `--style midnight` is the default video-style
-palette and typography. Brand colors/logo apply to the shared device frame.
-Portrait exports use phone frames; landscape exports use browser/terminal frames.
-Captures are scaled to fit without inventing, cropping, or rebuilding product UI.
+- Default / `--dry-run`: no-network preview, still subject to approval checks.
+- `--confirm`: writes local paste files, reminders and receipts. It does **not** send posts.
+- `--confirm --assist`: explicitly opts into connected-account help. Browser routes
+  fill forms; **you press Submit**. Product Hunt MCP supports draft/readiness/preview,
+  never submission. X MCP discovers capabilities and falls back to manual delivery
+  when no verified official create tool is available.
+- LinkedIn uses official API routes only: Liftoff stages an offline request, not
+  website automation or a live API post. Direct API, Postiz and Buffer routes also
+  remain offline staging. Never auto-post to Hacker News or Reddit; never auto-reply.
 
-Each shots.yaml entry needs `claim: <product.claims[].id>` (or
-`claim: features/<exact feature name>`) resolving to a sourced product.json claim.
-Add a benefit-led `caption` of 1–6 words. If omitted, the claim text (feature
-description) is used only when it already fits; long claims fail with an instruction
-to write a caption. The agent writes the benefit-led wording; the CLI cannot prove
-semantic entailment and never auto-shortens or fabricates copy.
+Read the [own-account guide](skill/references/phase5b.md),
+[adapter guide](skill/references/phase5c.md) and [channel guides](docs/channels/README.md)
+before connecting accounts. Local audience/waitlist previews and signup CSV export
+exist; they do not host a waitlist or send outreach.
 
-Exports live in `.launch/media/store/<target>/<NN>-<id>.png` with a shared manifest
-recording captions, claim references, geometry, source capture hashes and output
-hashes. Export automatically runs `shots check`: exact dimensions, RGB PNG color
-type (no alpha), grounded caption length, ≥6% safe margins, clearance above the
-device, ≥4.5:1 rendered-pixel contrast and visible caption ink, unchanged captures,
-unchanged exported files, complete gallery order, and the banned-content OCR guard.
-OCR is reported skipped if Tesseract is unavailable. Check writes `store/check.json`
-with pass/fail/skipped gates and fails on any failed gate. Re-export after changing
-captures or caption/claim references. Exports are staged and checked before replacing
-the entire gallery; failed renders or checks leave the previous PNGs, manifest and
-check report untouched. Receipts are local provenance checks, not
-tamper-proof signatures. **App Store Connect and Google Play upload are out of
-scope: review screenshots and upload manually.**
+## Keep going after the launch
 
-Storyboards use scale-2 web capture and light/dark variants, or VHS CLI tapes with
-hidden setup. If VHS is absent, an HTML terminal plus ffmpeg is used. Tesseract is
-required for storyboard safety checks; Chrome is required for media layouts.
-FFmpeg/ffprobe are required for animation/video processing. VHS is optional, but
-an installed VHS requires ttyd; a broken VHS installation is not silently skipped.
-Run doctor for versions and actionable installation hints.
+| Job | Commands |
+| --- | --- |
+| Find people and prepare | `communities fetch`, `communities report`, `communities check`, `audience prepare`, `prelaunch` |
+| Plan and write | `recommend`, `plan`, `brief`, `write`, `check`, `judge`, `pick` |
+| Make and inspect assets | `shots`, `shots export`, `images`, `media polish`, `media judge`, `video script`, `video`, `video check` |
+| Review and deliver | `review`, `connect`, `adapters`, `publish` |
+| Launch-day follow-through | `warroom --metrics <file>`, `results --replies`, `followup` |
+| Remember and relaunch | `learn`, `retro`, `receipt`, `release --draft`, `progress` |
+| Check the environment | `setup`, `doctor`, `selftest`, `estimate`, `telemetry status` |
 
-Polished shots in `.launch/media/polished/` have corner logos/wordmarks, frames,
-shadows and accent highlights. Set `config.brandKit` to a local JSON file with
-`logo`, `colors` and optional `music`, or put `logo.svg/png/jpg/webp` in media/;
-without a logo, the product name is the wordmark. Platform files have exact sizes:
-OG 1200×630, X 1600×900, LinkedIn 1200×627, YouTube 1280×720, Product Hunt
-1270×760 and Instagram 1080×1350. X/OG/LinkedIn/YouTube/PH start from the polished
-money moment. PH gets a gallery; Instagram gets five slides (hook, before, action,
-after, CTA), with `instagram.png` aliasing slide 1. Reports retain source provenance.
+Use `liftoff --help` and `liftoff <command> --help` for the complete interface.
+Global `--cwd <repository>` selects a repo; `--json` returns one result object.
+See [launch operations](skill/references/launch-ops.md) for release kits and
+follow-through. `release --draft` and `progress` make review-only drafts, not posts.
 
-Judge OCR-scans **all** media images, including raw captures, plus one frame per
-second of animations/videos. Quality scores apply only to images/, polished/ and
-rendered video frames. Banned content and incorrect X/PH-first provenance always
-fail; errors name files/timestamps and rules without reproducing secret values.
-Contact sheets, sampled frames and report.json are under `.launch/media/judge/`.
-Any readability, focus, brand or clutter score below 8/10 fails with a fix.
-Review runs this gate before building the approval page when finished media exists.
+## Local by default. Human at the boundary.
 
-For a human/agent vision review, run `media judge --write-vision-template`, view
-the contact sheets, supply honest 0–10 scores in the generated template, and save
-it as `vision.json` in the judge directory. Each item uses `file`, `sha256`,
-`readability`, `focus`, `brand`, `clutter`; image hashes bind original image bytes,
-and `video.mp4@Ns` hashes bind that sampled PNG. Valid per-asset scores override
-heuristics; stale hashes are rejected. They cannot override banned content or
-provenance. `--heuristic-only` ignores vision overrides and is used by selftest.
+Launch state lives in `.launch/`: product facts, plans, posts, media, review,
+approvals and results. Profile history lives in `~/.liftoff/history.json`.
+Core scanning and kit assembly need no server, database or LLM API. Explicit
+research, connection and optional voice operations can use the network.
+Telemetry is off by default; opting in records allowlisted local events only,
+with nothing uploaded. Never commit tokens, private research or approval credentials.
 
-Role-based scripts render 45–60s at 16x9/1x1 and 20–35s at 9x16; legacy scripts
-keep their 30–60s rule. Every scene has corner branding, a high-contrast caption
-plate, and money-moment highlights. Music is a deterministic local pad by default;
-use `--music <file>` or brandKit.music to replace it. `video voice` is the only
-optional network adapter: explicitly run it with ELEVENLABS_API_KEY (and optional
-ELEVENLABS_VOICE_ID) to create indexed vo/*.mp3 files. Dry-run writes nothing and
-never sends requests; no key reports captions-only. Never commit credentials.
+## Contribute
 
-### Standalone media renderers
-
-These exports need `.launch/product.json` and local source files, not shots.yaml:
-
-```ts
-import { renderCarousel } from 'launch-liftoff/dist/media/platform-images.js';
-import { renderClip } from 'launch-liftoff/dist/video/clip.js';
-
-await renderCarousel(cwd, [{ role: 'hook', caption: verifiedCaption }], {
-  size: 'instagram', outDir: 'out', prefix: 'launch',
-}); // { files, report }; optional slide.source is a local image path
-await renderClip(cwd, [{ role: 'after', caption: verifiedCaption,
-  source: 'out/launch.png', duration: 5 }], {
-  format: '9x16', outFile: 'out/clip.mp4', renderer: 'ffmpeg',
-}); // { file, duration, receipt }; adds a three-second end card
+```sh
+npm ci
+npm run dev -- doctor
+npm run build
+npm run typecheck
+npm test
+node dist/cli.js selftest --through 6 --json
 ```
 
-Carousel options are `size`, `outDir`, `prefix`. Clip options include `format`,
-`music`, indexed local `voice` paths, `outFile`, and `renderer`. Durations are used
-verbatim by renderClip; script generation owns the long/short duration policy.
-Neither standalone renderer calls a voice API.
+See [contributor ownership and fixture guidance](CONTRIBUTING/AGENTS.md)
+and the [skill reference index](skill/references/README.md).
+Bring reproducible artifacts, honest limits and permission to share them.
 
-## Folder contract
-
-**Find your first readers before launch day.** Once you have a checked
-[Pain Report](skill/references/phase0.md), run `liftoff audience prepare` to find
-where the problem is already being discussed. You get a community map, conversation
-starters, and a Kit waitlist preview under `.launch/audience/` — nothing goes live.
-[Try the local workflow](skill/references/phase0b.md).
-
-For offline launch readiness, run `liftoff prelaunch --init`, then follow the
-[pre-launch guide](skill/references/prelaunch.md) to score readiness, audit launch
-pages and support, and draft tracking links and a signup form.
-
-All paths below are relative to `<cwd>/.launch/`:
-
-```text
-config.json    scan.json     product.json    plan.md
-posts/         shots.yaml    media/          video/
-review/        approvals.json                published.json
-results.json   report.md
-```
-
-Schemas live in schemas/ (JSON Schema draft 2020-12). Post schema covers parsed Markdown
-front matter; shots schema covers parsed YAML. History is stored separately at
-`~/.liftoff/history.json`. Markdown, media and directories are not JSON documents.
-Product features and claims require file/commit/URL sources. Schema validation checks
-structure; later commands enforce source existence, citations, approvals and privacy.
-
-Profile/channel YAML is under rules/. Posting times are initial heuristics in the
-configured timezone, not researched performance promises. Phase 2 owns rules/platforms/.
-
-## Add a phase
-
-1. Replace only your command modules in src/commands/.
-2. Put implementation in phase-owned directories listed in CONTRIBUTING/AGENTS.md.
-3. Replace your src/selftest/phaseN.ts checks; add fixture data under each
-   fixtures/*/.liftoff-fixture/ with phase-specific names.
-4. Add tests in tests/phaseN.test.ts and run the gate.
-
-The selftest registry runs phases 1..N on fresh temporary copies of all three fixtures.
-Each copy gets a deterministic Git baseline, tag v0.1.0 and later commit; copies are
-removed after the run. Phase 7 is a dedicated, slower Part D media regression gate;
-`selftest --through 6` retains the baseline launch workflow. Run
-`selftest --through 7 --json` to include Part D checks on
-cli-tool and saas-next: money-moment planning, rejected unsafe frames and cleanup,
-capture/polish, exact platform dimensions and five-slide carousel, heuristic judge,
-and rendered long/short video durations. No GroundWork run or external API is used.
-Fixtures ship in npm so installed selftest works without a source checkout.
-
-## Safety
-
-Never publish without human approval of the exact post and media hash. Never auto-post
-to Hacker News or Reddit, and never auto-reply. Optional integrations need fallbacks.
-Scan is offline by default; GitHub stars require --github or LIFTOFF_ALLOW_NETWORK=1.
-Publish is a no-network preview by default; --confirm stages local artifacts only.
-`--confirm --assist` opts into connected-account assistance: official Product Hunt
-draft/readiness/preview (never submit), official X capability discovery with manual
-fallback, or browser filling without Submit. LinkedIn accepts official API routes
-only; direct API/Postiz/Buffer dispatch remains offline staging. See the
-[own-account guide](skill/references/phase5b.md) for X review costs, keychain setup,
-retry/manual recovery, caps and URL receipts. Tests and selftests use mocks only.
-MIT; author Aditya.
-
-## Benchmark-backed product inputs
-
-Before `liftoff write` or `liftoff brief`, product.json must validate. Use `problem: { summary, pains? }` (up to three researched pains with pain_index and exactly two source quotes), `audience: { who, where?, uses? }`, and `money_moment: { before, action, after }`. Communities and competitors are checked against local research when present. Existing proofPoints, features and claims remain required.
-
-Configure `proof.benchmarks` in .launch/config.json with a slug name, optional command and 1–3 repos, results JSON path, and metrics (`metric`, `pointer`, `unit`, `context`). Run `liftoff proof run` (`--skip-run` reads recorded results; `--timeout <s>` defaults to 1800). `{repo}` is substituted in commands and result paths. No benchmarks? The command writes .launch/proof/plan.md and exits non-zero. It never invents measurements.
-
-Paste emitted metrics into the required product.json `proof` array. Each includes `metric`, `value`, `unit`, `context`, `source_file` and an RFC 6901 `source_pointer`. Validation requires a schema-valid `.launch/proof/<name>.json` record, resolves the pointer within its `/results` subtree, and requires exact value equality. If the original results file is present, its SHA-256 must still match the record; otherwise rerun `liftoff proof run`. Do not type or fabricate benchmark values. Run `liftoff validate product --json`; errors block writing and brief generation.
+[MIT licensed](LICENSE). Built by Aditya.

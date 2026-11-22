@@ -12,11 +12,15 @@ import { aiTells } from '../voice/ai-tells.js';
 import { honesty } from '../voice/honesty.js';
 import { loadVoice } from '../voice/learn.js';
 import { scoreVoice } from '../voice/score.js';
+import { annotate, contains, grounded, inlineTag, splitSentences, type Citation } from './citations.js';
+import { guidelineIssues } from './guides.js';
+import { templateIssues } from './template.js';
 
 export interface Post {
   channel: string; title: string; body: string; media: {slot: string; path?: string; width?: number; height?: number}[];
   claims: string[]; link?: string; linkFirstComment?: boolean; subreddit?: string; flair?: string; selfPromotion?: boolean; account?: string;
   hashtags?: string[]; coverFrame?: number; name?: string; tagline?: string; makerComment?: string;
+  citations?: Citation[]; variants?: { title?: string[]; hook?: string[] }; picked?: 1 | 2;
 }
 const extensionValidator = new Ajv2020({ allErrors: true }).compile({
   type: 'object', additionalProperties: false, properties: {
@@ -73,9 +77,16 @@ export function similarity(a: string, b: string) {
   if (!x.size || !y.size) return 0;
   return [...x].filter(s => y.has(s)).length / new Set([...x, ...y]).size;
 }
-export function inspectPost(post: Post, channel: string, product: Product, cwd?: string): Issue[] {
+export function inspectPost(draft: Post, channel: string, sourceProduct: Product, cwd?: string): Issue[] {
   const rules = loadPlatform(channel, cwd), issues: Issue[] = [];
   const add = (rule: string, message: string, fix: string) => issues.push({ channel, rule, message, fix });
+  const product = grounded(sourceProduct);
+  if (inlineTag.test(draft.title + '\n' + draft.body + '\n' + JSON.stringify(draft.variants ?? {})))
+    add('claims.inline-tag', 'Raw [claim:...] tags are visible in the post', 'Run liftoff claims strip to move them into citations metadata.');
+  const visible = [draft.title, draft.body, ...(draft.variants?.title ?? []), ...(draft.variants?.hook ?? [])].join('\n');
+  for (const citation of draft.citations ?? [])
+    if (!contains(visible, citation.text)) add('citations.text', 'Citation text not found in the post: ' + citation.text.slice(0, 60), 'Quote the cited sentence exactly as it appears.');
+  const post = { ...draft, title: annotate(draft.title, draft.citations, product), body: annotate(draft.body, draft.citations, product) };
   const title = stripCitations(post.title), body = stripCitations(post.body);
   if (post.channel !== channel) add('post.channel', 'Channel does not match filename', 'Set channel to ' + channel);
   if (rules.title.required && !title) add('title.required', 'Title is empty', 'Supply a factual title');
@@ -131,19 +142,14 @@ export function inspectPost(post: Post, channel: string, product: Product, cwd?:
   const known = new Set(product.claims.map(c => c.id));
   const cited = [...(post.title + '\n' + post.body).matchAll(/\[claim:([^\]]+)\]/g)].map(m => m[1]);
   if ([...post.claims, ...cited].some(id => !known.has(id))) add('claims.unknown', 'Unknown claim ID', 'Use IDs from product.json');
-  if (cited.some(id => !post.claims.includes(id))) add('claims.undeclared', 'Citation missing from front matter', 'Declare cited IDs in claims');
-  const paragraphs = [post.title, ...post.body
-    .replace(/^[ \t]*(?:\d+[.)]|[-+*])[ \t]+/gm, '\n\n')
-    .split(/\r?\n---\r?\n|\r?\n[ \t]*\r?\n/)];
-  const sentences = paragraphs.flatMap(paragraph => paragraph
-    .replace(/\r?\n/g, ' ')
-    .replace(/([.!?])\s+((?:\[claim:[^\]]+\]\s*)+)/g, ' $2$1 ')
-    .split(/(?<=[.!?])\s+/)).filter(Boolean);
+  if (cited.some(id => !/^(?:proof|pain):/.test(id) && !post.claims.includes(id))) add('claims.undeclared', 'Citation missing from front matter', 'Declare cited IDs in claims');
+  const sentences = [...splitSentences(post.title), ...splitSentences(post.body.replace(/```[\s\S]*?```/g, ''))];
   if (sentences.some(sentence => {
     const clean = stripCitations(sentence).replace(/https?:\/\/\S+/g, '');
     return (/\d/.test(clean) || product.features.some(f => clean.toLowerCase().includes(f.name.toLowerCase())))
-      && !/\[claim:[^\]]+\]/.test(sentence);
-  })) add('claims.uncited', 'A number or feature sentence lacks a citation', 'Attach a supported [claim:id] to each factual sentence');
+      && ![...sentence.matchAll(/\[claim:([^\]]+)\]/g)].some(m => !/^(?:pain|proof):/.test(m[1]) || !!product.claims.find(c => c.id === m[1])?.sources?.length);
+  })) add('claims.uncited', 'A number or feature sentence lacks a citation', 'Add a citations entry (claim, proof or pain) for each factual sentence');
+  templateIssues({ ...draft, channel }, rules, product, add);
   return issues;
 }
 export function checkPosts(cwd: string, selected?: string[]) {
@@ -182,6 +188,9 @@ export function checkPosts(cwd: string, selected?: string[]) {
         const result = scoreVoice(post.body, voice, channel);
         if (!result.passed) issues.push({ channel, rule: 'voice.score', message: 'Voice score ' + result.score + ' below ' + result.threshold,
           fix: JSON.stringify(result.rewrite) });
+      } else {
+        const text = post.body.replace(/```[\s\S]*?```/g, '');
+        for (const issue of guidelineIssues(post.title + '\n' + text, splitSentences(text))) issues.push({ channel, ...issue });
       }
       posts.push({ ...post, channel });
     } catch (error) { issues.push({ channel, rule: 'post.schema', message: String(error), fix: 'Follow the brief front matter format' }); }

@@ -22,3 +22,10 @@ bannedWords: []
 guidance:
   - Use a short demonstration caption; 2200 is a conservative editorial budget.
 captionMax: 2200
+template:
+  summary:
+    - '"## Caption": the post caption.'
+    - '"## On-screen text": at least three short lines, one per beat of the 9:16 cut (hook, before, action, after, call to action).'
+  sections:
+    - { heading: "## Caption", minWords: 8 }
+    - { heading: "## On-screen text", minItems: 3 }

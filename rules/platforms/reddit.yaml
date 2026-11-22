@@ -54,3 +54,12 @@ subreddits:
     verified: false
     note: Unverified conservative local policy, not a statement of current subreddit rules. Fetch
       returned no content on 2026-11-21; manually review before posting.
+template:
+  summary:
+    - One version per subreddit, written for that community; never reuse the text elsewhere.
+    - Tell the story of building it, in first person, and ask a specific question.
+    - Include a disclosure line that you made it, and set the community's flair.
+    - The subreddit's self-promotion rule is checked before review.
+  flair: true
+  disclosure: true
+  sentences: { min: 5, max: 40 }

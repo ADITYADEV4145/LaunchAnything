@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, writeFile, copyFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, writeFile, copyFile, readFile, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -57,6 +57,24 @@ export async function demo(options: { dir?: string; onStage?: (stage: string, st
   const ffmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
   await run('video', async () => { await prepareFixtureVideo(cwd, 'cli-tool'); await render(cwd, 'ffmpeg', ['1x1']); }, ffmpeg ? undefined : 'ffmpeg missing; install FFmpeg');
   let reviewPath = '';
-  await run('review', async () => { reviewPath = (await buildReview(cwd)).path; });
+  await run('review', async () => { await linkDemoMedia(cwd); reviewPath = (await buildReview(cwd)).path; });
   return { dir: cwd, reviewPath, stages, durationMs: Date.now() - started, estimate: estimate(cwd, 'demo'), note: 'Offline prepared fixture copy; no accounts, LLM calls, posts or publishing.' };
+}
+
+/** Points the fixture posts' empty media slots at a demo image so review can hash them. */
+async function linkDemoMedia(cwd: string) {
+  const images = join(cwd, '.launch/media/images');
+  const png = (await readdir(images).catch(() => [] as string[])).find(f => f.endsWith('.png'));
+  let file = png ? '.launch/media/images/' + png : '';
+  if (!file) {
+    file = '.launch/media/demo.svg';
+    await mkdir(join(cwd, '.launch/media'), { recursive: true });
+    await writeFile(join(cwd, file), '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675"><rect width="100%" height="100%" fill="#111"/></svg>');
+  }
+  const posts = join(cwd, '.launch/posts');
+  for (const name of (await readdir(posts)).filter(f => f.endsWith('.md'))) {
+    const source = await readFile(join(posts, name), 'utf8');
+    const linked = source.replace(/\{ slot: ([\w-]+) \}/g, (_, slot) => '{ slot: ' + slot + ', path: ' + file + ' }');
+    if (linked !== source) await writeFile(join(posts, name), linked);
+  }
 }

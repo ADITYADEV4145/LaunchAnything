@@ -27,6 +27,16 @@ const temp: string[] = [];
 async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-5b-')); temp.push(path); return path; }
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(temp.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
+it('sends the PH description and maker comment sections separately', async () => {
+  const body = 'Teams lose the weekly plan.\n\n## Maker comment\n\nI made this. What is missing?\n\n```\n## not a heading\n```\n\n## Gallery order\n\n1. Hero\n2. Pricing';
+  const { cwd, home } = await approvedPost('product-hunt', [], { link: 'https://example.test' }, body);
+  const keys = new MemoryKeychain();
+  await connect({ platform: 'product-hunt', account: 'owner' }, 'private-token', keys, home);
+  const client = new MockMcpClient('product-hunt');
+  await assistedPublish(cwd, { home, keychain: keys, mcp: async () => client });
+  expect(client.calls[0].args).toMatchObject({ values: { description: 'Teams lose the weekly plan.', commentBody: 'I made this. What is missing?\n\n```\n## not a heading\n```' } });
+});
+
 it('defaults PH to official MCP draft, readiness and preview without submission', async () => {
   const { cwd, paths, home } = await approvedPost('product-hunt', [], { link: 'https://example.test', name: 'Own product' });
   const keys = new MemoryKeychain();
@@ -152,7 +162,7 @@ it.each(['empty', 'malformed', 'rpc-error', 'missing-id', 'read-error'])('reject
   expect(response!.body!.locked).toBe(false);
 });
 
-async function approvedPost(channel: string, media: string[] = [], extra = {}) {
+async function approvedPost(channel: string, media: string[] = [], extra = {}, body = 'Caption.') {
   const cwd = await workspace();
   const paths = launchDir(cwd);
   const home = join(cwd, 'connections');
@@ -160,7 +170,7 @@ async function approvedPost(channel: string, media: string[] = [], extra = {}) {
   await mkdir(paths.media, { recursive: true });
   await writeFile(paths.config, JSON.stringify({ profile: 'devtool', channels: [channel], launchType: 'new-product', launchDate: '2026-07-14', timezone: 'UTC', profileConfirmed: true }));
   for (const name of media) await writeFile(join(paths.media, name), 'fixture media');
-  const source = '---\n' + stringify({ title: 'Launch', media: media.map(name => ({ path: 'media/' + name, slot: 'attachment' })), claims: [], ...extra }) + '---\nCaption.\n';
+  const source = '---\n' + stringify({ title: 'Launch', media: media.map(name => ({ path: 'media/' + name, slot: 'attachment' })), claims: [], ...extra }) + '---\n' + body + '\n';
   await writeFile(join(paths.posts, channel + '.md'), source);
   const { posts: [post] } = await loadReview(cwd);
   await writeFile(paths.approvals, JSON.stringify({ approvals: [{ channel, hash: post.hash, name: 'Owner', time: new Date().toISOString() }] }));

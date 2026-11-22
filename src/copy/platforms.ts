@@ -16,9 +16,23 @@ export interface Platform {
   tryableNow?: boolean; taglineMax?: number; makerComment?: { heading: string; required: boolean };
   gallery?: { minImages: number; width: number; height: number };
   linkFirstComment?: boolean; captionMax?: number; subjectMax?: number;
+  template?: Template;
   subreddits?: Record<string, { selfPromotion: 'allowed' | 'restricted' | 'forbidden'; flairRequired: boolean; verified: boolean; note: string }>;
 }
+export interface Template {
+  summary: string[];
+  sentences?: { min: number; max: number };
+  words?: { min: number; max: number };
+  thread?: { min: number; max: number };
+  titlePattern?: string; titleExample?: string;
+  sections?: { heading: string; minWords?: number; maxWords?: number; minItems?: number; ask?: boolean }[];
+  headings?: { pattern: string; label: string }[];
+  codeBlock?: boolean; firstPostMedia?: boolean; lastPostLink?: boolean; lastPostAsk?: boolean;
+  flair?: boolean; disclosure?: boolean; paragraphMaxSentences?: number; minMedia?: number;
+  variants?: 'title' | 'hook';
+}
 const length = { type: 'integer', minimum: 1 };
+const range = { type: 'object', additionalProperties: false, required: ['min','max'], properties: { min: length, max: length } };
 const validate = new Ajv2020({ allErrors: true }).compile({
   type: 'object', additionalProperties: false,
   required: ['kind','id','name','version','lastVerified','sources','title','body','maxLinks','requiredLink','bannedWords','guidance','verified','verifiedFields','verificationNotes'],
@@ -49,7 +63,19 @@ const validate = new Ajv2020({ allErrors: true }).compile({
           selfPromotion: { enum: ['allowed','restricted','forbidden'] }, flairRequired: { type: 'boolean' },
           verified: { type: 'boolean' }, note: { type: 'string', minLength: 1 } } }
     }, additionalProperties: false },
-    guidance: { type: 'array', items: { type: 'string' } }
+    guidance: { type: 'array', items: { type: 'string' } },
+    template: { type: 'object', additionalProperties: false, required: ['summary'], properties: {
+      summary: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
+      sentences: range, words: range, thread: range,
+      titlePattern: { type: 'string' }, titleExample: { type: 'string' },
+      sections: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['heading'], properties: {
+        heading: { type: 'string', pattern: '^## ' }, minWords: length, maxWords: length, minItems: length, ask: { type: 'boolean' } } } },
+      headings: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['pattern','label'],
+        properties: { pattern: { type: 'string' }, label: { type: 'string' } } } },
+      codeBlock: { type: 'boolean' }, firstPostMedia: { type: 'boolean' }, lastPostLink: { type: 'boolean' },
+      lastPostAsk: { type: 'boolean' }, flair: { type: 'boolean' }, disclosure: { type: 'boolean' },
+      paragraphMaxSentences: length, minMedia: length, variants: { enum: ['title','hook'] }
+    } }
   }
 });
 export function loadPlatform(id: string, cwd?: string): Platform {

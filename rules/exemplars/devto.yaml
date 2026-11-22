@@ -1,0 +1,31 @@
+channel: devto
+source: "DEV.to API, top #showdev articles of the past year, fetched 2026-11-21"
+patterns:
+  - "The sampled top #showdev articles ran 1,050-1,650 words of prose plus code."
+  - "They pair a personal problem with headed sections: why I built it, how it works, step-by-step usage with code, and what is still missing."
+  - "Openings are first person and specific; heavy emoji is common on DEV but reads as noise to many developers, so keep it out of Liftoff drafts."
+examples:
+  - url: https://dev.to/matheusmaldaner/anki-on-my-wrist-3gi6
+    title: "Anki On My Wrist"
+    reactions: 43
+    date: 2026-03-18
+    words: 1056
+    headings: ["Flashcards", "The Prototype", "Anki on My Wrist", "Is Your Laptop On 24/7?", "More Issues", "Even More Extensions", "Project Timeline", "Overreliance"]
+    excerpt: "I've long been interested in \"learning how to learn\" and have long been annoyed by how I have grown to forget things -- which is not a great sign for a 24-year-old. That, combined with how I, and several of \u2026"
+    why: "Opens with the author's real annoyance before the build; sections follow the build story (prototype, architecture, issues, limits as \"Overreliance\")."
+  - url: https://dev.to/anmolbaranwal/i-built-a-self-hosted-google-forms-alternative-and-made-it-open-source-4f11
+    title: "I built a self-hosted Google Forms alternative and made it open source! \ud83c\udf89"
+    reactions: 97
+    date: 2025-11-22
+    words: 1547
+    headings: ["What is\u00a0covered?", "1. The vision behind the project.", "2. Tech Stack Used", "3. Architecture Overview.", "4. Data Flow: From Prompt \u2192 Form \u2192 Save", "5. How It Works (Under the Hood)"]
+    excerpt: "Over the past few weeks, I have been building a Google Forms alternative but with a huge twist. \u2026"
+    why: "Says what it is in two sentences, then a table of contents, architecture, data flow and code."
+  - url: https://dev.to/necoz/meet-type-tune-give-your-typescript-types-a-better-home-1p6l
+    title: "Meet type-tune! \ud83e\udd80 Give Your TypeScript Types a Better Home! \ud83d\ude38"
+    reactions: 120
+    date: 2026-11-11
+    words: 1337
+    headings: ["\ud83d\udc08 What Is type-tune?", "\ud83d\udca1 Why Did I Build It?", "\ud83d\ude80 How to Use type-tune", "\ud83d\udc08 Let's Build type-tune Together!", "\ud83c\udf31 Just the Beginning!", "\ud83d\udc9a Check It Out!", "\ud83d\udc9a Join Our Necoz Community!"]
+    excerpt: "Hoi hoi! \ud83d\udc4b \u2026"
+    why: "Problem section (\"Why did I build it?\") before a step-by-step usage walk-through with code blocks."

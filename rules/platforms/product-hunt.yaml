@@ -32,3 +32,14 @@ gallery:
   minImages: 2
   width: 1270
   height: 760
+template:
+  summary:
+    - 'Tagline (the title) of at most 60 characters, two variants.'
+    - A description paragraph before the sections.
+    - '"## Maker comment" under 200 words: the story, the problem, and an ask for feedback.'
+    - '"## Gallery order": a numbered list of at least two images, the money moment first.'
+  sentences: { min: 1, max: 4 }
+  sections:
+    - { heading: "## Maker comment", minWords: 40, maxWords: 199, ask: true }
+    - { heading: "## Gallery order", minItems: 2 }
+  variants: title

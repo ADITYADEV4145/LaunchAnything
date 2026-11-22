@@ -1,0 +1,44 @@
+channel: show-hn
+source: "HN Algolia API, Show HN stories over 400 points, fetched 2026-11-21"
+patterns:
+  - "Median title length in the 200 top Show HN posts sampled was 57 characters; 51 of 200 used a dash after the name."
+  - "Bodies open with the situation or the trick, not the product announcement: 18 of 81 bodies start with a greeting such as Hi HN, and the strongest open with a specific fact."
+  - "HN asks for a backstory, a clear statement of what it does, factual direct language, and no marketing (dang, item 22336638)."
+  - "HN moderators ask that Show HN text be written by hand, not generated or edited by an LLM (dang, item 22336638, edit of 2026-03-28). Treat the Liftoff draft as an outline the founder retypes in their own words."
+examples:
+  - url: https://news.ycombinator.com/item?id=48968606
+    title: "Show HN: I replaced a $120k bowling center system with $1,600 in ESP32s"
+    points: 2935
+    date: 2026-07-19
+    excerpt: "I might be the only SRE on Earth with his own bowling center. It's a more in-depth gig than you'd think. My family and I bought an abandoned 8-lane bowling center in the rural mid-west. In our small town there weren't many recreation options for \u2026"
+    why: "Opens on a concrete before/after cost in the title ($120k system replaced with $1,600 of parts); body starts with a personal, specific situation."
+  - url: https://news.ycombinator.com/item?id=44807868
+    title: "Show HN: Kitten TTS \u2013 25MB CPU-Only, Open-Source TTS Model"
+    points: 1003
+    date: 2025-08-06
+    excerpt: "Kitten TTS is an open-source series of tiny and expressive text-to-speech models for on-device applications. We are excited to launch a preview of our smallest model, which is less than 25 MB. This model has 15M parameters. This release supports English text-to-speech applications in eight \u2026"
+    why: "Title states the effort and the odd result plainly; the body makes one specific, slightly absurd claim and lets people try it."
+  - url: https://news.ycombinator.com/item?id=42645218
+    title: "Show HN: Tetris in a PDF"
+    points: 1289
+    date: 2025-01-09
+    excerpt: "I realized that the PDF engines of modern desktop browsers (PDFium and PDF.js) support JavaScript with enough I/O primitives to make a basic game like Tetris. It was a bit tricky to find a union of features that work in both engines, but in the \u2026"
+    why: "Three-word title says exactly what it is; body explains the technical trick and the tradeoff in plain words."
+  - url: https://news.ycombinator.com/item?id=44522683
+    title: "Show HN: Ten years of running every day, visualized"
+    points: 958
+    date: 2025-07-10
+    excerpt: "Today marks ten years, 3653 consecutive days, of running at least one mile every day under the USRSA rules [1]. To celebrate, I built an interactive dashboard that turns a decade of GPX files into charts you can explore. Running has truly changed my life: \u2026"
+    why: "Leads with the proof number (3653 consecutive days) before mentioning what was built."
+  - url: https://news.ycombinator.com/item?id=38733968
+    title: "Show HN: Heynote \u2013 A dedicated scratchpad for developers"
+    points: 1063
+    date: 2023-12-22
+    excerpt: "Hey! I made Heynote entirely for my own use case. For many years, I always had an Emacs instance running with the scratch buffer open, even long after I had abandoned Emacs as my programming editor in favor of more recent IDE:s. The simplicity of \u2026"
+    why: "Backstory from the author's own workflow explains why it exists; no marketing language."
+  - url: https://news.ycombinator.com/item?id=50326821
+    title: "Show HN: HackerBooks \u2013 HackerTube, but for books mentioned on HN"
+    points: 1870
+    date: 2026-11-01
+    excerpt: "Saw Karpathy's HackerTube and wanted the same thing for books. So I had Claude build one (Opus 5.5). It's ~16.5k books that at least two different HN commenters brought up, from 2007 till now. Each book links back to the comments that mentioned it. Data \u2026"
+    why: "Short, honest about how it was built (including what AI wrote), with a concrete count (~16.5k books)."

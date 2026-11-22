@@ -8,13 +8,57 @@ import type { CopyVerdict } from './checks.js';
 import { loadReview, mediaType } from './posts.js';
 import type { ReviewPost } from './posts.js';
 import { xCost, xPricingSource } from '../connect/costs.js';
+import { readFile } from 'node:fs/promises';
+import { citationId, grounded, spanPattern } from '../copy/citations.js';
+import type { Product } from '../copy/context.js';
+import { readJudgments, criteria, threshold, maxLoops, type Verdict } from '../copy/judge.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
 const safeLink = (value: string) => /^https?:\/\//i.test(value);
 const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
 
-function citedText(value: string) {
+type Sources = Map<string, { text: string; sources?: { type: string; ref: string }[] }>;
+function citedText(value: string, citations: ReviewPost['citations'] = [], product?: Product, sources?: Sources) {
+  const ranges: { start: number; end: number; title: string }[] = [];
+  for (const citation of citations) {
+    const match = spanPattern(citation.text).exec(value);
+    if (!match || ranges.some(r => match.index < r.end && match.index + match[0].length > r.start)) continue;
+    const id = product ? citationId(citation, product) ?? '' : citation.claim ?? citation.proof ?? String(citation.pain ?? '');
+    const claim = sources?.get(id);
+    ranges.push({ start: match.index, end: match.index + match[0].length, title: 'Source ' + id + (claim ? ': ' + claim.text
+      + (claim.sources?.length ? ' (' + claim.sources.map(s => s.ref).join(', ') + ')' : '') : '') });
+  }
+  if (!ranges.length) return inlineText(value);
+  ranges.sort((a, b) => a.start - b.start);
+  let html = '', at = 0;
+  for (const range of ranges) {
+    html += inlineText(value.slice(at, range.start)) + `<span class="cited" title="${escape(range.title)}">${inlineText(value.slice(range.start, range.end))}</span>`;
+    at = range.end;
+  }
+  return html + inlineText(value.slice(at));
+}
+
+function judgeMarkup(post: ReviewPost, judgment?: Verdict) {
+  if (!judgment) return 'Not judged — run <code>liftoff judge</code>';
+  if (judgment.sourceHash !== post.sourceHash) return 'Stale — the draft changed; run <code>liftoff judge</code> again';
+  const scores = criteria.map(c => `${c} ${judgment.scores[c]}`).join(' · ');
+  const reasons = judgment.reasons.length ? `<ul>${judgment.reasons.map(r => `<li>${escape(r)}</li>`).join('')}</ul>` : '';
+  if (judgment.status === 'pass') return `Pass (${escape(judgment.source)}): ${escape(scores)}`;
+  if (judgment.status === 'flagged') return `<strong class="flag">Red flag: below ${threshold}/10 after ${maxLoops} rewrites</strong> (${escape(judgment.source)}): ${escape(scores)}${reasons}`;
+  return `Rewrite ${judgment.attempts} of ${maxLoops} (${escape(judgment.source)}): ${escape(scores)}${reasons}`;
+}
+
+function variantsMarkup(post: ReviewPost) {
+  const list = post.variants?.title ?? post.variants?.hook;
+  if (!list) return '';
+  const live = post.variants?.title ? post.title : post.body.split(/\r?\n---\r?\n/)[0].trim();
+  return `<div class="variants"><strong>${post.variants?.title ? 'Title' : 'Post 1'} variants</strong><ol>${list.map((v, i) =>
+    `<li${v.trim() === live ? ' class="live"' : ''}>${escape(v)}${v.trim() === live ? ' <em>(in use)</em>' : ''}</li>`).join('')}</ol>
+    <p>Switch with <code>liftoff pick --channel ${escape(post.channel)} --variant ${list.findIndex(v => v.trim() === live) === 0 ? 2 : 1}</code></p></div>`;
+}
+
+function inlineText(value: string) {
   return value.split(/(\[claim:[^\]]+\])/g).map(part => {
     const claim = /^\[claim:([^\]]+)\]$/.exec(part);
     return claim ? `<sup class="claim" title="Source claim: ${escape(claim[1])}">${escape(claim[1])}</sup>` : escape(part);
@@ -29,7 +73,7 @@ function checkMarkup(verdict?: CopyVerdict) {
     Fix list: <code>${fixListPath}</code>`;
 }
 
-function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyVerdict, cost?: string) {
+function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyVerdict, cost?: string, judgment?: Verdict, product?: Product, sources?: Sources) {
   const media = post.media.map(({ path, slot, bytes }) => {
     const mime = mediaType(path);
     const src = mime && 'data:' + mime + ';base64,' + bytes.toString('base64');
@@ -43,8 +87,10 @@ function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyV
     .format(new Date(post.scheduledAt));
   return `<article data-channel="${post.channel}">
   <header><strong>${escape(post.label)}</strong><span class="state">${escape(state)}</span></header>
-  <h2>${citedText(post.title)}</h2>
-  <div class="body">${citedText(post.body)}</div>
+  ${judgment?.status === 'flagged' && judgment.sourceHash === post.sourceHash ? `<p class="flag">Red flag: the judge scored this below ${threshold}/10 after ${maxLoops} rewrites. Read the reasons before approving.</p>` : ''}
+  <h2>${citedText(post.title, post.citations, product, sources)}</h2>
+  <div class="body">${citedText(post.body, post.citations, product, sources)}</div>
+  ${variantsMarkup(post)}
   ${post.link ? `<p>${post.linkFirstComment ? 'First comment: ' : ''}${safeLink(post.link) ? `<a href="${escape(post.link)}" target="_blank" rel="noopener noreferrer">${escape(post.link)}</a>`
     : escape(post.link)}</p>` : ''}
   ${media}
@@ -54,6 +100,7 @@ function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyV
     <div><dt>Characters</dt><dd>${titleCount} title · ${bodyCount} body</dd></div>
     <div><dt>Checks</dt><dd>Post schema passed · ${post.media.length} local attachments verified</dd></div>
     <div><dt>Last platform check</dt><dd>${checkMarkup(verdict)}</dd></div>
+    <div><dt>Judge</dt><dd>${judgeMarkup(post, judgment)}</dd></div>
   </dl>
   <div class="actions">
     <button type="button" data-action="approve">Approve</button>
@@ -187,7 +234,7 @@ article{background:#fff;border:1px solid #ccd7e4;border-radius:16px;margin:22px 
 header,.actions,dl{display:flex;gap:12px;flex-wrap:wrap}header{justify-content:space-between;margin-bottom:12px}
 .state{border-radius:20px;background:#e6f0ff;padding:2px 12px;font-size:.85rem}
 .body{white-space:pre-wrap}img,video{display:block;max-width:100%;max-height:420px;margin:16px 0;border-radius:8px}
-.claim{font-size:.7em;background:#e6f0ff;color:#1b4faf;border-radius:4px;padding:1px 4px}
+.cited{border-bottom:1px dotted #1b4faf;cursor:help}.flag{color:#b00020;font-weight:600}.variants li.live{font-weight:600}.claim{font-size:.7em;background:#e6f0ff;color:#1b4faf;border-radius:4px;padding:1px 4px}
 dl{border-block:1px solid #e0e8f1;padding:12px 0;gap:12px 28px}dt{font-size:.8rem;font-weight:700}dd{margin:0}
 button,input,select,textarea{font:inherit;padding:6px 12px;border:1px solid #7587a0;border-radius:6px}
 button{cursor:pointer;background:white;color:inherit}button[data-action=approve]{background:#1b4faf;color:white;border-color:#1b4faf}
@@ -200,6 +247,10 @@ export async function buildReview(cwd?: string) {
   const unavailable = verdicts.filter(entry => entry.sourceHash === null);
   const { paths, config, posts } = await loadReview(cwd, new Set(unavailable.map(entry => entry.channel)));
   const { approvals, skips } = await decisions(paths);
+  const judgments = readJudgments(paths.posts);
+  let product: Product | undefined;
+  try { product = grounded(JSON.parse(await readFile(paths.product, 'utf8')) as Product); } catch { product = undefined; }
+  const sources: Sources = new Map((product?.claims ?? []).map(c => [c.id, c]));
   const approvers = config.approvers ?? [];
   const selector = approvers.length ? `<select id="approver"><option value="">Choose your name</option>
     ${approvers.map(({ name, role }, i) => `<option value="${i}">${escape(name + (role ? ' · ' + role : ''))}</option>`).join('')}</select>`
@@ -218,7 +269,7 @@ export async function buildReview(cwd?: string) {
       : 'Awaiting approval';
     const verdict = verdicts.find(entry => entry.channel === post.channel && entry.sourceHash === post.sourceHash);
     return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone, verdict,
-      post.channel === 'x' ? xCost(post, config.xApiCost) : undefined);
+      post.channel === 'x' ? xCost(post, config.xApiCost) : undefined, judgments.find(entry => entry.channel === post.channel), product, sources);
   });
   for (const verdict of unavailable.filter(entry => !posts.some(post => post.channel === entry.channel))) {
     cards.push(`<article><h2>${escape(verdict.channel)} · Post unavailable</h2>

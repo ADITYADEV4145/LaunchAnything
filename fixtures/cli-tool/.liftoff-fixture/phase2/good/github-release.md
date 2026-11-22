@@ -3,7 +3,10 @@ channel: github-release
 title: "Tasklight: repository snapshot"
 media: []
 claims: [interface]
+citations:
+  - { text: "Small daily task lists should not need a setup guide.", pain: 1 }
+  - { text: "The CLI adds and lists tasks in a local JSON file.", claim: interface }
 ---
 ## Source snapshot
 
-This repository contains the working interface and a README with setup instructions [claim:interface]. Review the source before running locally.
+Small daily task lists should not need a setup guide. This snapshot keeps everything in one local file. The CLI adds and lists tasks in a local JSON file. Review the source before running it locally.

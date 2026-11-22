@@ -1,0 +1,7 @@
+channel: product-hunt
+source: "Structure only; producthunt.com refused requests from this machine. Add real launches to .launch/exemplars/product-hunt.yaml (same format)."
+patterns:
+  - "The tagline says what it does for whom in plain words, under 60 characters, with no adjectives like 'ultimate' or 'AI-powered' unless that is the point."
+  - "The maker comment is a short first-person story: the problem you hit, what you built, what it does not do yet, and one question for hunters."
+  - "The first gallery image is the money moment: the result on screen, not the logo or a feature grid."
+examples: []

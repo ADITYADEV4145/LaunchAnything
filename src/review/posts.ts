@@ -23,6 +23,9 @@ interface Post {
   link?: string;
   linkFirstComment?: boolean;
   claims: string[];
+  citations?: { text: string; claim?: string; proof?: string; pain?: string | number }[];
+  variants?: { title?: string[]; hook?: string[] };
+  picked?: 1 | 2;
 }
 interface Media { slot: string; path: string; bytes: Buffer }
 export interface ReviewPost extends Omit<Post, 'channel' | 'media'> {

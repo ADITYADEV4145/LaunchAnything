@@ -106,7 +106,7 @@ Selftest retains its per-check report in data even when some checks fail.
 | 0b | audience | Local Kit waitlist preview, community map, and audience drafts |
 | 1 | init, scan, validate, plan | Implemented |
 | Foundation | doctor, selftest --through N | Implemented; phase 1 and 5 checks |
-| 2 | write, check | Stubs |
+| 2 | write, check, judge, pick, claims strip, blind-test | Briefs with templates, exemplars and founder voice; checks; judge gate; blind test ([scripts/blind-test.md](scripts/blind-test.md)) |
 | 3 | shots, images | Stubs |
 | 4 | video | Stub |
 | 5 | review, publish | Local approval and staging; no external posting |

@@ -110,7 +110,9 @@ unimplemented phases 2–4 (and phase 6).
 
 ## write and check — phase 2
 
-Future: prepare channel-native copy and enforce citations and platform rules.
+Write briefs, then posts that open on a cited pain or proof, follow each channel's
+template and keep claims in citations metadata. Run check, then judge (three loops
+max, then a red flag). See references/phase2.md and scripts/blind-test.md.
 
 ## shots and images — phase 3
 

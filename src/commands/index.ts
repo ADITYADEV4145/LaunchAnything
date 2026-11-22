@@ -33,10 +33,12 @@ import type { Command } from 'commander';
 import { register as voice } from './voice.js';
 import { register as research } from './research.js';
 import { register as audience } from './audience.js';
+import { register as judge } from './judge.js';
+import { register as drafts } from './drafts.js';
 export function registerCommands(program: Command) {
   adapters(program);
   for (const register of [bench, setup, demo, estimate, telemetry]) register(program);
   voice(program);
-  for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
+  for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, judge, drafts, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

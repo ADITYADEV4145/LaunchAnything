@@ -12,6 +12,26 @@ import { render, run } from '../video/render.js';
 import { git, optionalText, root } from './common.js';
 
 export interface Change { sha: string; title: string; body: string; files: string[]; issues: number[]; score: number; reasons: string[] }
+export interface ClosedIssue { number: number; title: string; state?: string; html_url?: string; closed_at?: string | null; pull_request?: unknown }
+export function cleanTitle(subject: string) {
+  const title = subject.trim().replace(/^[a-z][a-z\d-]*(?:\([^)]*\))?!?:\s*/i, '').replace(/\s*\(#\d+\)$/, '').trim();
+  return title.replace(/\p{L}/u, letter => letter.toUpperCase());
+}
+export function closedIssuesInRange(issues: ClosedIssue[], since: string, until: string) {
+  const start = Date.parse(since), end = Date.parse(until);
+  return issues.filter(issue => {
+    const closed = issue.closed_at ? Date.parse(issue.closed_at) : NaN;
+    return !('pull_request' in issue) && issue.state === 'closed' && closed >= start && closed <= end;
+  });
+}
+export function clipScenes(ids: string[], changes: Pick<Change, 'title'>[]) {
+  const texts = changes.flatMap(change => {
+    const words = cleanTitle(change.title).split(/\s+/).filter(Boolean);
+    return Array.from({ length: Math.ceil(words.length / 8) }, (_, i) => words.slice(i * 8, (i + 1) * 8).join(' '));
+  });
+  if (!ids.length || !texts.length) return [];
+  return Array.from({ length: Math.max(6, texts.length) }, (_, i) => ({ shot: `shots/${ids[i % ids.length]}.png`, text: texts[i % texts.length], duration: 4.5 }));
+}
 export function judge(title: string, files: string[], issues: number[] = []) {
   const reasons: string[] = [];
   let score = 0;
@@ -57,13 +77,16 @@ export async function draftPosts(folder: string, channels: string[], changes: Ch
     const budget = Math.min(rule.postMax ?? rule.body.maxLength, rule.body.maxLength);
     const link = changes[0] && source(changes[0]).startsWith('https://') ? source(changes[0]) : '';
     let body = intro;
-    for (const change of changes) if ((body + '\n\n' + change.title + '\n\n' + link).length <= budget) body += '\n\n' + change.title;
+    for (const change of changes) {
+      const title = cleanTitle(change.title);
+      if ((body + '\n\n' + title + '\n\n' + link).length <= budget) body += '\n\n' + title;
+    }
     if (!changes.length) body = 'No commits in this window.';
     if (link) body += '\n\n' + link;
     const title = 'Release update';
     const issues = inspectPost({ channel, title, body, media: [], claims: [] }, channel, { name: '', features: [], claims: [] });
     verdicts[channel] = { passed: !issues.length, issues };
-    await writeLocal(join(folder, 'posts', `${channel}.md`), `# ${title}\n\n${body}\n\n<!-- Sources (review evidence, not post copy):\n${changes.map(source).join('\n')}\n-->\n`);
+    await writeLocal(join(folder, 'posts', `${channel}.md`), `# ${title}\n\n${body}\n\n<!-- Sources (review evidence, not post copy):\n${changes.map(c => `${c.title} (${c.sha}) — ${source(c)}`).join('\n')}\n-->\n`);
   }
   await writeJson(join(folder, 'copy-check.json'), verdicts);
 }
@@ -72,7 +95,7 @@ export async function makeKit(cwd: string, folder: string, target: string, base:
   await rm(join(folder, 'media'), { recursive: true, force: true });
   const changes = readChanges(cwd, range ?? (base ? [`${base}..${target}`] : [target]));
   const warnings: string[] = [];
-  let issues: { number: number; title: string; state?: string; html_url?: string }[] = [];
+  let issues: ClosedIssue[] = [];
   if (options.issues) {
     const data = await readJson(options.issues);
     if (!Array.isArray(data) || data.some(i => !Number.isInteger(i.number) || typeof i.title !== 'string')) throw new Error('--issues must contain an array of issues with number and title');
@@ -83,16 +106,17 @@ export async function makeKit(cwd: string, folder: string, target: string, base:
   if (!options.issues && process.env.GITHUB_TOKEN && github && base) {
     try {
       const since = git(cwd, 'show', '-s', '--format=%cI', base);
+      const until = git(cwd, 'show', '-s', '--format=%cI', target);
       const response = await fetch(`https://api.github.com/repos/${github}/issues?state=closed&since=${encodeURIComponent(since)}&per_page=100`, { headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }, signal: AbortSignal.timeout(5000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      issues = (await response.json() as typeof issues).filter(i => i.state === 'closed');
+      issues = closedIssuesInRange(await response.json() as ClosedIssue[], since, until);
     } catch { warnings.push('Closed issue fetch failed; using commit references only.'); }
   }
   const selected = changes.filter(c => c.score >= 4).sort((a, b) => b.score - a.score || a.sha.localeCompare(b.sha)).slice(0, 3);
   const channels = selected.length ? (config.releaseChannels ?? ['x', 'linkedin', 'email', 'devto']).filter(c => c !== 'devto' || technical(config.profile, selected)) : [];
   await writeJson(join(folder, 'selection.json'), { threshold: 4, changes, selected: selected.map(c => c.sha), issues, recommendation: selected.length ? 'Review selected posts' : 'No posts recommended' });
   const source = (c: Change) => github ? `https://github.com/${github}/commit/${c.sha}` : `git show ${c.sha}`;
-  const notes = `# Release changes\n\n${changes.map(c => `- ${c.title} (${source(c)})`).join('\n')}\n\n${issues.map(i => `- #${i.number}: ${i.title}`).join('\n')}\n`;
+  const notes = `# Release changes\n\n${changes.map(c => `- ${c.title} (${source(c)})`).join('\n')}\n\n${issues.map(i => `- ${i.html_url ? `[#${i.number}](${i.html_url})` : `#${i.number}`}: ${i.title}`).join('\n')}\n`;
   await writeLocal(join(folder, 'changelog.md'), notes);
   await writeLocal(join(folder, 'github-release.md'), notes + '\nDraft only. Human approval required.\n');
   await draftPosts(folder, channels, selected, source);
@@ -122,7 +146,7 @@ export async function makeKit(cwd: string, folder: string, target: string, base:
       await cp(join(folder, 'media'), join(paths.media, 'shots'), { recursive: true });
       await cp(launchDir(cwd).product, paths.product);
       await cp(launchDir(cwd).shots, paths.shots);
-      await writeJson(join(paths.video, 'script.json'), { scenes: Array.from({ length: 6 }, (_, i) => ({ shot: `shots/${reshot[i % reshot.length]}.png`, text: 'Release update', duration: 4.5 })) });
+      await writeJson(join(paths.video, 'script.json'), { scenes: clipScenes(reshot, selected) });
       const result = await render(work, 'ffmpeg', ['16x9']);
       await cp(result.files[0], join(folder, 'media', 'x-clip.mp4'));
     } catch (error) { clipReason = `render unavailable: ${(error as Error).message.slice(0, 180)}`; }

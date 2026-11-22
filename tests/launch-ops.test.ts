@@ -13,7 +13,7 @@ import { collect } from '../src/results/collect.js';
 import { readJson, writeJson, writeLocal } from '../src/results/files.js';
 import { parseTargets, retro } from '../src/results/retro.js';
 import { checks } from '../src/selftest/launch-ops.js';
-import { affected, judge, technical, relaunch, type Change } from '../src/launch-ops/release-kit.js';
+import { affected, cleanTitle, clipScenes, closedIssuesInRange, draftPosts, judge, technical, relaunch, type Change } from '../src/launch-ops/release-kit.js';
 import { progress, isoWeek } from '../src/launch-ops/progress.js';
 
 const dirs: string[] = [];
@@ -135,6 +135,57 @@ it('scores user-noticeable changes, technical posts and relaunch substance deter
   expect(relaunch(Array(6).fill(change))).toMatchObject({ ph: true, hn: false });
   expect(relaunch([...Array(5).fill(change), { ...change, title: 'perf: query 30% faster' }] as Change[]).hn).toBe(true);
 });
+it.each([
+  ['feat(cli): clearer command help (#123)', 'Clearer command help'],
+  ['fix!: prevent a crash (#7)', 'Prevent a crash'],
+  ['perf(api)!: faster queries', 'Faster queries'],
+  ['already useful copy', 'Already useful copy'],
+  ['fix: échapper les caractères', 'Échapper les caractères'],
+  ['', ''],
+  ['feat: (#123)', ''],
+])('cleans user-facing subject %j without git metadata', (raw, expected) => {
+  expect(cleanTitle(raw)).toBe(expected);
+});
+it('uses cleaned selected titles in posts and clip scenes while preserving source subjects and hashes', async () => {
+  const { paths } = await workspace();
+  const changes: Change[] = [
+    { sha: 'abc123', title: 'feat(cli)!: clearer command help (#123)', body: '', files: [], issues: [], score: 4, reasons: [] },
+    { sha: 'def456', title: 'fix: prevent a crash (#124)', body: '', files: [], issues: [], score: 4, reasons: [] },
+  ];
+  await draftPosts(paths.root, ['email'], changes, c => `git show ${c.sha}`);
+  const post = await readFile(join(paths.root, 'posts/email.md'), 'utf8');
+  const [body, sources] = post.split('<!-- Sources');
+  expect(body).toContain('Clearer command help');
+  expect(body).toContain('Prevent a crash');
+  expect(body).not.toMatch(/feat\(|fix:|\(#\d+\)/);
+  expect(sources).toContain('feat(cli)!: clearer command help (#123) (abc123)');
+  expect(sources).toContain('fix: prevent a crash (#124) (def456)');
+  const scenes = clipScenes(['changed'], changes);
+  expect(scenes).toHaveLength(6);
+  expect(scenes.map(s => s.text)).toEqual(Array(3).fill(['Clearer command help', 'Prevent a crash']).flat());
+  const longTitle = 'feat: one two three four five six seven eight nine ten (#9)';
+  expect(clipScenes(['changed'], [{ title: longTitle }]).slice(0, 2).map(s => s.text)).toEqual(['One two three four five six seven eight', 'nine ten']);
+  expect(clipScenes([], changes)).toEqual([]);
+  expect(clipScenes(['changed'], [])).toEqual([]);
+});
+it('filters API issues by closure date inclusively, excluding PRs and updated-but-previously-closed issues', () => {
+  const since = '2026-01-02T00:00:00Z', until = '2026-01-09T00:00:00Z';
+  const issue = { number: 1, title: 'Command help', state: 'closed', closed_at: since };
+  const issues = [
+    issue,
+    { ...issue, number: 2, closed_at: until },
+    { ...issue, number: 3, closed_at: '2026-01-01T23:59:59Z', updated_at: until },
+    { ...issue, number: 4, closed_at: '2026-01-09T00:00:01Z' },
+    { ...issue, number: 5, pull_request: { url: 'https://api.github.com/repos/example/tool/pulls/5' } },
+    { ...issue, number: 6, state: 'open' },
+    { ...issue, number: 7, closed_at: null },
+    { ...issue, number: 8, closed_at: 'invalid' },
+    { number: 9, title: 'No closure date', state: 'closed' },
+  ];
+  expect(closedIssuesInRange(issues, since, until).map(i => i.number)).toEqual([1, 2]);
+  expect(closedIssuesInRange([], since, until)).toEqual([]);
+  expect(closedIssuesInRange(issues, 'invalid', until)).toEqual([]);
+});
 it('maps routes, explicit sources, global files and terminal changes without reshooting other screens', () => {
   expect(affected({ route: '/settings' }, ['src/app/settings/page.tsx'])).toBe(true);
   expect(affected({ route: '/' }, ['pages/index.tsx'])).toBe(true);
@@ -163,10 +214,16 @@ it('honors release channel overrides, no-shots and offline issue input with empt
   const { cwd, paths } = await workspace(); await repository(cwd);
   const config = await readJson(paths.config) as Record<string, unknown>;
   await writeJson(paths.config, { ...config, releaseChannels: ['email'] });
-  const issues = join(cwd, 'issues.json'); await writeJson(issues, [{ number: 5, title: 'Fix command help', state: 'closed' }]);
+  const issues = join(cwd, 'issues.json'); await writeJson(issues, [{ number: 5, title: 'Fix command help', state: 'closed', html_url: 'https://github.com/example/tool/issues/5' }, { number: 6, title: 'Offline issue without URL' }]);
   const kit = await release(cwd, { issues, shots: false });
   expect(kit.channels).toEqual(['email']);
   expect(await readFile(join(kit.notes, '../github-release.md'), 'utf8')).toContain('Fix command help');
+  for (const file of ['changelog.md', 'github-release.md']) {
+    const notes = await readFile(join(kit.notes, '..', file), 'utf8');
+    expect(notes).toContain('[#5](https://github.com/example/tool/issues/5): Fix command help');
+    expect(notes).toContain('#6: Offline issue without URL');
+    expect(notes).toContain(`feat: useful change (git show ${git(cwd, 'rev-parse', 'HEAD')})`);
+  }
   await writeJson(issues, {}); await expect(release(cwd, { issues })).rejects.toThrow('--issues');
   await expect(release(cwd, { openPr: true })).rejects.toThrow('requires --draft');
   await writeLocal(join(cwd, 'docs.md'), 'Internal docs'); git(cwd, 'add', 'docs.md'); git(cwd, 'commit', '-m', 'docs: internal notes');

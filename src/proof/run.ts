@@ -1,5 +1,5 @@
 import { readFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, resolve, isAbsolute } from 'node:path';
+import { join, resolve, isAbsolute, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { launchDir } from '../core/launch-dir.js';
@@ -73,6 +73,8 @@ export async function runProof(cwd: string, options: { skipRun?: boolean; timeou
     if (isAbsolute(resultsFile)) throw new Error('Benchmark results must be relative to the repository');
     const resultPath = resolve(cwd, resultsFile);
     assertSafePath(cwd, resultPath);
+    if (resultPath === directory || resultPath.startsWith(directory + sep))
+      throw new Error('Invalid benchmark config: results must not be under .launch/proof/');
     const mode = command && !options.skipRun ? 'ran' : 'recorded';
     if (mode === 'ran') await runCommand(command!, cwd, timeout);
     assertSafePath(cwd, resultPath);

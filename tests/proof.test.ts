@@ -94,6 +94,18 @@ describe('proof run', () => {
     config([{ ...benchmark, results: '../escape.json', command: undefined }]);
     await expect(runProof(cwd)).rejects.toThrow('outside repository');
   });
+  it('rejects results under the proof directory without running or overwriting files', async () => {
+    const recordPath = join(cwd, '.launch/proof/checks.json');
+    writeFileSync(recordPath, '{"count":3}');
+    for (const results of ['.launch/proof/checks.json', '.launch/proof/nested/results.json', 'bench/../.launch/proof/checks.json', '.launch/proof']) {
+      config([{ ...benchmark, results, command: 'node -e "require(\'node:fs\').writeFileSync(\'ran\',\'yes\')"' }]);
+      for (const skipRun of [false, true]) {
+        await expect(runProof(cwd, { skipRun })).rejects.toThrow('Invalid benchmark config: results must not be under .launch/proof/');
+        expect(existsSync(join(cwd, 'ran'))).toBe(false);
+        expect(readFileSync(recordPath, 'utf8')).toBe('{"count":3}');
+      }
+    }
+  });
 });
 
 describe('product proof and research validation', () => {

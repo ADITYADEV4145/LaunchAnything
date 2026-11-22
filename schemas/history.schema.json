@@ -35,7 +35,10 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 23
-            }
+            },
+            "bestHook": { "type": "string", "maxLength": 100 },
+            "bestAngle": { "type": "string", "maxLength": 100 },
+            "zeroMeasuredClicks": { "type": "boolean" }
           },
           "required": [
             "time",
@@ -46,6 +49,64 @@
         },
         "minItems": 0
       }
+    },
+    "judgeCalibrations": {
+      "type": "object",
+      "propertyNames": { "enum": ["devtool", "indie-saas", "b2b-saas", "consumer-mobile", "enterprise"] },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "time": { "type": "string", "format": "date-time" },
+            "signal": { "enum": ["signups", "waitlistConversions", "clicks", "views"] },
+            "samples": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "channel": { "type": "string" },
+                  "score": { "type": "number", "minimum": 0, "maximum": 100 },
+                  "metrics": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+                },
+                "required": ["channel", "score", "metrics"],
+                "additionalProperties": false
+              }
+            },
+            "comparablePosts": { "type": "integer", "minimum": 0 },
+            "scoreAgreement": { "type": "number", "minimum": -1, "maximum": 1 },
+            "highScoredLowPerformance": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "channel": { "type": "string" },
+                  "score": { "type": "number", "minimum": 0, "maximum": 100 },
+                  "actual": { "type": "integer", "minimum": 0 }
+                },
+                "required": ["channel", "score", "actual"],
+                "additionalProperties": false
+              }
+            },
+            "rubricId": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,100}$" },
+            "originalWeights": { "$ref": "#/$defs/weights" },
+            "suggestedWeights": { "$ref": "#/$defs/weights" },
+            "reason": { "type": "string" }
+          },
+          "required": ["time", "samples", "comparablePosts", "highScoredLowPerformance", "reason"],
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "weights": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+      "additionalProperties": { "type": "number", "exclusiveMinimum": 0 },
+      "minProperties": 2
     }
   },
   "required": [

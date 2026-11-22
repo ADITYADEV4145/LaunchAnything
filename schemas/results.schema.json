@@ -38,6 +38,10 @@
           "signups": {
             "type": "integer",
             "minimum": 0
+          },
+          "waitlistConversions": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [

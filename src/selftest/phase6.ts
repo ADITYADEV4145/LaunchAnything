@@ -31,7 +31,7 @@ export const checks: Check[] = [{
     await writeJson(paths.published, { posts });
     const recordings = manualObservations(await readJson(join(fixtures, 'phase6-metrics.json')), posts);
     const readStatus = async (post: PublishedPost) => recordings.get(postKey(post.channel, post.id));
-    for (const [day, checkpoint] of [[7, 'T+1'], [9, 'T+3'], [13, 'T+7']] as const) {
+    for (const [day, checkpoint] of [[7, 'T+1'], [9, 'T+3'], [13, 'T+7'], [36, 'T+30']] as const) {
       const result = await collect(workspace, {
         now: new Date(Date.UTC(2026, 0, day, 22)), readStatus, replies: true,
       });

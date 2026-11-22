@@ -8,7 +8,7 @@ import { packageRoot } from '../src/core/package-root.js';
 import { checkpointAt, collect } from '../src/results/collect.js';
 import { readJson, writeJson } from '../src/results/files.js';
 import { githubStarsDelta } from '../src/results/github.js';
-import { learn, loadPlanLessons } from '../src/results/history.js';
+import { learn, loadJudgeWeights, loadPlanLessons } from '../src/results/history.js';
 import { receipt } from '../src/results/receipt.js';
 import { checks } from '../src/selftest/phase6.js';
 
@@ -40,6 +40,8 @@ it('selects checkpoints by launch calendar date across DST', () => {
   expect(checkpointAt(config, new Date('2026-03-10T06:59:00Z'))).toBe('T+1');
   expect(checkpointAt(config, now)).toBe('T+3');
   expect(checkpointAt(config, new Date('2026-03-14T07:00:00Z'))).toBe('T+7');
+  expect(checkpointAt(config, new Date('2026-04-06T06:59:00Z'))).toBe('T+7');
+  expect(checkpointAt(config, new Date('2026-04-06T07:00:00Z'))).toBe('T+30');
 });
 
 it('joins by channel and id; overlays imported fields without counting missing as zero', async () => {
@@ -71,6 +73,77 @@ it('rejects mismatched imported post ids, invalid numbers and duplicate rows', a
   await expect(collect(cwd, { now })).rejects.toThrow('Invalid x views count');
   await writeJson(input, { posts: [{ channel: 'x', id: 'one' }, { channel: 'x', id: 'one' }] });
   await expect(collect(cwd, { now })).rejects.toThrow('Duplicate metrics');
+});
+
+it('rejects ambiguous UTM mappings and keeps unmatched analytics separate', async () => {
+  const { cwd, paths } = await workspace();
+  const input = join(paths.root, 'metrics.json');
+  await writeJson(input, { posts: [{ channel: 'x', id: 'one', utmContent: 'shared' },
+    { channel: 'x', id: 'two', utmContent: 'shared' }] });
+  await expect(collect(cwd, { now })).rejects.toThrow('Multiple posts share the same utmContent');
+  await writeJson(input, { posts: [], attribution: [{ signups: 8 }, { signups: 4 }] });
+  await expect(collect(cwd, { now })).rejects.toThrow('Duplicate UTM attribution row');
+  await writeJson(input, { posts: [], attribution: [{ utmContent: 'unknown', signups: 8 }] });
+  const result = await collect(cwd, { now });
+  expect(result.results.channels.every(row => row.signups === undefined)).toBe(true);
+  expect(await readFile(paths.report, 'utf8')).toContain('excluded from post and channel totals): signups: 8');
+});
+
+it('turns recorded checkpoints into attribution, feedback drafts, repurposing, and reusable calibration', async () => {
+  const { cwd, paths } = await workspace();
+  const fixture = join(packageRoot(), 'fixtures', 'cli-tool', '.liftoff-fixture', 'part-g-metrics.json');
+  const input = join(paths.root, 'metrics.json');
+  const data = JSON.parse(await readFile(fixture, 'utf8'));
+  await writeJson(paths.published, { posts: [
+    { channel: 'x', id: 'one', status: 'published', scheduledAt: '2026-03-08T01:00:00Z' },
+    { channel: 'x', id: 'two', status: 'published', scheduledAt: '2026-03-07T23:00:00Z' },
+    { channel: 'show-hn', id: 'hn', status: 'published' },
+  ] });
+  await writeJson(input, data);
+  const day1 = await collect(cwd, { now: new Date('2026-03-08T20:00:00Z') });
+  expect(await readFile(join(day1.drafts, 't-plus-1-thank-you.md'), 'utf8')).toContain('18 signups');
+
+  const carousel = vi.fn(() => 'fixture-carousel');
+  const vertical = vi.fn(() => 'fixture-clip');
+  const day3 = await collect(cwd, { now, repurposeMedia: { carousel, vertical } });
+  expect(day3.feedback).toEqual({ faq: 6, issues: 3, objections: 1 });
+  expect(day3.results.channels).toContainEqual(expect.objectContaining({ channel: 'x', clicks: 40, signups: 18, waitlistConversions: 9 }));
+  const report = await readFile(day3.report, 'utf8');
+  expect(report).toContain('| x | one | fixture-a | 1200 | 4 | 9 | 2 | 1 | clicks, signups, waitlistConversions |');
+  expect(report).toContain('| x | two | fixture-b | 500 | 3 | 31 | 16 | 8 | clicks, signups, waitlistConversions |');
+  expect(report).toContain('signups: 11');
+  expect(await readFile(join(day3.drafts, 't-plus-3-lessons.md'), 'utf8')).toContain('Show HN: 4 views');
+  expect(await readFile(join(day3.drafts, 'faq.md'), 'utf8')).toContain('draft for site and README');
+  const issues = await readJson(join(day3.drafts, 'issues.json')) as Array<{ title: string; labels: string[]; body: string }>;
+  expect(issues).toHaveLength(3);
+  expect(issues.every(issue => issue.labels.includes('from-launch'))).toBe(true);
+  expect(issues.find(issue => issue.title === 'Please add CSV export.')?.body).toMatch(/comment a3.*comment b2/);
+  expect(await readFile(join(day3.drafts, 'exemplar-notes.md'), 'utf8')).toContain('privacy risk');
+  expect(await readFile(join(day3.drafts, 'repurpose.md'), 'utf8')).toContain('Source: x / two');
+  expect(carousel).toHaveBeenCalledWith(expect.objectContaining({ hook: 'See exactly what changed.' }));
+  expect(vertical).toHaveBeenCalledOnce();
+  expect(day3.media).toEqual({ carousel: 'fixture-carousel', vertical: 'fixture-clip' });
+
+  const history = join(cwd, 'history.json');
+  const learned = await learn(cwd, history);
+  expect(learned.observations.find(row => row.channel === 'x')).toMatchObject({
+    bestHour: 15, bestHook: 'See exactly what changed.', bestAngle: 'Sample export',
+  });
+  const weights = await loadJudgeWeights('devtool', 'fixture-v1', history);
+  expect(weights?.specificity).toBeGreaterThan(50);
+  expect(weights?.polish).toBeLessThan(50);
+  expect(await loadJudgeWeights('devtool', 'other-rubric', history)).toBeUndefined();
+
+  const day7 = await collect(cwd, { now: new Date('2026-03-14T21:00:00Z') });
+  const email = join(day7.drafts, 't-plus-7-email.md');
+  expect(await readFile(email, 'utf8')).not.toContain('We’ve shipped');
+  await writeJson(input, { ...data, shippedFix: { channel: 'x', postId: 'two', commentId: 'b2',
+    title: 'CSV export', releaseUrl: 'https://example.test/releases/2' } });
+  await collect(cwd, { now: new Date('2026-03-14T21:00:00Z') });
+  expect(await readFile(email, 'utf8')).toContain('We’ve shipped CSV export');
+  const day30 = await collect(cwd, { now: new Date('2026-04-06T21:00:00Z') });
+  expect(day30.checkpoint).toBe('T+30');
+  expect(await readJson(day7.snapshot)).toBeDefined();
 });
 
 it('drafts only verified owned unanswered comments and escapes active content', async () => {

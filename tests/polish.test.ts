@@ -32,6 +32,10 @@ it('captures a real tiny CLI product, polishes it and automatically builds the b
     const { stdout } = await exec(process.execPath, ['--import', 'tsx', 'src/cli.ts', '--cwd', cwd, '--json', 'media', 'polish'], { timeout: 120000 });
     const polished = JSON.parse(stdout).data;
     expect(polished).toHaveLength(6); expect(polished.every((item: { scale: number }) => item.scale === 2)).toBe(true);
+    for(const id of ['hook','after']) {
+      const ocr=await ocrWords(await readFile(join(paths,'polished',`${id}.png`)));
+      expect(ocr.words.some(word=>word.text==='Scope' && word.x<250 && word.y<120)).toBe(true);
+    }
     await rm(join(paths, 'polished'), { recursive: true });
     const report = await makeImages(cwd);
     expect(report.every(item => item.ok && item.contrastRatio >= 7)).toBe(true);

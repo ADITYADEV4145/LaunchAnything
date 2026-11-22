@@ -46,3 +46,18 @@ it('removes the private directory even if a probe throws', async () => {
   expect(directory).not.toBe('');
   expect(existsSync(directory)).toBe(false);
 });
+
+it('reports media versions and required versus optional degradation without downloads',async()=>{
+  vi.mocked(spawnSync).mockImplementation((command)=>({status:command==='vhs'?1:0,stdout:'tool 1.2.3\nmore details'} as ReturnType<typeof spawnSync>));
+  const report=await doctor(tmpdir(),tmpdir());
+  for(const name of ['tesseract','ffprobe','chrome']) expect(report.tools[name]).toMatchObject({available:true,required:true,version:'tool 1.2.3',installHint:expect.any(String)});
+  expect(report.tools.vhs).toMatchObject({available:false,required:false,version:null});expect(report.tools.ttyd.required).toBe(false);
+  vi.mocked(spawnSync).mockReturnValue({status:0,stdout:'tool 1.2.3'} as ReturnType<typeof spawnSync>);
+  expect((await doctor(tmpdir(),tmpdir())).tools.ttyd.required).toBe(true);
+});
+
+it('reports missing media dependencies with install hints and no misleading versions',async()=>{
+  vi.mocked(spawnSync).mockReturnValue({status:null,error:Object.assign(new Error('missing'),{code:'ENOENT'})} as ReturnType<typeof spawnSync>);
+  const report=await doctor(tmpdir(),tmpdir());
+  for(const name of ['tesseract','vhs','ttyd','ffprobe','chrome']) expect(report.tools[name]).toMatchObject({available:false,version:null,installHint:expect.any(String)});
+});

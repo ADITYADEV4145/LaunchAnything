@@ -99,6 +99,8 @@ it('detects the actual corner logo even when OCR has no product wordmark',async(
 it('counts nested rings as one highlight but rejects two separate focus targets',async()=>{
   const cwd=await fixture(); const path=join(cwd,'.launch/media/images/rings.png');
   const box=(left:number,top:number,width:number,height:number)=>`<span style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;border:3px solid #77e5b3"></span>`;
+  await picture(path,'Catch unknown exports<span style="color:#77e5b3;text-decoration:underline;position:absolute;left:200px;top:450px;font-size:40px">Simple pricing</span>');
+  expect((await judge(cwd)).items.find(item=>item.file.endsWith('/rings.png'))!.metrics!.highlightCount).toBe(0);
   await picture(path,`Catch unknown exports${box(100,450,200,90)}${box(110,460,180,70)}`);
   const clean=await judge(cwd); expect(clean.items.find(item=>item.file.endsWith('/rings.png'))!.metrics!.highlightCount).toBe(1);
   await picture(path,`Catch unknown exports${box(100,450,200,90)}${box(600,450,200,90)}`);

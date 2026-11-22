@@ -47,7 +47,7 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
         const contentHeight = frameWidth * visibleHeight / crop.width;
         const host = homepageHost(product.homepage ?? product.homepageUrl ?? product.url);
         const values: Record<string, string> = {
-          ...brand.colors, frameWidth: String(frameWidth), contentHeight: String(contentHeight),
+          ...brand.colors, title: product.name, logo: brand.logo, logoClass: brand.logo ? 'has-logo' : '', frameWidth: String(frameWidth), contentHeight: String(contentHeight),
           kind: mobile ? 'phone' : capture.kind === 'terminal' ? 'terminal' : 'browser', addressClass: capture.kind === 'web' ? 'address' : '',
           windowTitle: capture.kind === 'web' ? host || product.name : product.name,
           screenshot: `data:image/png;base64,${PNG.sync.write(cropped).toString('base64')}`, caption: shot.caption ?? '', cardClass: shot.card ? 'title-card' : '',
@@ -58,7 +58,7 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
         try {
           await page.route('**/*', route => route.abort());
           await page.setContent(template.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(values[key] ?? '')));
-          await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode())); });
+          await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].filter(image => image.getAttribute('src')).map(image => image.decode())); });
           assertClean(await page.locator('body').innerText(), `polished ${shot.id}`);
           const output = await page.screenshot(); assertClean((await ocrWords(output)).text, `polished ${shot.id}`);
           await writeFile(destination, output); const { width, height } = PNG.sync.read(output);

@@ -81,12 +81,17 @@ function cornerLogo(image: PNG, logo?: PNG) {
   }
   return false;
 }
-function highlights(image: PNG, accent: number[]) {
+function highlights(image: PNG, accent: number[], words: OcrWord[]) {
   const step=Math.max(1,Math.ceil(Math.max(image.width,image.height)/600));
   const width=Math.ceil(image.width/step),height=Math.ceil(image.height/step),mask=new Uint8Array(width*height);
   for(let y=Math.floor(height*.15);y<height*.85;y++) for(let x=Math.floor(width*.05);x<width*.95;x++) {
     const offset=(Math.min(image.height-1,y*step)*image.width+Math.min(image.width-1,x*step))*4;
     if(accent.every((value,index)=>Math.abs(image.data[offset+index]-value)<40)) mask[y*width+x]=1;
+  }
+  for(const word of words) {
+    const left=Math.max(0,Math.floor((word.x-1)/step)),right=Math.min(width,Math.ceil((word.x+word.width+1)/step));
+    const top=Math.max(0,Math.floor((word.y-1)/step)),bottom=Math.min(height,Math.ceil((word.y+word.height+1)/step));
+    for(let y=top;y<bottom;y++) mask.fill(0,y*width+left,y*width+right);
   }
   const boxes: {left:number;right:number;top:number;bottom:number}[]=[];
   for(let index=0;index<mask.length;index++) {
@@ -98,7 +103,22 @@ function highlights(image: PNG, accent: number[]) {
       for(const next of [x>0?current-1:-1,x+1<width?current+1:-1,current-width,current+width]) if(next>=0 && next<mask.length && mask[next]) { mask[next]=0;queue.push(next); }
     }
     const w=right-left+1,h=bottom-top+1,area=w*h/(width*height);
-    if(w*step>=15 && h*step>=10 && w/h>=.4 && w/h<=30 && area>=.0001 && area<=.15 && queue.length/(w*h)<.7) {
+    if(w*step>=Math.max(15,image.width*.025) && h*step>=10 && w/h>=.4 && w/h<=30 && area>=.0001 && area<=.25 && queue.length/(w*h)<.7) {
+      const rows=new Map<number,number[]>(),cols=new Map<number,number[]>();
+      for(const pixel of queue) {
+        const x=pixel%width,y=Math.floor(pixel/width);
+        if(!rows.has(y)) rows.set(y,[]);rows.get(y)!.push(x);
+        if(!cols.has(x)) cols.set(x,[]);cols.get(x)!.push(y);
+      }
+      const longest=(values:number[])=>{
+        values.sort((a,b)=>a-b);let run=0,best=0,previous=-2;
+        for(const value of values) { run=value===previous+1?run+1:1;best=Math.max(best,run);previous=value; }
+        return best;
+      };
+      const horizontal=(from:number,to:number)=>[...rows].some(([y,values])=>y>=from && y<=to && longest(values)>=w*.45);
+      const vertical=(from:number,to:number)=>[...cols].some(([x,values])=>x>=from && x<=to && longest(values)>=h*.35);
+      const band=Math.max(1,Math.min(w,h)*.2);
+      if(!horizontal(top,top+band) || !horizontal(bottom-band,bottom) || !vertical(left,left+band) || !vertical(right-band,right)) continue;
       const overlaps=boxes.filter(box=>box.left<=right && box.right>=left && box.top<=bottom && box.bottom>=top);
       for(const box of overlaps) { left=Math.min(left,box.left);right=Math.max(right,box.right);top=Math.min(top,box.top);bottom=Math.max(bottom,box.bottom);boxes.splice(boxes.indexOf(box),1); }
       boxes.push({left,right,top,bottom});
@@ -130,7 +150,7 @@ function measure(image: PNG, words: OcrWord[], name: string, colors: {background
   const rgb = (hex: string) => [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16));
   const bg = rgb(colors.background), accent = rgb(colors.accent);
   const logoPresent = !cornerWordmark && cornerLogo(image,logo);
-  const highlightCount = highlights(image,accent);
+  const highlightCount = highlights(image,accent,valid);
   let edges = 0, samples = 0, background = 0, accents = 0;
   const stride = Math.max(1, Math.floor(Math.sqrt(width * height / 500000)));
   for (let y = 0; y < height - 1; y += stride) for (let x = 0; x < width - 1; x += stride) {

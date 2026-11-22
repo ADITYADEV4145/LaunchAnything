@@ -3,8 +3,8 @@
 Repo in, launch kit out — with grounded claims and human approval.
 TypeScript CLI and agent skill for Node.js 22+. No server, database or LLM API calls.
 
-**Implemented:** phase-1 init/scan/validate/plan and phase-5 review/local staging,
-plus doctor and fixture checks. Phases 2–4 and 6 remain explicit stubs (exit 2).
+Includes grounded planning, local media production, human review/local staging,
+doctor and cumulative fixture checks.
 
 ## Install
 
@@ -105,17 +105,102 @@ Selftest retains its per-check report in data even when some checks fail.
 | --- | --- | --- |
 | 0b | audience | Local Kit waitlist preview, community map, and audience drafts |
 | 1 | init, scan, validate, plan | Implemented |
-| Foundation | doctor, selftest --through N | Implemented; phase 1 and 5 checks |
+| Foundation | doctor, selftest --through N | Local dependency probes and cumulative checks through phase 7 (Part D media), plus Part I |
 | 2 | write, check, judge, pick, claims strip, blind-test | Briefs with templates, exemplars and founder voice; checks; judge gate; blind test ([scripts/blind-test.md](scripts/blind-test.md)) |
-| 3 | shots, images | Stubs |
-| 4 | video | Stub |
+| 3 | shots plan, shots, media polish, images, media judge | Storyboard capture, branded platform sets, safety and quality gates |
+| 4 | video script, video voice, video, video check | Branded long/short cuts, optional voice, local music and ffmpeg fallback |
 | 5 | review, publish | Local approval and staging; no external posting |
 | 5b | connect, publish --confirm --assist | Own accounts; official PH draft MCP, X discovery/manual fallback, browser-assisted HN/Reddit |
 | 6 | results, learn, receipt | Stubs |
 
 Doctor lists skill names, MCP server names (never configuration values), and executable
-availability. Missing extras never fail it. CLI tool detection uses PATH; it does not
-download or execute npm packages. Later phases may add local-package adapters.
+availability, versions, stage requirements and install hints. Missing extras never
+fail doctor itself. CLI detection uses PATH; Chrome also checks the bundled
+Playwright browser and configured executable paths. Probes never download packages.
+
+## Media workflow (local/offline)
+
+```sh
+liftoff shots plan                 # reads product.json money_moment; --force replaces a plan
+# Review captions/actions against the repository; replace every TODO before capture.
+liftoff shots                     # add --url http://127.0.0.1:3000 for a running web app
+liftoff media polish
+liftoff images                    # automatically polishes storyboards
+liftoff media judge --json
+liftoff video script --from-shots
+liftoff video voice --dry-run
+liftoff video --renderer ffmpeg --format 16x9,9x16
+liftoff video check --format 16x9,9x16
+liftoff media judge --json        # includes the rendered videos
+```
+
+The director makes 4–8 ordered shots with exactly one money moment. `money_moment`
+may be an object with summary/before/after/proof, commands/setup or route, and
+highlight; strings and missing values fall back to verified product copy. Planning
+is a scaffold, not permission to invent claims or execute unreviewed commands.
+Legacy shots without new fields retain their original rendering path.
+
+Storyboards use scale-2 web capture and light/dark variants, or VHS CLI tapes with
+hidden setup. If VHS is absent, an HTML terminal plus ffmpeg is used. Tesseract is
+required for storyboard safety checks; Chrome is required for media layouts.
+FFmpeg/ffprobe are required for animation/video processing. VHS is optional, but
+an installed VHS requires ttyd; a broken VHS installation is not silently skipped.
+Run doctor for versions and actionable installation hints.
+
+Polished shots in `.launch/media/polished/` have corner logos/wordmarks, frames,
+shadows and accent highlights. Set `config.brandKit` to a local JSON file with
+`logo`, `colors` and optional `music`, or put `logo.svg/png/jpg/webp` in media/;
+without a logo, the product name is the wordmark. Platform files have exact sizes:
+OG 1200×630, X 1600×900, LinkedIn 1200×627, YouTube 1280×720, Product Hunt
+1270×760 and Instagram 1080×1350. X/OG/LinkedIn/YouTube/PH start from the polished
+money moment. PH gets a gallery; Instagram gets five slides (hook, before, action,
+after, CTA), with `instagram.png` aliasing slide 1. Reports retain source provenance.
+
+Judge OCR-scans **all** media images, including raw captures, plus one frame per
+second of animations/videos. Quality scores apply only to images/, polished/ and
+rendered video frames. Banned content and incorrect X/PH-first provenance always
+fail; errors name files/timestamps and rules without reproducing secret values.
+Contact sheets, sampled frames and report.json are under `.launch/media/judge/`.
+Any readability, focus, brand or clutter score below 8/10 fails with a fix.
+Review runs this gate before building the approval page when finished media exists.
+
+For a human/agent vision review, run `media judge --write-vision-template`, view
+the contact sheets, supply honest 0–10 scores in the generated template, and save
+it as `vision.json` in the judge directory. Each item uses `file`, `sha256`,
+`readability`, `focus`, `brand`, `clutter`; image hashes bind original image bytes,
+and `video.mp4@Ns` hashes bind that sampled PNG. Valid per-asset scores override
+heuristics; stale hashes are rejected. They cannot override banned content or
+provenance. `--heuristic-only` ignores vision overrides and is used by selftest.
+
+Role-based scripts render 45–60s at 16x9/1x1 and 20–35s at 9x16; legacy scripts
+keep their 30–60s rule. Every scene has corner branding, a high-contrast caption
+plate, and money-moment highlights. Music is a deterministic local pad by default;
+use `--music <file>` or brandKit.music to replace it. `video voice` is the only
+optional network adapter: explicitly run it with ELEVENLABS_API_KEY (and optional
+ELEVENLABS_VOICE_ID) to create indexed vo/*.mp3 files. Dry-run writes nothing and
+never sends requests; no key reports captions-only. Never commit credentials.
+
+### Standalone media renderers
+
+These exports need `.launch/product.json` and local source files, not shots.yaml:
+
+```ts
+import { renderCarousel } from 'launch-liftoff/dist/media/platform-images.js';
+import { renderClip } from 'launch-liftoff/dist/video/clip.js';
+
+await renderCarousel(cwd, [{ role: 'hook', caption: verifiedCaption }], {
+  size: 'instagram', outDir: 'out', prefix: 'launch',
+}); // { files, report }; optional slide.source is a local image path
+await renderClip(cwd, [{ role: 'after', caption: verifiedCaption,
+  source: 'out/launch.png', duration: 5 }], {
+  format: '9x16', outFile: 'out/clip.mp4', renderer: 'ffmpeg',
+}); // { file, duration, receipt }; adds a three-second end card
+```
+
+Carousel options are `size`, `outDir`, `prefix`. Clip options include `format`,
+`music`, indexed local `voice` paths, `outFile`, and `renderer`. Durations are used
+verbatim by renderClip; script generation owns the long/short duration policy.
+Neither standalone renderer calls a voice API.
 
 ## Folder contract
 
@@ -157,8 +242,12 @@ configured timezone, not researched performance promises. Phase 2 owns rules/pla
 
 The selftest registry runs phases 1..N on fresh temporary copies of all three fixtures.
 Each copy gets a deterministic Git baseline, tag v0.1.0 and later commit; copies are
-removed after the run. Phases 2–4 and 6 intentionally fail until implemented,
-so cumulative gates above phase 1 still report those unimplemented phases.
+removed after the run. Phase 7 is a dedicated, slower Part D media regression gate;
+`selftest --through 6` retains the baseline launch workflow. Run
+`selftest --through 7 --json` to include Part D checks on
+cli-tool and saas-next: money-moment planning, rejected unsafe frames and cleanup,
+capture/polish, exact platform dimensions and five-slide carousel, heuristic judge,
+and rendered long/short video durations. No GroundWork run or external API is used.
 Fixtures ship in npm so installed selftest works without a source checkout.
 
 ## Safety

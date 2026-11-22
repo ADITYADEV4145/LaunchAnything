@@ -11,6 +11,31 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each([
+    'Promotion is allowed in only two places, not only in the comments but in the pinned post',
+    'Self-promotion is allowed not only in the comments',
+    'Self-promotion is allowed not only in the comments. You may also use your own posts',
+    'Self-promotion is allowed not only in the comments; but also in your own posts',
+    'Self-promotion is allowed not only in the comments but also in your own posts is forbidden',
+    'Self-promotion is allowed not only in the comments but also in your own posts unless approved',
+    'Follow 9:1. Only on the **Sunday Showcase** post',
+    'Self-promotion is allowed only on Sunday thread',
+    'Follow 9:1. Only on the Sunday demo post',
+    'Self-promotion is allowed only in-game',
+    'Self-promotion is allowed only on-platform',
+    'Self-promotion is allowed only on-topic-only',
+  ])('does not turn an ambiguous exclusive destination into a standalone plan: %s', async description => {
+    const cwd = await setup(); const rules = [{ short_name: 'Self-promotion', description }];
+    const limit = restrictions(rules, 'UTC'); expect(limit.manualReview).toBeDefined();
+    expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); expect(result.valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]);
+    expect(result.markdown).toContain('## Needs manual review\n- r/builders:');
+    expect(result.markdown).toContain(`> Self-promotion: ${description}`);
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
   it.each(['**Sundays**', '*Sundays*', '_Sundays_', '__Sundays__', 'a Sunday', 'an **Sunday**', 'the **Sunday**'])('keeps emphasized or article-prefixed days schedulable: %s', async day => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
     const rules = [{ short_name: 'Self-promotion', description: `Follow 9:1. Only on ${day}.` }];
@@ -23,7 +48,7 @@ describe('communities', () => {
     report.plan[0].date = '2026-01-02';
     expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting day violates cited rule');
   });
-  it.each(['not only in the comments', 'not only on this post', 'only on-topic', 'only on‑topic'])('does not invent an exclusive destination for %s', async phrase => {
+  it.each(['not only in the comments but also in your own posts', 'not only in the comments but also in standalone posts', 'only on-topic', 'only on‑topic', 'only on-brand', 'only on-subject'])('does not invent an exclusive destination for %s', async phrase => {
     const cwd = await setup(); const rules = [{ short_name: 'Self-promotion', description: `Self-promotion is allowed ${phrase}` }];
     expect(restrictions(rules, 'UTC')).toMatchObject({ days: [], megathread: false, manualReview: undefined });
     const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);

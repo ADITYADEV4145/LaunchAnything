@@ -77,11 +77,22 @@ function parseRestriction(rules: { short_name: string; description: string }[], 
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed || unparsedTime) manualReview ??= unknownTimeContext(source);
-  const exclusiveMentions = (value: string) => [...value.matchAll(/\bonly\s+(?:allowed\s+)?(in|on)\b(?![-\u2010-\u2015])/gi)].filter(match => !/\bnot\s+$/i.test(value.slice(0, match.index)));
+  const exclusiveMentions = (value: string) => [...value.matchAll(/\bonly\s+(?:allowed\s+)?(in|on)\b/gi)].filter(match => {
+    const suffix = value.slice(match.index + match[0].length);
+    if (match[1]!.toLowerCase() === 'on' && /^[-\u2010-\u2015](?:topic|brand|subject)(?=\s|[.;!?,]|$)/i.test(suffix)) return false;
+    const prefix = value.slice(0, match.index);
+    if (!/\bnot\s+$/i.test(prefix)) return true;
+    const clause = prefix.split(/[.;!?\n]/).at(-1)! + value.slice(match.index).split(/[.;!?\n]/)[0]!;
+    const permission = clause.replace(/\bnot\s+only\b/gi, '');
+    const denied = /\b(?:not|no|never|forbidden|prohibited|disallowed|except|unless|cannot)\b|n['’]t\b/i.test(permission);
+    return denied || !/\bbut\s+also\s+in\s+(?:(?:your\s+)?own|standalone)\s+posts?\b/i.test(permission);
+  });
   const unresolvedExclusive = exclusiveMentions(source).some(match => {
     const target = source.slice(match.index + match[0].length).trimStart();
     const dayTarget = target.replace(/[*_]/g, '').replace(/^(?:a|an|the)\s+/i, '');
-    const knownDay = match[1]!.toLowerCase() === 'on' && new RegExp(`^${dayToken}\\b`, 'i').test(dayTarget);
+    const dayName = dayTarget.split(/\b(?:at|from|between|in|on|and|or|only)\b|[.;!?\n]/i)[0]!;
+    const namedDayDestination = /\b(?:posts?|threads?|mega[-_\s]?threads?|showcases?)\b/i.test(dayName);
+    const knownDay = !namedDayDestination && match[1]!.toLowerCase() === 'on' && new RegExp(`^${dayToken}\\b`, 'i').test(dayTarget);
     const knownThread = /^(?:the\s+)?(?:mega[-_\s]?threads?|weekly[-_\s]+(?:posts?|threads?))\b/i.test(target);
     return !knownDay && !knownThread;
   });

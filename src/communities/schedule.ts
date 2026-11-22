@@ -23,7 +23,7 @@ export function restrictions(rules: { short_name: string; description: string }[
     new RegExp(`\\b${zonePattern}[ \\t]*$`).test(text.slice(0, m.index)) || new RegExp(`^[ \\t]*[(\\[]?[ \\t]*${zonePattern}\\b`).test(text.slice(m.index! + m[0].length)));
   const at = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(text);
   const start = range ? clock(range[1]!, range[2], range[3]) : at ? clock(at[1]!, at[2], at[3]) : undefined;
-  const end = range ? clock(range[4]!, range[5], range[6]) : start;
+  const end = range ? range[4] === '24' && range[5] === '00' && !range[6] ? 1440 : clock(range[4]!, range[5], range[6]) : start;
   const mentions: string[] = [];
   let manualReview: string | undefined;
   for (const [zone] of text.matchAll(new RegExp(`(?<![\\w./:])${zonePattern}(?![\\w/])`, 'g'))) {

@@ -11,6 +11,21 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['UTC', 'ET'])('accepts 24:00 as an end-of-day boundary in %s', async zone => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));
+    const rules = [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday 18:00-24:00 ${zone}` }]; const limit = restrictions(rules, 'UTC');
+    expect(limit).toMatchObject({ start: 1080, end: 1440, manualReview: undefined });
+    const offset = zone === 'ET' ? 5 : 0; const lateDate = zone === 'ET' ? '2026-01-05' : '2026-01-04';
+    expect(postingWindow(lateDate, zone === 'ET' ? '04:59' : '23:59', 'UTC', limit)).toEqual({ day: true, time: true });
+    expect(postingWindow('2026-01-04', `${17 + offset}:59`, 'UTC', limit).time).toBe(false);
+    expect(postingWindow('2026-01-05', zone === 'ET' ? '05:00' : '00:00', 'UTC', limit).day).toBe(false);
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.plan[0].time).toBe(`${18 + offset}:00`); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it.each(['24:00-24:00 UTC', '18:00-24:01 UTC', '18:00-25:00 UTC', '18:00-24:00pm UTC'])('does not accept invalid uses of the 24:00 boundary: %s', description => {
+    expect(restrictions([{ short_name: 'Promotions', description }], 'UTC').manualReview).toBeDefined();
+  });
   it.each(['Please post on Sundays at 9am ET', 'Please post on Sundays at 9am', 'Post at 9am Sundays', 'at 9am ET Singapore', 'ET at 9am Sundays'])('limits place checks to attached context: %s', async description => {
     const cwd = await setup(); const rules = [{ short_name: 'Self-Promo Sunday', description }];
     expect(restrictions(rules, 'UTC').manualReview).toBeUndefined();

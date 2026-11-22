@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -23,7 +23,8 @@ describe('recommend', () => {
       expect(reddit.time).toBe(sub.bestHours[0].split(' ')[0]);
       expect(reddit.why).toContain(`${sub.painMentions} pain mentions`);
       expect(reddit.why).toContain(sub.rulesUrl);
-      expect(reddit.why).toContain(`${sub.activity.subscribers} members`);
+      expect(reddit.scoring.potentialMembers).toBe(sub.activity.subscribers);
+      expect(reddit.scoring.account).toMatchObject({ requirements: sub.requirements, eligibility: 'meets' });
       sub.eligibility = 'fails';
       await writeFile(join(paths.root, 'communities.json'), JSON.stringify({ subreddits: [sub], recommended: [sub.subreddit], plan: [], threads: [], other: [] }));
       expect((await recommend(work, { historyPath: join(work, 'history.json') })).channels.some(row => row.channel === 'reddit')).toBe(false);
@@ -31,7 +32,19 @@ describe('recommend', () => {
   }, 30000);
   it('passes the GroundWork top-five, sequencing and learned observation gate', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'recommend-'));
-    try { await groundworkRecommendGate(cwd); } finally { await rm(cwd, { recursive: true, force: true }); }
+    try {
+      const { first, second } = await groundworkRecommendGate(cwd);
+      for (const result of [first, second]) {
+        expect(result.channels.slice(0, 5).map(row => row.channel)).toEqual(['show-hn', 'devto', 'reddit', 'x', 'github-release']);
+        expect(new Set(result.channels.map(row => row.date + ' ' + row.time.slice(0, 2))).size).toBe(result.channels.length);
+        const firstBig = Math.min(...result.channels.filter(row => !['x', 'email', 'blog', 'github-release'].includes(row.channel)).map(row => Date.parse(row.instant)));
+        expect(result.channels.filter(row => ['x', 'email', 'blog', 'github-release'].includes(row.channel)).every(row => Date.parse(row.instant) >= firstBig + 3600000)).toBe(true);
+        expect(result.markdown).not.toContain('account-risk penalty');
+        expect(result.channels.every(row => row.asset.length < 100 && !row.asset.includes('→'))).toBe(true);
+        expect(result.channels.find(row => row.channel === 'github-release')!.asset).toBe('release notes');
+        expect(result.channels.find(row => row.channel === 'email')!.asset).toBe('email to waitlist with demo link');
+      }
+    } finally { await rm(cwd, { recursive: true, force: true }); }
   }, 30000);
   it('handles empty evidence, missing eligibility, offline PH and adapter errors deterministically', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'recommend-'));
@@ -76,4 +89,22 @@ describe('recommend', () => {
     expect(chooseAngle('indie-hackers', { ...product, competitors: [{ name: 'tool', dislikes: ['opaque state'] }] }).angle).toBe('contrarian take');
     expect(chooseAngle('x', { ...product, money_moment: { before: 'before', action: 'run', after: 'after' } }).angle).toBe('before/after demo');
   });
+  it('counts unique cited channel sources without assigning every cluster mention to each channel', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'recommend-'));
+    try {
+      const { work, paths } = await groundworkGoFixture(cwd);
+      await mkdir(join(paths.root, 'research'), { recursive: true });
+      await writeFile(join(paths.root, 'research/pains.json'), JSON.stringify({ idea: 'test', pains: [{ name: 'mixed evidence', mentions: 12, quotes: [
+        { text: 'HN pain', url: 'https://news.ycombinator.com/item?id=1' },
+        { text: 'duplicate citation', url: 'https://news.ycombinator.com/item?id=1' },
+        { text: 'GitHub pain', url: 'https://github.com/example/project/issues/1' },
+      ] }] }));
+      const result = await recommend(work, { historyPath: join(work, 'history.json') });
+      const hn = result.channels.find(row => row.channel === 'show-hn')!;
+      expect(hn.scoring.citedSources).toBe(1);
+      expect(hn.why).toContain('1 pain clusters with 1 cited sources on news.ycombinator.com');
+      expect(hn.why).not.toContain('12');
+      expect(result.channels.find(row => row.channel === 'github-release')!.scoring.citedSources).toBe(1);
+    } finally { await rm(cwd, { recursive: true, force: true }); }
+  }, 30000);
 });

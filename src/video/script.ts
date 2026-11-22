@@ -65,7 +65,7 @@ export async function resolveShot(cwd: string, shot: string): Promise<string> {
   }
   throw new Error(`Shot does not resolve to captured media: ${shot}`);
 }
-export async function validateScript(cwd: string, data: unknown): Promise<Script> {
+export async function validateScript(cwd: string, data: unknown, selected: readonly string[] = ['16x9','9x16','1x1']): Promise<Script> {
   const result = validateFile('video-script', data);
   if (!result.valid) throw new Error(result.errors.join('; '));
   const script = data as Script;
@@ -76,10 +76,13 @@ export async function validateScript(cwd: string, data: unknown): Promise<Script
   if (!modern && (script.scenes.length < 6 || script.scenes.some(scene => scene.text.trim().split(/\s+/).length > 8))) throw new Error('Legacy scripts require 6–10 scenes and captions of 1–8 words');
   if (duration < (modern ? 45 : 30) || duration > 60) throw new Error(`Total duration including the 3-second end card must be ${modern ? '45' : '30'}–60 seconds`);
   if (modern) {
+    const vertical = selected.includes('9x16');
     const hookLimit = Math.max(3, minimumHookDuration(script.scenes[0].text));
-    if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > hookLimit || sceneDuration(script.scenes[0], '9x16') > hookLimit || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds, extended only for minimum reading or narration time');
-    const short = totalDuration(script, '9x16');
-    if (short < 20 || short > shortCutBudgetSeconds + 1e-8) throw new Error(`Short duration including end card must be 20–${shortCutBudgetSeconds} seconds, reserving rendering headroom below 35 seconds`);
+    if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > hookLimit || (vertical && sceneDuration(script.scenes[0], '9x16') > hookLimit) || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds, extended only for minimum reading or narration time');
+    if (vertical) {
+      const short = totalDuration(script, '9x16');
+      if (short < 20 || short > 35) throw new Error('Short duration including end card must be 20–35 seconds');
+    }
   }
   for (const scene of script.scenes) await resolveShot(cwd, scene.shot);
   return script;
@@ -117,7 +120,7 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
   await mkdir(launchDir(cwd).video, { recursive: true });
   await writeFile(join(launchDir(cwd).video, 'script.json'), JSON.stringify(script, null, 2)); return script;
 }
-export async function loadScript(cwd: string) { return validateScript(cwd, JSON.parse(await readFile(join(launchDir(cwd).video, 'script.json'), 'utf8'))); }
+export async function loadScript(cwd: string, selected?: readonly string[]) { return validateScript(cwd, JSON.parse(await readFile(join(launchDir(cwd).video, 'script.json'), 'utf8')),selected); }
 export async function productName(cwd: string) {
   try { const p = JSON.parse(await readFile(launchDir(cwd).product, 'utf8')); return String(p.name ?? p.productName ?? 'Product'); }
   catch { return 'Product'; }

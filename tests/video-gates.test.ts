@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromeLint, readcheck, sceneDuration, scriptFromShots, shortCutBudgetSeconds, srt, totalDuration, validateScript, words } from '../src/video/script.js';
+import { chromeLint, loadScript, readcheck, sceneDuration, scriptFromShots, shortCutBudgetSeconds, srt, totalDuration, validateScript, words } from '../src/video/script.js';
 import * as polishing from '../src/media/polish.js';
 import { checkProbe, endCardGate, motionGates, transcriptCoverage, voiceGate } from '../src/video/check.js';
 import { run } from '../src/video/render.js';
@@ -113,14 +113,23 @@ describe('video gates',() => {
     await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots:shots.map(shot=>({...shot,caption:long}))}));
     await expect(scriptFromShots(cwd)).rejects.toThrow(`cannot fit the ${shortCutBudgetSeconds}-second vertical budget at minimum reading and narration times; shorten captions or remove scenes`);
   });
-  it('rejects manually supplied vertical scripts that consume rendering headroom',async()=>{
+  it('keeps the hard 35-second limit only for requested vertical cuts',async()=>{
     const cwd=await mkdtemp(join(tmpdir(),'video-hook-headroom-')); dirs.push(cwd);
     await mkdir(join(cwd,'.launch/media'),{recursive:true});
     await writeFile(join(cwd,'.launch/media/real.png'),'captured image');
     const roles=['hook','before','after','cta'] as const;
     const scenes=roles.map((role,index)=>({role,shot:'real.png',text:'Keep work private',duration:index===0?2:15,shortDuration:[2,10,10,9.75][index]}));
     expect(totalDuration({scenes},'9x16')).toBe(34.75);
-    await expect(validateScript(cwd,{scenes})).rejects.toThrow(`20–${shortCutBudgetSeconds} seconds, reserving rendering headroom`);
+    await expect(validateScript(cwd,{scenes},['9x16'])).resolves.toEqual({scenes});
+    const atLimit={scenes:scenes.map((scene,index)=>index===3?{...scene,shortDuration:10}:scene)};
+    await expect(validateScript(cwd,atLimit,['9x16'])).resolves.toEqual(atLimit);
+    const overLimit={scenes:scenes.map((scene,index)=>index===3?{...scene,shortDuration:11}:scene)};
+    for(const selected of [['16x9'],['1x1'],['16x9','1x1']]) await expect(validateScript(cwd,overLimit,selected)).resolves.toEqual(overLimit);
+    await expect(validateScript(cwd,overLimit,['9x16'])).rejects.toThrow('20–35 seconds');
+    await mkdir(join(cwd,'.launch/video'));
+    await writeFile(join(cwd,'.launch/video/script.json'),JSON.stringify(overLimit));
+    await expect(loadScript(cwd,['16x9','1x1'])).resolves.toEqual(overLimit);
+    await expect(loadScript(cwd,['16x9','9x16'])).rejects.toThrow('20–35 seconds');
   });
   it('runs both local STT adapters, rejects poor transcripts and reports tool errors',async () => {
     const dir = await mkdtemp(join(tmpdir(),'video-stt-')); dirs.push(dir);

@@ -71,7 +71,9 @@ G1 no-black (blackdetect), G2 no-freeze (no hold longer than 3 seconds), G3 read
 words/s plus 0.25s padding, rounded up to a frame and normally ≤3 seconds),
 with other vertical scenes trimmed toward their readable narration minimums
 when necessary to stay within a shared 34.5-second script budget, leaving rendering
-headroom below the 35-second output limit; impossible budgets require shorter copy,
+headroom below the 35-second output limit; impossible budgets require shorter copy.
+Validation keeps the hard 35-second limit for supplied scripts and checks the
+vertical-cut duration only when 9x16 is requested,
 (text ≥0.5s + words/3, voiceover ≤2.8 words/s, SRT scene cue map), G4 no-page-chrome
 (no counters or progress markers), G5 end-card (3s ±0.25), and G6 voice-stt (≥80%
 normalized script word coverage via local whisper or whisper-cli on scene-aligned

@@ -34,7 +34,7 @@ export function register(program: Command) {
     const brief = {styles:(await listStyles(cwd)).map(({id,name,summary,pacing}) => ({id,name,summary,pacing})), defaultStyle:'midnight', product:await productName(cwd), shots:await shots(cwd), media:await media(cwd), capabilities:await doctor(cwd), rules:'Agent: choose optional script.style from the available styles; midnight is the unchanged default. Respect its pacing. Prefer video script --from-shots for storyboards (45–60s long, 20–35s short, hook first and at most 3s). Legacy scripts use 6–10 scenes, shot, text (1–8 words), duration, optional voiceover; total 30–60s including the 3s end card. Use real captured or polished product media. Only explicit video voice can call ElevenLabs; preview with --dry-run. Local voice files go in .launch/video/vo/<zero-based scene index>.wav or .mp3. Credit only Aditya.'};
     try { await readFile(join(launchDir(cwd).video,'script.json')); }
     catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {brief,valid:null}; throw e; }
-    try { const script = await loadScript(cwd); return {brief,valid:true,script,readcheck:readcheck(script)}; }
+    try { const script = await loadScript(cwd,parseFormats(opts.format)); return {brief,valid:true,script,readcheck:readcheck(script)}; }
     catch (e) { throw new Error(`${(e as Error).message}\nAgent brief: ${JSON.stringify(brief)}`); }
   });
   action(video.command('record').requiredOption('--url <base>','Application base URL'),'record',async (cwd,opts) => record(cwd,opts.url));

@@ -94,7 +94,7 @@ export function checkProbe(probe: {format: {duration: string}; streams: {codec_t
 }
 export async function check(cwd: string, selected: Format[] = parseFormats()) {
   const dir = launchDir(cwd).video;
-  const script = await loadScript(cwd);
+  const script = await loadScript(cwd,selected);
   const captions = await readFile(join(dir,'captions.srt'),'utf8');
   if (captions.trim() !== srt(script).trim()) throw new Error('Captions SRT missing or out of date');
   const style = await loadStyle(cwd,script.style);

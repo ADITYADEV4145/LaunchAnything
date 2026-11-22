@@ -46,7 +46,7 @@ export async function remotionCli(cwd: string): Promise<string | undefined> {
 }
 export async function render(cwd: string, renderer = 'auto', selected: Format[] = parseFormats(), options: { music?: string } = {}) {
   if (!['auto','remotion','ffmpeg'].includes(renderer)) throw new Error('Renderer must be auto, remotion or ffmpeg');
-  const script = await loadScript(cwd);
+  const script = await loadScript(cwd,selected);
   const style = await loadStyle(cwd,script.style);
   const dir = launchDir(cwd).video;
   await mkdir(dir, { recursive: true });

@@ -43,7 +43,9 @@ it('refuses symlinked output directories and files without touching external tar
 });
 const product = { name: 'Demo', features: [{ name: 'Task editor', description: 'Edits tasks' }], claims: [{ id: 'edit', text: 'Edits tasks' }] };
 const post: Post = { channel: 'x', title: 'Demo', body: 'Try this small project.', media: [], claims: [] };
-function rules(p: Partial<Post>, channel = 'x') { return inspectPost({ ...post, channel, ...p }, channel, product).map(i => i.rule); }
+const partC = /^(?:opener|template|variants|voice)\.|^claims\.inline-tag$/;
+function rules(p: Partial<Post>, channel = 'x') { return inspectPost({ ...post, channel, ...p }, channel, product).map(i => i.rule).filter(rule => !partC.test(rule)); }
+function partCRules(p: Partial<Post>, channel = 'x', item = product) { return inspectPost({ ...post, channel, ...p }, channel, item).map(i => i.rule).filter(rule => partC.test(rule)); }
 function isolated(run: (cwd: string) => void, fixture = 'cli-tool') {
   const cwd = mkdtempSync(join(tmpdir(), 'liftoff-phase2-'));
   try { cpSync(join(root, 'fixtures', fixture), cwd, { recursive: true }); run(cwd); }
@@ -342,7 +344,7 @@ it('records cross-channel issues for each affected channel and clears them on re
   expect(report.posts).toHaveLength(2);
   for (const entry of report.posts) {
     expect(entry.sourceHash).toMatch(/^[a-f0-9]{64}$/);
-    expect(entry.issues).toEqual([{ rule: 'text.duplicate', message: 'Over 60% similarity with another channel' }]);
+    expect(entry.issues.filter((i: {rule: string}) => !partC.test(i.rule))).toEqual([{ rule: 'text.duplicate', message: 'Over 60% similarity with another channel' }]);
   }
   checkPosts(cwd, ['x']);
   const updated = JSON.parse(readFileSync(join(posts, 'check-results.json'), 'utf8'));

@@ -23,3 +23,10 @@ hookMax: 210
 guidance:
   - First paragraph is the hook; optionally put external links in first comment.
 linkFirstComment: true
+template:
+  summary:
+    - The first paragraph is the hook, within 210 characters, before LinkedIn's "see more".
+    - Short paragraphs of at most two sentences.
+    - Attach one image or a carousel (at least one media slot).
+  paragraphMaxSentences: 2
+  minMedia: 1

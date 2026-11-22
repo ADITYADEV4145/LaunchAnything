@@ -21,3 +21,13 @@ requiredLink: false
 bannedWords: []
 guidance:
   - Use a technical walkthrough and disclose affiliation.
+template:
+  summary:
+    - An article of 800-1500 words with at least one code block.
+    - Sections for before/after, how it works and limits, under ## headings.
+  words: { min: 800, max: 1500 }
+  codeBlock: true
+  headings:
+    - { pattern: '^##+ .*\b(before|after)\b', label: before/after }
+    - { pattern: '^##+ .*\bhow it works\b', label: how it works }
+    - { pattern: '^##+ .*\blimit', label: limits }

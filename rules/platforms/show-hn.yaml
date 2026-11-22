@@ -43,3 +43,15 @@ bannedWords:
 guidance:
   - Share a project people can try now, not a signup page.
 tryableNow: true
+template:
+  summary:
+    - 'Title: "Show HN: <Name> – <what it does, in plain words>", at most 80 characters, two variants.'
+    - 'Description of 3-5 sentences above any section, in this order: the problem, what it does, one proof number, how it runs, where to try it.'
+    - '"## First comment outline": 3-6 bullets the founder finishes by hand (backstory, how it works, limits, the feedback you want).'
+  titlePattern: '^Show HN: \S.* [–-] \S'
+  titleExample: 'Show HN: Tasklight – a checklist that lives in one JSON file'
+  sentences: { min: 3, max: 5 }
+  sections:
+    - heading: "## First comment outline"
+      minItems: 3
+  variants: title

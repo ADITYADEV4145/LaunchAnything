@@ -1,0 +1,8 @@
+channel: reddit
+source: "Structure only; reddit.com refused requests from this machine. Add real posts to .launch/exemplars/<channel>.yaml (same format)."
+patterns:
+  - "Write for the subreddit, not for a launch: the problem you had, what you tried, what you built, what is still rough."
+  - "Disclose plainly that you made it, near the top or bottom ('Disclosure: I built this')."
+  - "Ask a question the community can answer from experience; never ask for upvotes."
+  - "Set the flair the community requires and check its self-promotion rule first."
+examples: []

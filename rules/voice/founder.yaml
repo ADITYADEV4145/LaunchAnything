@@ -1,0 +1,58 @@
+kind: voice-guidelines
+id: founder
+name: Researched founder voice
+note: >-
+  Used when no .launch/voice.json exists (fewer than 20 owned posts). These are researched rules for how
+  credible founders and developer marketers write, not a copy of anyone's personal voice. Learn your own
+  voice with liftoff voice learn as soon as you have 20 posts.
+sources:
+  - { id: showhn, url: "https://news.ycombinator.com/showhn.html", what: "Show HN guidelines" }
+  - { id: dang-tips, url: "https://news.ycombinator.com/item?id=22336638", what: "HN moderator tips for presenting your work" }
+  - { id: pg-talk, url: "https://paulgraham.com/talk.html", what: "Paul Graham, Write Like You Talk" }
+  - { id: pg-simply, url: "https://paulgraham.com/simply.html", what: "Paul Graham, Write Simply" }
+  - { id: hn-sample, url: "https://hn.algolia.com/api/v1/search?tags=show_hn&numericFilters=points%3E400", what: "200 top Show HN posts, analysed 2026-11-21" }
+rules:
+  - id: talk
+    rule: Write the way you would explain it to a developer friend across the table. If you would not say a sentence out loud, rewrite it.
+    avoid: "Our platform empowers teams to seamlessly streamline workflows."
+    prefer: "You paste a repo URL and get the launch posts back in about a minute."
+    source: pg-talk
+  - id: plain
+    rule: Use short, common words and short sentences (most under 20 words). One idea per sentence.
+    source: pg-simply
+  - id: pain-first
+    rule: Open on the pain in the reader's words or on the strongest proof number, never on yourself or the announcement.
+    avoid: '"I built a tool that…", "Introducing…", "Excited to share…"'
+    prefer: "Writing launch posts took me a full day for every release."
+    source: hn-sample
+  - id: specific
+    rule: Replace adjectives with a number, a name or a before/after. 'Fast' becomes '40 ms'; 'easy' becomes 'one command'.
+    source: dang-tips
+  - id: backstory
+    rule: Say why you built it and what is different, in one or two sentences of personal story.
+    source: dang-tips
+  - id: limits
+    rule: Name one thing it does not do yet. Admitting a limit makes every other claim easier to believe.
+    source: dang-tips
+  - id: no-marketing
+    rule: Drop language that sounds like marketing or sales; use factual, direct language and technical detail.
+    avoid: "revolutionary, game-changing, seamless, cutting-edge, unlock, supercharge, leverage"
+    source: dang-tips
+  - id: try-it
+    rule: Make it easy to try without signup, and say exactly how (one command, one link).
+    source: showhn
+  - id: ask
+    rule: End with one specific question you want answered, not 'thoughts?' or a request for upvotes.
+    prefer: "Which part of the setup broke for you?"
+    source: showhn
+  - id: by-hand
+    rule: On Hacker News, type the final text yourself. HN moderators ask that Show HN text not be generated or edited by an LLM, so treat the Show HN draft as an outline to retell in your own words.
+    source: dang-tips
+  - id: human
+    rule: Write as a person, not a brand. 'I' or 'we', contractions are fine, no exclamation marks in a row, at most one emoji.
+    source: dang-tips
+checks:
+  hype: [revolutionary, game-changing, game changer, seamless, seamlessly, cutting-edge, unlock, supercharge, leverage, empower, effortless, next-level, best-in-class, world-class]
+  maxAverageSentenceWords: 20
+  maxExclamations: 1
+  maxEmoji: 1

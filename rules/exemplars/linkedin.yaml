@@ -1,0 +1,8 @@
+channel: linkedin
+source: "Structure only; LinkedIn posts need a signed-in session. Add real posts to .launch/exemplars/<channel>.yaml (same format)."
+patterns:
+  - "The first 210 characters are all most readers see before 'see more': put the pain or the result there."
+  - "One or two sentences per paragraph, white space between them, one image or a carousel."
+  - "Tell what happened and what you learned; skip 'I'm thrilled to announce' and hashtag blocks."
+  - "Put the link in the first comment when the link-in-comment option is set."
+examples: []

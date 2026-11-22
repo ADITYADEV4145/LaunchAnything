@@ -1,0 +1,7 @@
+channel: shorts
+source: "Structure only; short-video platforms need a signed-in session. Add real posts to .launch/exemplars/<channel>.yaml (same format)."
+patterns:
+  - "On-screen text beat 1 (first second) is the pain or the result; viewers decide to stay in the opening seconds."
+  - "One short line per beat: hook, before, the action, after, call to action. Keep each line readable in under two seconds."
+  - "The caption adds the context the video cannot: what it is, where to try it, one question."
+examples: []

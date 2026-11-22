@@ -1,0 +1,8 @@
+channel: x
+source: "Structure only. X, Product Hunt and Reddit refused unauthenticated requests from this machine, so no real posts are stored here yet; add your own to .launch/exemplars/<channel>.yaml (same format)."
+patterns:
+  - "Post 1 stands alone: the pain or the result in one or two sentences, with the screenshot or clip attached. Most readers never open the thread."
+  - "Each later post carries one idea: what it does, one proof number, how it runs, a limit."
+  - "The last post has the link and asks one specific question (which part breaks for you, what would you remove)."
+  - "No hashtags beyond one, no thread emoji, no 'A thread 🧵'."
+examples: []

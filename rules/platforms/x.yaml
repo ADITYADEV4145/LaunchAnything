@@ -25,3 +25,13 @@ threadMax: 10
 guidance:
   - Conservative budget counts URL characters literally; separate thread posts with --- on its own
     line.
+template:
+  summary:
+    - A thread of 4-6 posts separated by a line containing only ---. The title is an internal label and is never posted.
+    - Post 1 is the pain or the result, with media attached (the first media slot). Write two variants of post 1.
+    - The last post carries the link and asks for specific feedback.
+  thread: { min: 4, max: 6 }
+  firstPostMedia: true
+  lastPostLink: true
+  lastPostAsk: true
+  variants: hook

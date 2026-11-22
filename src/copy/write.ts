@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { validateProduct } from '../product/validate.js';
 import { context } from './context.js';
 import { loadPlatform } from './platforms.js';
 import { assertSafePath } from './safe-path.js';
@@ -7,6 +8,8 @@ import { loadVoice } from '../voice/learn.js';
 
 export function writeBriefs(cwd: string, selected?: string[]) {
   const ctx = context(cwd, selected);
+  const checked = validateProduct(cwd, ctx.product);
+  if (!checked.valid) throw new Error(checked.errors.join('; '));
   const directory = join(ctx.paths.posts, 'briefs');
   assertSafePath(cwd, directory);
   for (const channel of ctx.channels) assertSafePath(cwd, join(directory, channel + '.md'));

@@ -2,8 +2,7 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } fr
 import { join } from 'node:path';
 import { writeBriefs } from '../copy/write.js';
 import { checkPosts, parsePost } from '../copy/check.js';
-import { judgePosts, criteria } from '../copy/judge.js';
-import { createHash } from 'node:crypto';
+import { judgePosts, criteria, judgeKeys } from '../copy/judge.js';
 import type { Check, CheckContext } from './types.js';
 
 function setup({ cwd }: CheckContext) {
@@ -49,7 +48,7 @@ export const checks: Check[] = [
       mkdirSync(join(posts, 'judge'), { recursive: true });
       for (let loop = 0; loop < 3; loop++) {
         writeFileSync(x, original + '\n'.repeat(loop));
-        writeFileSync(join(posts, 'judge/x.scores.json'), JSON.stringify({ sourceHash: createHash('sha256').update(readFileSync(x)).digest('hex'),
+        writeFileSync(join(posts, 'judge/x.scores.json'), JSON.stringify({ ...judgeKeys(ctx.cwd, 'x'),
           judge: 'selftest', scores: Object.fromEntries(criteria.map(c => [c, c === 'proof' ? 5 : 9])), reasons: ['proof: cite a metric'] }));
         statuses.push(judgePosts(ctx.cwd, ['x']).verdicts[0].status);
       }

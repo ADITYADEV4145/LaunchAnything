@@ -68,12 +68,23 @@ export function localScores(post: Post, channel: string, product: Product, cwd: 
 }
 
 const judgeDir = (posts: string) => join(posts, 'judge');
-function brief(cwd: string, channel: string, post: Post, sourceHash: string, product: Product) {
+function evidenceOf(post: Post, product: Product) {
   const g = grounded(product);
-  const evidence = (post.citations ?? []).map(c => {
+  return (post.citations ?? []).map(c => {
     const id = citationId(c, g) ?? '?', claim = g.claims.find(item => item.id === id);
     return '- "' + c.text + '" rests on ' + id + (claim ? ': ' + claim.text + (claim.sources?.length ? ' (' + claim.sources.map(s => s.ref).join(', ') + ')' : ' (no source)') : ' (unknown)');
   });
+}
+const sha = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
+
+/** Keys a separate judge's scores must carry: the draft file and the evidence it was shown. */
+export function judgeKeys(cwd: string, channel: string) {
+  const ctx = context(cwd, [channel]);
+  const source = readFileSync(join(ctx.paths.posts, channel + '.md'));
+  return { sourceHash: sha(source), evidenceHash: sha(evidenceOf(parsePost(source.toString('utf8')), ctx.product).join('\n')) };
+}
+
+function brief(cwd: string, channel: string, post: Post, sourceHash: string, evidenceHash: string, evidence: string[]) {
   const exemplars = loadExemplars(channel, cwd), feedback = blindFeedback(cwd, channel), guide = loadVoiceGuidelines();
   return ['# Judge brief: ' + channel,
     'You are the judge, not the writer. Score this draft against the rubric below, 0-10 each. Be strict: 8 means you would post it unchanged on ' + channel + '.',
@@ -86,15 +97,15 @@ function brief(cwd: string, channel: string, post: Post, sourceHash: string, pro
     'Link: ' + (post.link ? post.link + (post.linkFirstComment ? ' (posted as the first comment)' : '') : 'none in front matter'),
     '## Evidence behind the cited sentences', evidence.join('\n') || 'No citations: treat every factual claim as unsupported.',
     '## Your answer',
-    'Write .launch/posts/judge/' + channel + '.scores.json as JSON: {"sourceHash": "' + sourceHash + '", "judge": "<model or person>", "scores": {' + criteria.map(c => '"' + c + '": 0').join(', ') + '}, "reasons": ["<one line per score under 8: what to change>"]}',
+    'Write .launch/posts/judge/' + channel + '.scores.json as JSON: {"sourceHash": "' + sourceHash + '", "evidenceHash": "' + evidenceHash + '", "judge": "<model or person>", "scores": {' + criteria.map(c => '"' + c + '": 0').join(', ') + '}, "reasons": ["<one line per score under 8: what to change>"]}',
     'Then run liftoff judge again.'].join('\n\n') + '\n';
 }
 
-function modelScores(path: string, sourceHash: string): { scores: Scores; reasons: string[]; judge?: string } | undefined {
+function modelScores(path: string, sourceHash: string, evidenceHash: string): { scores: Scores; reasons: string[]; judge?: string } | undefined {
   if (!existsSync(path)) return;
   try {
     const data = JSON.parse(readFileSync(path, 'utf8'));
-    if (data.sourceHash !== sourceHash) return;
+    if (data.sourceHash !== sourceHash || data.evidenceHash !== evidenceHash) return;
     if (!criteria.every(c => Number.isFinite(data.scores?.[c]) && data.scores[c] >= 0 && data.scores[c] <= 10)) return;
     return { scores: Object.fromEntries(criteria.map(c => [c, Number(data.scores[c])])) as Scores,
       reasons: Array.isArray(data.reasons) ? data.reasons.map(String) : [], judge: typeof data.judge === 'string' ? data.judge : undefined };
@@ -117,11 +128,12 @@ export function judgePosts(cwd: string, selected?: string[]) {
     const path = join(ctx.paths.posts, channel + '.md');
     if (!existsSync(path)) { skipped.push(channel); continue; }
     const source = readFileSync(path);
-    const sourceHash = createHash('sha256').update(source).digest('hex');
+    const sourceHash = sha(source);
     const post = parsePost(source.toString('utf8'));
-    atomicWrite(cwd, join(dir, channel + '.md'), brief(cwd, channel, post, sourceHash, ctx.product));
+    const evidence = evidenceOf(post, ctx.product), evidenceHash = sha(evidence.join('\n'));
+    atomicWrite(cwd, join(dir, channel + '.md'), brief(cwd, channel, post, sourceHash, evidenceHash, evidence));
     const local = localScores(post, channel, ctx.product, cwd);
-    const model = modelScores(join(dir, channel + '.scores.json'), sourceHash);
+    const model = modelScores(join(dir, channel + '.scores.json'), sourceHash, evidenceHash);
     const scores = model?.scores ?? local.scores;
     const reasons = [...(model?.reasons ?? []), ...criteria.filter(c => scores[c] < threshold && !model)
       .map(c => c + ' ' + scores[c] + '/10'), ...(model ? [] : local.reasons)];

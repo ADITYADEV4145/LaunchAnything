@@ -7,7 +7,7 @@ import { checks } from '../src/selftest/phase2.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { checkPosts, inspectPost, parsePost } from '../src/copy/check.js';
 import { pickVariant, stripClaims } from '../src/copy/edit.js';
-import { judgePosts, criteria } from '../src/copy/judge.js';
+import { judgePosts, criteria, judgeKeys } from '../src/copy/judge.js';
 import { prepareBlindTest, recordBlindTest, tallyBlindTest, plainPrompt } from '../src/copy/blind-test.js';
 import { writeBriefs } from '../src/copy/write.js';
 import { loadExemplars, loadVoiceGuidelines } from '../src/copy/guides.js';
@@ -139,9 +139,8 @@ it('briefs carry the template, real exemplars and the opening pain', project(cwd
 it('judge gate rewrites up to three loops and then red-flags with reasons', project(async (cwd, posts) => {
   const judgeDir = join(posts, 'judge');
   const scores = (value: number) => {
-    const hash = createHash('sha256').update(readFileSync(join(posts, 'x.md'))).digest('hex');
     mkdirSync(judgeDir, { recursive: true });
-    writeFileSync(join(judgeDir, 'x.scores.json'), JSON.stringify({ sourceHash: hash, judge: 'test judge',
+    writeFileSync(join(judgeDir, 'x.scores.json'), JSON.stringify({ ...judgeKeys(cwd, 'x'), judge: 'test judge',
       scores: Object.fromEntries(criteria.map(c => [c, c === 'hook' ? value : 9])), reasons: ['hook: lead with the result'] }));
   };
   const first = judgePosts(cwd, ['x']);
@@ -252,9 +251,8 @@ it('does not accept an unsourced pain or proof as evidence for a number', projec
 }));
 
 it('counts one judge loop per draft version, whoever scored it', project((cwd, posts) => {
-  const hash = createHash('sha256').update(readFileSync(join(posts, 'x.md'))).digest('hex');
   expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ source: 'local', attempts: 1, status: 'rewrite' });
-  writeFileSync(join(posts, 'judge/x.scores.json'), JSON.stringify({ sourceHash: hash,
+  writeFileSync(join(posts, 'judge/x.scores.json'), JSON.stringify({ ...judgeKeys(cwd, 'x'),
     scores: Object.fromEntries(criteria.map(c => [c, 5])), reasons: [] }));
   expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ source: 'model', attempts: 1, status: 'rewrite' });
 }));
@@ -273,3 +271,13 @@ it('cites Part A pains by number with their quote URLs as sources', () => {
   expect(claims.find(c => c.id === 'pain:2')).toMatchObject({ text: expect.stringContaining('Launch posts take a day'), sources: [{ type: 'url', ref: 'https://a.test/1' }, { type: 'url', ref: 'https://a.test/2' }] });
   expect(claims.find(c => c.id === 'pain:1')?.text).toBe('Setup is slow.');
 });
+
+it('ignores judge scores given for older evidence', project((cwd, posts) => {
+  judgePosts(cwd, ['x']);
+  writeFileSync(join(posts, 'judge/x.scores.json'), JSON.stringify({ ...judgeKeys(cwd, 'x'), scores: Object.fromEntries(criteria.map(c => [c, 9])), reasons: [] }));
+  expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ source: 'model', status: 'pass' });
+  const path = join(cwd, '.launch/product.json'), product = JSON.parse(readFileSync(path, 'utf8'));
+  product.claims[0].text = 'The CLI now syncs tasks to a server.';
+  writeFileSync(path, JSON.stringify(product));
+  expect(judgePosts(cwd, ['x']).verdicts[0].source).toBe('local');
+}));

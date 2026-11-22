@@ -32,6 +32,7 @@ export function chromeLint(script: Script): Gate {
   return {id:'G4', name:'no-page-chrome', status:bad.length ? 'fail' : 'pass', detail:bad.length ? `${bad.join(', ')} contains counters or progress markers` : 'No counters or progress markers'};
 }
 export const endCardSeconds = 3;
+export const shortCutBudgetSeconds = 34.5;
 export function sceneDuration(scene: Scene, format = '16x9', storyboard = Boolean(scene.role)) { return format === '9x16' && storyboard ? scene.shortDuration ?? scene.duration * .5 : scene.duration; }
 export function totalDuration(script: Script, format = '16x9') { return script.scenes.reduce((n, s) => n + sceneDuration(s, format, script.scenes.some(scene => scene.role)), 0) + endCardSeconds; }
 export interface Shot { id: string; route: string; viewport: {width: number; height: number}; record?: boolean; theme?: 'light' | 'dark'; waitFor?: string; actions?: {type: string; selector: string; text?: string}[] }
@@ -78,7 +79,7 @@ export async function validateScript(cwd: string, data: unknown): Promise<Script
     const hookLimit = Math.max(3, minimumHookDuration(script.scenes[0].text));
     if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > hookLimit || sceneDuration(script.scenes[0], '9x16') > hookLimit || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds, extended only for minimum reading or narration time');
     const short = totalDuration(script, '9x16');
-    if (short < 20 || short > 35 + 1e-8) throw new Error('Short duration including end card must be 20–35 seconds');
+    if (short < 20 || short > shortCutBudgetSeconds + 1e-8) throw new Error(`Short duration including end card must be 20–${shortCutBudgetSeconds} seconds, reserving rendering headroom below 35 seconds`);
   }
   for (const scene of script.scenes) await resolveShot(cwd, scene.shot);
   return script;
@@ -102,7 +103,7 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
     const shortDuration = shot.purpose === 'hook' ? duration : Math.max(duration * .5, readingSeconds);
     scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
   }
-  let excess = totalDuration({scenes},'9x16') - 35;
+  let excess = totalDuration({scenes},'9x16') - shortCutBudgetSeconds;
   for (const scene of scenes) {
     if (excess <= 1e-8) break;
     if (scene.role === 'hook') continue;
@@ -111,7 +112,7 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
     scene.shortDuration! -= reduction;
     excess -= reduction;
   }
-  if (excess > 1e-8) throw new Error('Storyboard cannot fit the 35-second vertical limit at minimum reading and narration times; shorten captions or remove scenes');
+  if (excess > 1e-8) throw new Error(`Storyboard cannot fit the ${shortCutBudgetSeconds}-second vertical budget at minimum reading and narration times; shorten captions or remove scenes`);
   const script = await validateScript(cwd, { scenes });
   await mkdir(launchDir(cwd).video, { recursive: true });
   await writeFile(join(launchDir(cwd).video, 'script.json'), JSON.stringify(script, null, 2)); return script;

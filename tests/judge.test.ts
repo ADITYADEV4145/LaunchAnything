@@ -91,6 +91,14 @@ it('rejects stale per-asset vision hashes and allows valid scores to override ra
   expect(accepted.items.find(asset=>asset.file===item.file)!.scores!.readability).toBe(9);
 },120000);
 
+it('requires money provenance only for storyboards, not legacy image kits',async()=>{
+  const cwd=await fixture();
+  await rm(join(cwd,'.launch/media/images/report.json'));
+  await expect(judge(cwd)).rejects.toThrow('provenance must identify');
+  await rm(join(cwd,'.launch/shots.yaml'));
+  expect((await judge(cwd)).ok).toBe(true);
+},120000);
+
 it('fails non-money source provenance even with valid vision overrides',async()=>{
   const cwd=await fixture(); const initial=await judge(cwd); await overrides(cwd,initial.items);
   const path=join(cwd,'.launch/media/images/report.json'); const entries=JSON.parse(await readFile(path,'utf8'));

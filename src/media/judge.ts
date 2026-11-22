@@ -274,7 +274,7 @@ export async function judge(cwd: string, options: { heuristicOnly?: boolean; wri
       report.items.push(item);
     }
     const provenance = await optionalJson(join(paths.media,'images/report.json'));
-    for (const name of ['x.png','product-hunt-1.png']) {
+    for (const name of planned ? ['x.png','product-hunt-1.png'] : []) {
       if (!images.some(asset => asset.file === label(join(paths.media,'images',name)))) continue;
       const record = Array.isArray(provenance) ? provenance.find(item => item.file === name) : undefined;
       let correct = false;

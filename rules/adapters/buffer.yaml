@@ -1,1 +1,17 @@
-{"id":"buffer","name":"buffer","channels":["x","linkedin","tiktok","reels","shorts","instagram"],"envKeys":["BUFFER_ACCESS_TOKEN","BUFFER_API_KEY"],"mcpAliases":["buffer","buffer-mcp","mcp-buffer"],"priority":1}
+id: buffer
+name: Buffer
+priority: 1
+channels:
+  - x
+  - linkedin
+  - tiktok
+  - reels
+  - shorts
+  - instagram
+envKeys:
+  - BUFFER_ACCESS_TOKEN
+  - BUFFER_API_KEY
+mcpAliases:
+  - buffer
+  - buffer-mcp
+  - mcp-buffer

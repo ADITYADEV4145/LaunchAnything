@@ -1,1 +1,10 @@
-{"id":"email","name":"email","channels":["email"],"envKeys":[],"mcpAliases":["email","email-mcp","mcp-email"],"priority":5}
+id: email
+name: Email
+priority: 5
+channels:
+  - email
+envKeys: []
+mcpAliases:
+  - email
+  - email-mcp
+  - mcp-email

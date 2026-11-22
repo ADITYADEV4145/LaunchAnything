@@ -1,1 +1,9 @@
-{"id":"manual","name":"manual","channels":[],"envKeys":[],"mcpAliases":["manual","manual-mcp","mcp-manual"],"priority":6}
+id: manual
+name: Manual
+priority: 6
+channels: []
+envKeys: []
+mcpAliases:
+  - manual
+  - manual-mcp
+  - mcp-manual

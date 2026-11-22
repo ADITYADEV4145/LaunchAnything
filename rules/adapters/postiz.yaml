@@ -1,1 +1,16 @@
-{"id":"postiz","name":"postiz","channels":["x","linkedin","tiktok","reels","shorts","instagram"],"envKeys":["POSTIZ_API_KEY"],"mcpAliases":["postiz","postiz-mcp","mcp-postiz"],"priority":0}
+id: postiz
+name: Postiz
+priority: 0
+channels:
+  - x
+  - linkedin
+  - tiktok
+  - reels
+  - shorts
+  - instagram
+envKeys:
+  - POSTIZ_API_KEY
+mcpAliases:
+  - postiz
+  - postiz-mcp
+  - mcp-postiz

@@ -7,6 +7,7 @@ import { stringify } from 'yaml';
 import { registry, site } from '../src/core/registry.js';
 import { packageRoot } from '../src/core/package-root.js';
 import { adapterSelection } from '../src/adapters/index.js';
+import { loadAdapterMetadata } from '../src/adapters/metadata.js';
 import { publish } from '../src/adapters/publish.js';
 import { writeBriefs } from '../src/copy/write.js';
 import { checkPosts } from '../src/copy/check.js';
@@ -30,6 +31,27 @@ function add(cwd: string, value = definition(), name = 'betalist') {
 }
 const cli = (cwd: string, ...args: string[]) => spawnSync(process.execPath,
   ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args, '--cwd', cwd, '--json'], { encoding: 'utf8' });
+
+it('loads validated adapter display names and accepts an empty metadata directory', () => {
+  expect(loadAdapterMetadata().map(adapter => adapter.name)).toEqual([
+    'Postiz', 'Buffer', 'Ayrshare', 'GitHub Releases', 'DEV', 'Email', 'Manual',
+  ]);
+  expect(loadAdapterMetadata(temp())).toEqual([]);
+});
+
+it('reports adapter schema and YAML errors with the file path', () => {
+  const directory = temp(), path = join(directory, 'invalid.yaml');
+  writeFileSync(path, stringify({ id: 'buffer', name: 'Buffer', priority: -1,
+    channels: ['invalid channel'], envKeys: ['bad-key'], mcpAliases: [] }));
+  expect(() => loadAdapterMetadata(directory)).toThrow(path);
+  expect(() => loadAdapterMetadata(directory)).toThrow('/priority');
+  expect(() => loadAdapterMetadata(directory)).toThrow('/channels/0');
+  expect(() => loadAdapterMetadata(directory)).toThrow('/envKeys/0');
+  writeFileSync(path, 'id: [');
+  expect(() => loadAdapterMetadata(directory)).toThrow(path);
+  writeFileSync(path, '');
+  expect(() => loadAdapterMetadata(directory)).toThrow('must be object');
+});
 
 it('discovers and carries a single site through plan/write/check/review and approval-gated offline publish', async () => {
   const cwd = temp(); add(cwd);

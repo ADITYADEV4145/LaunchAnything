@@ -1,6 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { parse } from 'yaml';
-import { packageRoot } from '../core/package-root.js';
+import { loadAdapterMetadata } from './metadata.js';
 import { site } from '../core/registry.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -34,10 +32,7 @@ export interface PublishAdapter {
   cancel(channel: string, id: string, cwd?: string): Promise<AdapterStatus | undefined>;
 }
 
-interface Metadata { id: AdapterName; name: string; priority: number; channels: string[]; envKeys: string[]; mcpAliases: string[] }
-const metadata = readdirSync(join(packageRoot(), 'rules/adapters')).filter(f => f.endsWith('.yaml'))
-  .map(f => parse(readFileSync(join(packageRoot(), 'rules/adapters', f), 'utf8')) as Metadata)
-  .sort((a, b) => a.priority - b.priority);
+const metadata = loadAdapterMetadata();
 const integrations = metadata.filter(m => m.id !== 'manual').map(m => m.id);
 const accepts = (name: AdapterName, channel: string, cwd?: string) => {
   const target = site(channel, cwd);

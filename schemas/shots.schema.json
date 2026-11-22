@@ -12,6 +12,26 @@
         "type": "object",
         "properties": {
           "sources": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "purpose": { "enum": ["hook", "before", "action", "after", "proof", "cta"] },
+          "caption": { "type": "string", "pattern": "^\\s*(?:\\S+\\s+){0,11}\\S*\\s*$" },
+          "moneyMoment": { "type": "boolean" },
+          "element": { "type": "string", "minLength": 1 },
+          "highlight": {
+            "oneOf": [
+              { "type": "object", "properties": { "selector": { "type": "string", "minLength": 1 } }, "required": ["selector"], "additionalProperties": false },
+              { "type": "object", "properties": { "text": { "type": "string", "minLength": 1 } }, "required": ["text"], "additionalProperties": false },
+              { "type": "object", "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "width": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number", "exclusiveMinimum": 0 } }, "required": ["x", "y", "width", "height"], "additionalProperties": false }
+            ]
+          },
+          "themes": { "type": "array", "items": { "enum": ["light", "dark"] }, "minItems": 1, "uniqueItems": true },
+          "deviceScale": { "type": "number", "minimum": 1, "maximum": 3, "default": 2 },
+          "setup": { "type": "array", "items": { "type": "string" } },
+          "card": { "type": "boolean" },
+          "fontSize": { "type": "integer", "minimum": 1, "default": 32 },
+          "cols": { "type": "integer", "minimum": 1 },
+          "rows": { "type": "integer", "minimum": 1 },
+          "width": { "type": "integer", "minimum": 1 },
+          "height": { "type": "integer", "minimum": 1 },
           "commands": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
           "fullPage": { "type": "boolean" },
           "id": {
@@ -87,7 +107,7 @@
           "id",
           "viewport"
         ],
-        "anyOf": [{ "required": ["route"] }, { "required": ["commands"] }],
+        "anyOf": [{ "required": ["route"] }, { "required": ["commands"] }, { "required": ["card"], "properties": { "card": { "const": true } } }],
         "additionalProperties": false
       },
       "minItems": 1

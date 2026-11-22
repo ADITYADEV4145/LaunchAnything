@@ -72,7 +72,7 @@ it('discovers and carries a single site through plan/write/check/review and appr
   expect(createPlan(config, { cwd }).channels.map(c => c.id)).toContain('betalist');
   expect(writeBriefs(cwd, ['betalist']).briefs).toHaveLength(1);
   const file = join(cwd, '.launch/posts/betalist.md');
-  const copy = '---\nchannel: betalist\ntitle: Launch notes\nmedia: []\nclaims: []\n---\nA small local project for thoughtful people.\n';
+  const copy = '---\nchannel: betalist\ntitle: Launch notes\nmedia: []\nclaims: []\ncitations:\n  - { text: "A small local project for thoughtful people.", pain: 1 }\n---\nA small local project for thoughtful people.\n';
   writeFileSync(file, copy);
   expect(checkPosts(cwd, ['betalist']).issues).toEqual([]);
   writeFileSync(file, copy + 'guaranteed');

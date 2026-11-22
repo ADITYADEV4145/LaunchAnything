@@ -110,6 +110,29 @@ it('discovers user sites through LIFTOFF_HOME and caches separately per cwd', ()
   const other = temp(); add(other); expect(() => registry(other)).toThrow('collision');
 });
 
+it.each(['project', 'user'])('rejects reserved %s site IDs before check can overwrite or delete a draft', source => {
+  const cwd = temp();
+  let path: string;
+  if (source === 'project') path = add(cwd, definition('fix-list'));
+  else {
+    const home = temp(); mkdirSync(join(home, 'sites'));
+    path = join(home, 'sites/reserved.yaml');
+    writeFileSync(path, stringify(definition('fix-list')));
+    vi.stubEnv('LIFTOFF_HOME', home);
+  }
+  mkdirSync(join(cwd, '.launch/posts'), { recursive: true });
+  writeFileSync(join(cwd, '.launch/config.json'), JSON.stringify({ profile: 'devtool',
+    launchType: 'new-product', channels: ['fix-list'], timezone: 'UTC',
+    launchDate: '2026-07-14', profileConfirmed: true }));
+  cpSync(join(packageRoot(), 'fixtures/cli-tool/.liftoff-fixture/phase2/product.json'), join(cwd, '.launch/product.json'));
+  const draft = join(cwd, '.launch/posts/fix-list.md');
+  writeFileSync(draft, 'Keep this draft intact.');
+  expect(() => registry(cwd)).toThrow(path);
+  expect(() => registry(cwd)).toThrow('reserved site id fix-list');
+  expect(() => checkPosts(cwd)).toThrow('reserved site id fix-list');
+  expect(readFileSync(draft, 'utf8')).toBe('Keep this draft intact.');
+});
+
 it('preserves built-in MCP-before-env ordering and stages integration sites offline', async () => {
   const cwd = temp();
   expect((await adapterSelection('x', cwd, { BUFFER_API_KEY: 'fixture' })).reason).toBe('env:BUFFER_API_KEY');

@@ -13,6 +13,7 @@ export interface Site {
   source: 'built-in' | 'project' | 'user'; path: string;
 }
 const cache = new Map<string, Map<string, Site>>();
+const reservedIds = new Set(['fix-list']);
 const files = (dir: string) => existsSync(dir) ? readdirSync(dir).filter(f => /\.ya?ml$/.test(f)).sort().map(f => join(dir, f)) : [];
 const read = (path: string) => parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
 export function registry(cwd = process.cwd()) {
@@ -39,6 +40,7 @@ export function registry(cwd = process.cwd()) {
     const result = validateFile('site', data);
     if (!result.valid) throw new Error(path + ': ' + result.errors.join('; '));
     const id = String(data.id);
+    if (reservedIds.has(id)) throw new Error(path + ': reserved site id ' + id + ' (used for launch diagnostics)');
     if (sites.has(id)) throw new Error('Site collision ' + id + ': ' + sites.get(id)!.path + ' and ' + path);
     const site = data as unknown as Site;
     sites.set(id, { ...site, custom: true, route: site.route ?? 'manual', source, path,

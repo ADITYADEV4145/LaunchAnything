@@ -71,7 +71,8 @@ export async function validateScript(cwd: string, data: unknown): Promise<Script
   if (!modern && (script.scenes.length < 6 || script.scenes.some(scene => scene.text.trim().split(/\s+/).length > 8))) throw new Error('Legacy scripts require 6–10 scenes and captions of 1–8 words');
   if (duration < (modern ? 45 : 30) || duration > 60) throw new Error(`Total duration including the 3-second end card must be ${modern ? '45' : '30'}–60 seconds`);
   if (modern) {
-    if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > 3 || sceneDuration(script.scenes[0], '9x16') > 3 || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds');
+    const hookLimit = Math.max(3, Math.ceil((.5 + words(script.scenes[0].text).length / 3) * 12) / 12);
+    if (script.scenes[0].role !== 'hook' || script.scenes[0].duration > hookLimit || sceneDuration(script.scenes[0], '9x16') > hookLimit || script.scenes.slice(1).some(scene => scene.role === 'hook')) throw new Error('Hook must be first and at most 3 seconds, extended only for minimum reading time');
     const short = totalDuration(script, '9x16');
     if (short < 20 || short > 35) throw new Error('Short duration including end card must be 20–35 seconds');
   }
@@ -92,9 +93,9 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
     if (shot.commands && !shot.moneyMoment && !shot.card) {
       try { await access(join(launchDir(cwd).media, footage)); source = footage; } catch { /* Still captures remain valid scene sources. */ }
     }
-    const duration = shot.purpose === 'hook' ? 3 : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
     const readingSeconds = Math.ceil((.5 + words(shot.caption ?? '').length / 3) * 12) / 12;
-    const shortDuration = shot.purpose === 'hook' ? Math.min(3, Math.max(2, readingSeconds)) : Math.max(duration * .5, readingSeconds);
+    const duration = shot.purpose === 'hook' ? Math.max(3, readingSeconds) : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
+    const shortDuration = shot.purpose === 'hook' ? Math.max(3, readingSeconds) : Math.max(duration * .5, readingSeconds);
     scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
   }
   const script = await validateScript(cwd, { scenes });

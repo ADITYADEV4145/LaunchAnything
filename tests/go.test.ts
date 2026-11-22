@@ -75,6 +75,28 @@ it('retries exactly once then writes paste files and failed board entries', asyn
   expect(await readdir(join(paths.root, 'go-paste'))).toHaveLength(channels.length);
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
 }, 30000);
+it.each(['consent', 'approval'])('rechecks %s before a retry and never publishes after revocation', async kind => {
+  const { work, paths } = await fixture();
+  let attempts = 0;
+  const mock = mockAdapter();
+  const result = await go(work, { mock: true, confirm: true, yes: true, noWait: true, adapter: { async publish(context) {
+    if (context.post.channel !== 'x') return mock.publish(context);
+    attempts++;
+    if (kind === 'consent') {
+      const consent = await readConsent(paths.root, true);
+      consent.grants = consent.grants.filter(grant => grant.channel !== 'x');
+      await saveConsent(paths.root, consent, true);
+    } else {
+      const path = join(paths.root, 'approvals.mock.json');
+      const data = JSON.parse(await readFile(path, 'utf8'));
+      await writeFile(path, JSON.stringify({ approvals: data.approvals.filter((approval: any) => approval.channel !== 'x') }));
+    }
+    throw new Error('First attempt failed before publishing');
+  } } });
+  expect(attempts).toBe(1);
+  expect('board' in result && result.board?.find(row => row.channel === 'x')?.status).toBe('failed');
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts.some((post: any) => post.channel === 'x')).toBe(false);
+}, 30000);
 it('uses injectable clock/sleep to wait for each schedule slot', async () => {
   const { work } = await fixture(); let now = Date.parse('2026-09-25T12:59:00Z');
   const sleep = vi.fn(async (ms: number) => { now += ms; });

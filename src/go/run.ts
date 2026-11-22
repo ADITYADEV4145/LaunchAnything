@@ -126,6 +126,12 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
         if (!options.mock) await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
+            if (!(await readConsent(paths.root, options.mock)).grants.some(grant => sameScope(grant, scope)))
+              throw new Error('Standing consent revoked before attempt: ' + post.channel);
+            const current = options.mock ? validate<{ approvals: typeof approvals }>('approvals',
+              JSON.parse(await readOptional(join(paths.root, 'approvals.mock.json')) ?? '{"approvals":[]}'))
+              : await decisions(paths);
+            requireApproval(post, current.approvals, config.approvers);
             receipt = await adapter.publish({ post, connection, root: paths.root, notify: message => log('\u0007' + message) });
             if (receipt.status !== 'published' || !receipt.url || !/^https:\/\//.test(receipt.url)) throw new Error('No live URL returned');
             break;

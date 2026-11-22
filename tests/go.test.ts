@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -229,6 +229,33 @@ it('unverified PH/X/Kit publishing fails closed with the reason in the board and
   }
   const receipts = JSON.parse(await readFile(paths.published, 'utf8')).posts;
   expect(receipts.some((post: any) => ['product-hunt', 'x', 'email'].includes(post.channel))).toBe(false);
+}, 30000);
+it('accepts connected Kit API accounts and isolates missing or unsupported routes to their posts', async () => {
+  const { work, paths, channels } = await groundworkFixture();
+  const home = join(paths.root, 'test-connections');
+  await mkdir(home);
+  await writeFile(join(home, 'connections.json'), JSON.stringify(channels.filter(channel => channel !== 'x').map(channel => ({
+    platform: channel === 'email' ? 'kit' : channel,
+    route: ['show-hn', 'reddit'].includes(channel) ? 'browser' : channel === 'product-hunt' ? 'mcp' : 'api',
+    account: 'fixture-founder', profile: ['show-hn', 'reddit'].includes(channel) ? '/fixture/chrome' : undefined, connectedAt: ''
+  }))));
+  const seen: string[] = [], mock = mockAdapter();
+  const result = await go(work, { confirm: true, yes: true, phSubmit: true, home, now: () => new Date('2027-01-01T00:00:00Z'),
+    adapter: { async publish(context) {
+      seen.push(context.post.channel);
+      if (context.post.channel === 'email') expect(context.connection).toMatchObject({ platform: 'kit', route: 'api' });
+      return mock.publish(context);
+    } } });
+  if (!('board' in result) || !result.board) throw new Error('Missing board');
+  expect(seen).toContain('email');
+  for (const channel of ['x', 'linkedin']) {
+    const row = result.board.find(row => row.channel === channel)!;
+    expect(row.status).toBe('failed');
+    expect(await readFile(row.paste!, 'utf8')).toContain(channel === 'x' ? 'connect your own account' : 'go requires postiz');
+    expect(seen).not.toContain(channel);
+  }
+  expect(result.board.filter(row => row.status === 'live')).toHaveLength(6);
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toHaveLength(6);
 }, 30000);
 it('GroundWork CLI mock --confirm covers every route after chat approval and PH confirmation', async () => {
   const { work } = await groundworkFixture();

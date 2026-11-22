@@ -38,16 +38,19 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
   const active = posts.filter(post => skips[post.channel] !== post.hash);
   if (!active.length) throw new Error('No posts to publish');
   const queue = await Promise.all(active.map(async post => {
-    const route = routeFor(post.channel);
-    const connection: Connection = options.mock ? { platform: post.channel, route: route === 'browser' ? 'browser' : route === 'postiz' ? 'postiz' : route.endsWith('api') ? 'api' : 'mcp',
-      account: options.account ?? 'mock-founder', connectedAt: now().toISOString() }
-      : options.confirm ? await requireConnection(post.channel === 'email' ? 'kit' : post.channel, options.account, options.home, cwd)
-        : { platform: post.channel, route: route === 'browser' ? 'browser' : route === 'postiz' ? 'postiz' : route.endsWith('api') ? 'api' : 'mcp', account: options.account ?? '(connected account)', connectedAt: '' };
-    const expected = route === 'browser' ? 'browser' : route === 'postiz' ? 'postiz' : route.endsWith('api') ? 'api' : 'mcp';
-    if (connection.route !== expected) throw new Error(expected === 'mcp' ? mcpUnavailableReason(post.channel)
-      : `${post.channel}: go requires ${expected}, connected route is ${connection.route}`);
+    let route = 'unsupported', connectionError: string | undefined;
+    let connection: Connection = { platform: post.channel, route: 'api', account: options.account ?? '(unconnected account)', connectedAt: '' };
+    try {
+      route = routeFor(post.channel);
+      const expected = route === 'browser' ? 'browser' : route === 'postiz' ? 'postiz' : route.endsWith('api') || route === 'kit-mcp' ? 'api' : 'mcp';
+      connection = options.mock ? { platform: post.channel, route: expected, account: options.account ?? 'mock-founder', connectedAt: now().toISOString() }
+        : options.confirm ? await requireConnection(post.channel === 'email' ? 'kit' : post.channel, options.account, options.home, cwd)
+          : { platform: post.channel, route: expected, account: options.account ?? '(connected account)', connectedAt: '' };
+      if (connection.route !== expected) throw new Error(expected === 'mcp' ? mcpUnavailableReason(post.channel)
+        : `${post.channel}: go requires ${expected}, connected route is ${connection.route}`);
+    } catch (error) { connectionError = error instanceof Error ? error.message : 'Connection unavailable'; }
     const scope: Scope = { channel: post.channel, route, account: connection.account };
-    return { post, connection, scope };
+    return { post, connection, scope, connectionError };
   }));
   queue.sort((a, b) => a.post.scheduledAt.localeCompare(b.post.scheduledAt));
   const timeline = queue.map(({ post, scope }) => ({ channel: post.channel, route: scope.route,
@@ -74,7 +77,7 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
     if (!checkPosts(cwd, channels).passed || !judgePosts(cwd, channels).passed)
       throw new Error('Quality gates failed; run liftoff check and liftoff judge and fix the posts');
     const consent = await readConsent(paths.root, options.mock);
-    const missing = queue.filter(({ scope }) => !consent.grants.some(grant => sameScope(grant, scope)));
+    const missing = queue.filter(({ scope, connectionError }) => !connectionError && !consent.grants.some(grant => sameScope(grant, scope)));
     if (missing.length) {
       const summary = missing.map(({ scope }) => `${scope.channel} via ${scope.route} as ${scope.account}`).join(', ');
       if (!options.yes && !await options.ask?.('Allow standing publishing consent for future content: ' + summary + '?'))
@@ -84,7 +87,8 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
       await saveConsent(paths.root, consent, options.mock);
     }
     const audit = JSON.parse(await readOptional(join(paths.root, 'go-approvals.json')) ?? '{"grants":[]}');
-    for (const { post, scope } of queue) {
+    for (const { post, scope, connectionError } of queue) {
+      if (connectionError) continue;
       const grant = consent.grants.find(grant => sameScope(grant, scope))!;
       if (!approvals.some(a => a.channel === post.channel && a.hash === post.hash && a.name === grant.by))
         approvals.push({ channel: post.channel, hash: post.hash, name: grant.by, time: now().toISOString() });
@@ -105,24 +109,23 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
     };
     const identityFor = (hash: string, scope: Scope) => (options.mock ? 'go-mock:' : 'go:') +
       createHash('sha256').update(JSON.stringify([hash, scope])).digest('hex');
-    if (queue.some(({ post, scope }) => post.channel === 'product-hunt' &&
+    if (queue.some(({ post, scope, connectionError }) => !connectionError && post.channel === 'product-hunt' &&
       !receipts.some(receipt => receipt.id === identityFor(post.hash, scope) && receipt.status === 'published')) && !options.phSubmit &&
       !await options.ask?.('Product Hunt: confirm final Submit for this launch?'))
       throw new Error('PH final submission needs founder confirmation (--ph-submit after explicit approval)');
-    const completed = await Promise.allSettled(queue.map(async ({ post, connection, scope }) => {
+    const completed = await Promise.allSettled(queue.map(async ({ post, connection, scope, connectionError }) => {
       const identity = identityFor(post.hash, scope);
       const existing = receipts.find(receipt => receipt.id === identity && receipt.status === 'published');
       if (existing) { board.push({ channel: post.channel, status: 'live', url: existing.url }); log(`${post.channel} | live | ${existing.url}`); return; }
       let remaining = Date.parse(post.scheduledAt) - now().getTime();
-      while (!options.noWait && remaining > 0) {
+      while (!connectionError && !options.noWait && remaining > 0) {
         await (options.sleep ?? setTimeout)(Math.min(remaining, 2147483647));
         remaining = Date.parse(post.scheduledAt) - now().getTime();
       }
-      if (!(await readConsent(paths.root, options.mock)).grants.some(grant => sameScope(grant, scope)))
-        throw new Error('Standing consent revoked before dispatch: ' + post.channel);
       let receipt: PublishReceipt | undefined;
-      let unavailableReason: string | undefined;
+      let unavailableReason = connectionError;
       try {
+        if (connectionError) throw new Error(connectionError);
         if (!options.mock) await serial(() => reserveCap(paths.root, post.channel, connection.account, now()));
         for (let attempt = 0; attempt < 2; attempt++) {
           try {

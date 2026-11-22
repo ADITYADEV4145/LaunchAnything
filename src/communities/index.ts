@@ -63,7 +63,14 @@ export function scoreEvidence(e: Evidence, names: string[], quotes: string[], fo
   const painMentions = quoteUrls.length + fetchedUrls.length;
   const citedRules = e.rules;
   let selfPromotion: Verdict = 'unknown';
-  for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) { const found = citedRules.some(r => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(r.short_name + '\n' + r.description))); if (found) { selfPromotion = verdict; break; } }
+  for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) {
+    const found = citedRules.some(r => {
+      const text = r.short_name + '\n' + r.description;
+      const clauses = verdict === 'forbidden' ? [text] : text.replace(/\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi, url => ' ' + (/[).,;]+$/.exec(url)?.[0] ?? '')).split(/[.;!?\n,]+|\b(?:and|but|however)\b/i).filter(clause => rulebook.permission_scope!.some(s => new RegExp(s, 'i').test(clause)));
+      return clauses.some(clause => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(clause)));
+    });
+    if (found) { selfPromotion = verdict; break; }
+  }
   const text = e.rules.map(r => r.short_name + ' ' + r.description).join('\n');
   const karma = Math.max(0, ...[...text.matchAll(/(\d+)\s+(?:comment\s+)?karma/gi)].map(m => Number(m[1])));
   const age = Math.max(0, ...[...text.matchAll(/account\s+(?:must be\s+)?(?:at least\s+)?(\d+)\s+(days|months)/gi)].map(m => Number(m[1]) * (m[2]!.toLowerCase() === 'months' ? 30 : 1)));

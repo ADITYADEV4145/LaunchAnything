@@ -1,3 +1,5 @@
+permission_scope:
+  - '\b(?:self[- ]?promo(?:tion)?|promotions?|advertising|your\s+(?:own\s+)?(?:projects?|products?))\b'
 forbidden:
   - 'no self[- ]?promo'
   - 'no advertising'

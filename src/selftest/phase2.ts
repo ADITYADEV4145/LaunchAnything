@@ -18,7 +18,7 @@ function setup({ cwd }: CheckContext) {
 export const checks: Check[] = [
   { name: 'phase 2 briefs for every channel', run(ctx) {
     const { channels } = setup(ctx);
-    const result = writeBriefs(ctx.cwd);
+    const result = writeBriefs(ctx.cwd, channels);
     if (result.briefs.length !== channels.length || !result.briefs.every(existsSync)) throw new Error('Missing brief');
     for (const channel of channels) if (existsSync(join(ctx.cwd, '.launch/posts', channel + '.md'))) throw new Error('write generated a post');
   } },

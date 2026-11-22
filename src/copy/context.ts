@@ -10,6 +10,13 @@ export interface Product {
   name: string; features: {name: string; description: string}[];
   claims: {id: string; text: string; sources?: {type: string; ref: string}[]}[];
 }
+function plannedChannels(planPath: string, configured: string[]) {
+  if (!existsSync(planPath)) return undefined;
+  const rows = readFileSync(planPath, 'utf8').split(/\r?\n/).map(line => line.split('|').map(cell => cell.trim()))
+    .filter(cells => cells[0] === '' && /^\d{4}-\d{2}-\d{2}$/.test(cells[2] ?? ''));
+  const planned = rows.map(cells => cells[1]).filter(channel => configured.includes(channel));
+  return planned.length ? planned : undefined;
+}
 export function context(cwd: string, selected?: string[]) {
   const paths = launchDir(cwd);
   function read(kind: 'config' | 'product') {
@@ -20,7 +27,7 @@ export function context(cwd: string, selected?: string[]) {
   }
   const config = read('config') as {profile: string; channels: string[]; brandKit?: string};
   const product = read('product') as Product;
-  const channels = [...new Set(selected?.length ? selected : config.channels)];
+  const channels = [...new Set(selected?.length ? selected : plannedChannels(paths.plan, config.channels) ?? config.channels)];
   channels.forEach(loadPlatform);
   const profile = loadRule('profiles', config.profile);
   const brandPath = config.brandKit ? resolve(cwd, config.brandKit) : undefined;

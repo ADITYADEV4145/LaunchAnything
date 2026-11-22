@@ -30,7 +30,7 @@ export function estimate(cwd: string, stage = 'all', formatCount = stage === 'de
     } catch { warnings.push('Could not read scenes from .launch/video/script.json; assuming 6 scenes'); }
   }
   const xText = text('.launch/posts/x.md');
-  let xPost;
+  let xPost: ReturnType<typeof parsePost> | undefined;
   if (xText) {
     try { xPost = parsePost(xText); }
     catch { warnings.push('Could not parse .launch/posts/x.md; assuming one X post with a URL'); }

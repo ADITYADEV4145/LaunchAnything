@@ -96,7 +96,8 @@ describe('adoption', () => {
     await writeFile(join(cwd, '.launch/posts/x.md'), '---\ntitle: Draft\nclaims: []\nmedia: []\n---\nHello\n---\nSee https://example.test');
     const config = join(cwd, '.launch/config.json');
     await writeFile(config, JSON.stringify({ xApiCost: { create: 0.03, withUrl: 0.4 } }));
-    expect(estimate(cwd)).toMatchObject({ xPosts: 2, xApiUsd: 0.43 });
+    expect(estimate(cwd).xPosts).toBe(2);
+    expect(estimate(cwd).xApiUsd).toBeCloseTo(0.43);
     await writeFile(config, JSON.stringify({ xApiCost: { create: 0, withUrl: null } }));
     expect(estimate(cwd)).toMatchObject({ xPosts: 2, xApiUsd: null });
     expect(estimate(cwd).xPricing).toContain('cost unknown — set it in config');
@@ -119,6 +120,7 @@ describe('adoption', () => {
     expect(result.warnings).toHaveLength(2);
     expect(result.scenes).toBe(6);
     expect(printEstimate(cwd, 'write', true)).toMatchObject({ estimated: true, warnings: result.warnings });
+    await rm(join(cwd, '.launch/video/script.json'));
     const raw = execFileSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', '--cwd', cwd, 'video', 'script', '--json'], { encoding: 'utf8' });
     expect(JSON.parse(raw)).toMatchObject({ ok: true });
   }, 30000);

@@ -12,6 +12,7 @@ import { phases } from '../src/selftest/index.js';
 import { connect, connections } from '../src/connect/registry.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
 import { checkPosts } from '../src/copy/check.js';
+import { init } from '../src/product/init.js';
 
 const dirs: string[] = [];
 async function temp() { const dir = await mkdtemp(join(tmpdir(), 'liftoff-adopt-test-')); dirs.push(dir); return dir; }
@@ -48,7 +49,21 @@ describe('adoption', () => {
     await expect(importBrand(cwd, { site: 'file:///etc/passwd' })).rejects.toThrow('HTTP(S)');
   });
 
-  it.each(['file', 'directory'])('rejects a symlinked brand output %s without changing external files', async kind => {
+  it('feeds the image/copy brand kit before or after init without losing config', async () => {
+    const cwd = await temp(), html = join(cwd, 'site.html');
+    await writeFile(html, '<title>Brand</title><meta name="theme-color" content="#123456"><style>body {font-family: Inter}</style>');
+    await importBrand(cwd, { siteFile: html });
+    const first = await init(cwd, { yes: true, timezone: 'UTC' });
+    expect(first.config.brandKit).toBe('.launch/brand-kit.json');
+    const kit = JSON.parse(await readFile(join(cwd, first.config.brandKit!), 'utf8'));
+    expect(kit).toMatchObject({ name: 'Brand', colors: { accent: '#123456' }, fonts: { heading: 'Inter', body: 'Inter' } });
+    await writeFile(html, '<title>Updated</title>');
+    await importBrand(cwd, { siteFile: html });
+    expect(JSON.parse(await readFile(join(cwd, '.launch/config.json'), 'utf8'))).toEqual(first.config);
+    expect(JSON.parse(await readFile(join(cwd, first.config.brandKit!), 'utf8'))).toMatchObject({ name: 'Updated', colors: {}, fonts: {} });
+  });
+
+  it.each(['brand.json', 'brand-kit.json', 'config.json', 'directory'])('rejects a symlinked brand output %s without changing external files', async kind => {
     const cwd = await temp(), outside = await temp();
     const html = join(cwd, 'site.html'), external = join(outside, 'brand.json');
     await writeFile(html, '<title>Imported</title>');
@@ -56,7 +71,7 @@ describe('adoption', () => {
     if (kind === 'directory') await symlink(outside, join(cwd, '.launch'));
     else {
       await mkdir(join(cwd, '.launch'));
-      await symlink(external, join(cwd, '.launch/brand.json'));
+      await symlink(external, join(cwd, '.launch', kind));
     }
     await expect(importBrand(cwd, { siteFile: html })).rejects.toThrow('Unsafe symlink');
     expect(await readFile(external, 'utf8')).toBe('untouched');

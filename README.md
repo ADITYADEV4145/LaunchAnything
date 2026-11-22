@@ -37,7 +37,10 @@ tokens are read from environment variables, not recorded in configuration.
 `liftoff setup --site https://example.com` explicitly fetches HTML only (no linked
 resources); `--site-file ./site.html` imports offline. The imported `.launch/brand.json`
 contains best-effort name, description, icon/logo URL, OG image, inline theme colors and
-font families. Missing fields remain empty; external CSS and JavaScript are not run.
+font families. `.launch/brand-kit.json` adapts the first color to the image accent
+and first font to heading/body fonts. Import updates `config.brandKit` when initialized;
+otherwise the next `init` discovers it. Remote logo URLs remain metadata (no logo is
+downloaded). Missing fields retain image defaults; external CSS and JavaScript are not run.
 `--voice ./samples/*.md` delegates to `voice learn`. Next run `liftoff init`.
 
 `liftoff estimate [--stage write|video|publish|demo]` estimates agent input tokens

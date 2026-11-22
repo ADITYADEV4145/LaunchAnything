@@ -38,8 +38,22 @@ export async function importBrand(cwd: string, options: { site?: string; siteFil
   const checked = validateFile('brand', brand);
   if (!checked.valid) throw new Error(checked.errors.join('; '));
   const target = join(cwd, '.launch/brand.json');
-  assertSafePath(cwd, target);
+  const kitPath = join(cwd, '.launch/brand-kit.json');
+  const configPath = join(cwd, '.launch/config.json');
+  for (const path of [target, kitPath, configPath]) assertSafePath(cwd, path);
+  let config;
+  try {
+    config = JSON.parse(await readFile(configPath, 'utf8'));
+    const checked = validateFile('config', config);
+    if (!checked.valid) throw new Error(checked.errors.join('; '));
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  const kit = { ...brand,
+    colors: brand.colors.length ? { accent: brand.colors[0] } : {},
+    fonts: brand.fonts.length ? { heading: brand.fonts[0], body: brand.fonts[0] } : {},
+  };
   await mkdir(join(cwd, '.launch'), { recursive: true });
   atomicWrite(cwd, target, JSON.stringify(brand, null, 2) + '\n');
+  atomicWrite(cwd, kitPath, JSON.stringify(kit, null, 2) + '\n');
+  if (config) atomicWrite(cwd, configPath, JSON.stringify({ ...config, brandKit: '.launch/brand-kit.json' }, null, 2) + '\n');
   return brand;
 }

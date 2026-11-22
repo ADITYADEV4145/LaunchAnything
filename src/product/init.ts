@@ -63,6 +63,7 @@ export async function init(cwd: string, options: InitOptions = {}) {
     timezone: options.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     launchDate: options.date ?? new Date().toISOString().slice(0, 10),
     profileConfirmed: Boolean(options.yes || options.profile), approvers: [], redact: [],
+    ...(await optionalText(join(cwd, '.launch/brand-kit.json')) ? { brandKit: '.launch/brand-kit.json' } : {}),
   };
   validateConfig(config, cwd);
   await writeJson(paths.config, config, !options.force);

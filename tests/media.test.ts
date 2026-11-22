@@ -104,6 +104,17 @@ it('detects web frameworks or existing routes, preserves legacy validation and e
     expect((await planShots(cwd, { force: true })).kind).toBe('web');
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
+it('honors explicit money-moment routes without framework dependencies, even in CLI packages',async()=>{
+  const cwd=await repo({...product,money_moment:{route:'/editor',selector:'#result',after:'Export resolved'}});
+  try {
+    await writeFile(join(cwd,'package.json'),JSON.stringify({bin:{scope:'cli.js'}}));
+    const result=await planShots(cwd);
+    expect(result.kind).toBe('web');
+    expect(result.storyboard.shots.every(shot=>'route' in shot && shot.route==='/editor' && !('commands' in shot))).toBe(true);
+    expect(validateFile('shots',result.storyboard).valid).toBe(true);
+  } finally {await rm(cwd,{recursive:true,force:true});}
+});
+
 it('uses Part A before/action/after copy without executing the narrative action', async () => {
   const cwd = await repo({ ...product, money_moment: { before: 'An import references a missing export', action: 'Run the grounding check', after: 'BLOCK names the missing export' } });
   try {

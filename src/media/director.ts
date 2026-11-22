@@ -27,7 +27,7 @@ export async function planShots(cwd: string, options: { force?: boolean } = {}) 
   const pain = text(moment.before, product.problem?.summary, product.problem, summary);
   const after = text(moment.after, summary);
   const proof = text(moment.proof, product.proofPoints?.[0], typeof feature === 'string' ? feature : feature?.description, feature?.name, summary);
-  const web = existing.shots?.some((shot: { route?: string }) => shot.route) ||
+  const web = Boolean(text(moment.route)) || existing.shots?.some((shot: { route?: string }) => shot.route) ||
     (Boolean(pkg.scripts?.dev || pkg.scripts?.start) && Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).some(name => /^(?:next|vite|react-scripts|astro|remix|@remix-run\/.*|nuxt|sveltekit|@sveltejs\/kit)$/.test(name)));
   const commands = strings(moment.commands).length ? strings(moment.commands) : strings(moment.command);
   const setup = strings(moment.setup);

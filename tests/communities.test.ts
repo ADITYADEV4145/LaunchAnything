@@ -11,8 +11,48 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['only in', 'only on', 'only allowed in'].flatMap(phrase => [
+    `[this post](https://reddit.com/r/builders/comments/a/discussion)`,
+    `[the destination](https://reddit.com/r/builders/comments/a/discussion)`,
+    `[this post, please](https://reddit.com/r/builders/comments/a/discussion)`,
+    `[this post. Please read](https://reddit.com/r/builders/comments/a/discussion)`,
+    'https://reddit.com/r/builders/comments/a/discussion',
+    'this post', 'this thread', 'this megathread',
+  ].map(destination => `Self-promotion is allowed ${phrase} ${destination}`)))('never plans a standalone post for an exclusive promotion destination: %s', async description => {
+    const cwd = await setup(); const rules = [{ short_name: 'Posting', description }];
+    const limit = restrictions(rules, 'UTC'); expect(limit.megathread).toBe(true);
+    if (!limit.threadUrl) { expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow(); }
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); expect(result.valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    if (limit.manualReview) {
+      expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]);
+      expect(result.markdown).toContain('## Needs manual review\n- r/builders:');
+      expect(result.markdown).toContain(`> Posting: ${description}`);
+    } else {
+      expect(report.plan).toHaveLength(1); expect(report.plan[0].destination).toBe(`megathread: ${limit.threadUrl}`);
+    }
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it.each(['Self-promotion', 'Promotion', 'Advertising', 'Your own project', 'Your product'].flatMap(short_name => ['Follow 9:1', 'Be considerate. Follow 9:1'].map(description => ({ short_name, description }))))('inherits promotion scope from the title: %j', async rule => {
+    const cwd = await setup(); const rules = [rule];
+    expect(scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC')).toMatchObject({ selfPromotion: 'restricted', citedRules: rules });
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    expect((await reportCommunities(cwd)).valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual(['builders']); expect(report.plan).toHaveLength(1);
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it('does not inherit promotion scope between different rules', () => {
+    const rules = [{ short_name: 'Self-promotion', description: 'Be considerate' }, { short_name: 'Jobs', description: 'Follow 9:1' }];
+    expect(scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC').selfPromotion).toBe('unknown');
+  });
+  it('fails closed for a linked exclusive destination scoped by the promotion title', () => {
+    const rules = [{ short_name: 'Self-promotion', description: 'Only in [this post](https://reddit.com/r/builders/comments/a/discussion)' }];
+    expect(restrictions(rules, 'UTC')).toMatchObject({ megathread: true, manualReview: 'Unresolved thread destination; manual review required' });
+  });
   it.each(['Job listings: 10% maximum', 'Job listings follow a 9:1 ratio', 'Jobs only in the megathread', 'Jobs only on Saturday', 'Jobs need flair', 'Show off', 'Self-promotion; job listings: 10% maximum', 'Job listings: 10% maximum. Self-promotion', 'Self-promotion and job listings: 10% maximum', 'Job listings: 10% maximum https://example.com/. Self-promotion', 'Job listings: 10% maximum www.example.com/promotion', 'Job listings: 10% maximum example.com/promotion'])('does not infer promotion permission from an unrelated clause: %s', async description => {
-    const cwd = await setup(); const rules = [{ short_name: 'Promotion', description }];
+    const cwd = await setup(); const rules = [{ short_name: 'Posting', description }];
     const scored = scoreEvidence({ ...fixture[0]!, rules }, ['pain tracking'], [], {}, 'UTC');
     expect(scored).toMatchObject({ selfPromotion: 'unknown', citedRules: rules });
     const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
@@ -493,7 +533,7 @@ describe('communities', () => {
     'https://www.reddit.com/r/builders/about/rules.json', '[rules](https://example.org/Europe/Paris?at=6pm)',
     'www.example.org/Europe/Paris?at=6pm', 'example.org/Europe/Paris?at=6pm',
   ])('ignores references rather than treating them as rule times or zones: %s', async reference => {
-    const description = `Only on Sunday at 9am ET ${reference}`; const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
+    const description = `On Sunday at 9am ET; see ${reference}`; const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
     expect(limit.manualReview).toBeUndefined(); expect(limit.timezone).toBe('America/New_York'); expect(postingSlot('2026-01-04', limit, 'UTC').time).toBe('14:00');
     const cwd = await setup(); const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, file);
     const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));

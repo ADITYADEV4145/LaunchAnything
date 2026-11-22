@@ -66,7 +66,8 @@ export function scoreEvidence(e: Evidence, names: string[], quotes: string[], fo
   for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) {
     const found = citedRules.some(r => {
       const text = r.short_name + '\n' + r.description;
-      const clauses = verdict === 'forbidden' ? [text] : text.replace(/\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi, url => ' ' + (/[).,;]+$/.exec(url)?.[0] ?? '')).split(/[.;!?\n,]+|\b(?:and|but|however)\b/i).filter(clause => rulebook.permission_scope!.some(s => new RegExp(s, 'i').test(clause)));
+      const promotionTitle = rulebook.permission_scope!.some(s => new RegExp(s, 'i').test(r.short_name));
+      const clauses = verdict === 'forbidden' ? [text] : text.replace(/\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi, url => ' ' + (/[).,;]+$/.exec(url)?.[0] ?? '')).split(/[.;!?\n,]+|\b(?:and|but|however)\b/i).filter(clause => promotionTitle || rulebook.permission_scope!.some(s => new RegExp(s, 'i').test(clause)));
       return clauses.some(clause => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(clause)));
     });
     if (found) { selfPromotion = verdict; break; }

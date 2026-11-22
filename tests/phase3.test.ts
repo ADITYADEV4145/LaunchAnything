@@ -195,6 +195,36 @@ it('accepts a non-2xx base response or the first working shot route for readines
     await expect(takeShots(cwd)).rejects.toThrow('App readiness timeout');
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(cwd, { recursive: true, force: true }); }
 }, 30000);
+it('retains only current unselected shots on subset captures and replaces full manifests', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'phase3-manifest-'));
+  const server = createServer((_, res) => { res.end('<h1>Current capture</h1>'); });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const dir = join(cwd, '.launch/media/shots');
+    await mkdir(dir, { recursive: true });
+    const shots = ['selected', 'retained'].map(id => ({ id, route: '/', viewport: { width: 400, height: 300 } }));
+    await writeFile(join(cwd, '.launch/shots.yaml'), JSON.stringify({ baseUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}`, shots }));
+    const manifestPath = join(dir, 'manifest.json');
+    const oldManifest = [{ id: 'selected', marker: 'stale capture' }, { id: 'retained', marker: 'keep this capture' }, { id: 'removed', marker: 'removed from spec' }];
+    for (const options of [{ ids: new Set(['selected']) }, { only: 'selected' }]) {
+      await writeFile(manifestPath, JSON.stringify(oldManifest));
+      const captured = await takeShots(cwd, options);
+      expect(captured.map(s => s.id)).toEqual(['selected']);
+      const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+      expect(manifest.map((s: { id: string }) => s.id).sort()).toEqual(['retained', 'selected']);
+      expect(manifest.find((s: { id: string }) => s.id === 'retained')).toEqual(oldManifest[1]);
+      expect(manifest.find((s: { id: string }) => s.id === 'selected')).not.toHaveProperty('marker');
+    }
+    await writeFile(manifestPath, JSON.stringify(oldManifest));
+    await takeShots(cwd);
+    const full = JSON.parse(await readFile(manifestPath, 'utf8'));
+    expect(full.map((s: { id: string }) => s.id)).toEqual(['selected', 'retained']);
+    expect(full.every((s: { marker?: string }) => !s.marker)).toBe(true);
+    await writeFile(manifestPath, 'invalid old manifest');
+    await takeShots(cwd);
+    expect(JSON.parse(await readFile(manifestPath, 'utf8'))).toHaveLength(2);
+  } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(cwd, { recursive: true, force: true }); }
+}, 30000);
 it('rejects missing input, empty shot lists and invalid image options', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'phase3-errors-'));
   try {

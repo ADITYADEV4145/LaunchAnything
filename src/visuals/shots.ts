@@ -18,7 +18,10 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
   let config: { redact?: string[] } = {}; try { config = JSON.parse(await readFile(paths.config, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
   const dir = join(paths.media, 'shots'); await mkdir(dir, { recursive: true });
   let previous: { id: string }[] = [];
-  try { previous = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+  if (options.ids || options.only) {
+    try { previous = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+    previous = previous.filter(s => spec.shots.some(shot => shot.id === s.id) && !selected.some(shot => shot.id === s.id));
+  }
   let stop = () => {}; let url = options.url ?? spec.baseUrl;
   const app = await browser(); const manifest = [];
   try {
@@ -76,6 +79,6 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
         manifest.push({ id: shot.id, kind: shot.commands ? 'terminal' : shot.viewport.width < 600 ? 'mobile' : 'web', files, width, height, redactedCount, secretsFound: 0, ocr });
       } finally { await page.close(); }
     }
-    await writeFile(join(dir, 'manifest.json'), JSON.stringify([...previous.filter(s => !selected.some(next => next.id === s.id)), ...manifest], null, 2)); return manifest;
+    await writeFile(join(dir, 'manifest.json'), JSON.stringify([...previous, ...manifest], null, 2)); return manifest;
   } finally { stop(); await app.close(); }
 }

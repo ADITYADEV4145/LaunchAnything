@@ -15,8 +15,8 @@ export async function narrationFiles(cwd: string, scenes: { voiceover?: string }
   }));
 }
 
-export async function voice(cwd: string, options: { dryRun?: boolean } = {}) {
-  const script = await loadScript(cwd);
+export async function voice(cwd: string, options: { dryRun?: boolean; formats?: readonly string[] } = {}) {
+  const script = await loadScript(cwd,options.formats);
   const id = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}`;
   const requests = script.scenes.flatMap((scene, index) => scene.voiceover?.trim() ? [{ index, url, method: 'POST', body: { text: scene.voiceover, model_id: 'eleven_multilingual_v2' } }] : []);

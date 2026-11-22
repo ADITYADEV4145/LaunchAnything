@@ -6,6 +6,7 @@ import { chromeLint, loadScript, readcheck, sceneDuration, scriptFromShots, shor
 import * as polishing from '../src/media/polish.js';
 import { checkProbe, endCardGate, motionGates, transcriptCoverage, voiceGate } from '../src/video/check.js';
 import { run } from '../src/video/render.js';
+import { voice } from '../src/video/voice.js';
 
 const dirs: string[] = [];
 async function fixture(source: string, duration = 4) {
@@ -169,5 +170,22 @@ describe('video gates',() => {
         await rm(binary);
       }
     } finally { process.env.PATH = previous; }
+  },30000);
+  it('validates pacing and voices only requested cuts, including CLI --format',async()=>{
+    const cwd=await mkdtemp(join(tmpdir(),'video-selected-pacing-')); dirs.push(cwd);
+    await mkdir(join(cwd,'.launch/media'),{recursive:true});
+    await mkdir(join(cwd,'.launch/video'));
+    await writeFile(join(cwd,'.launch/media/real.png'),'captured image');
+    const roles=['hook','before','after','cta'] as const;
+    const data={style:'paper',scenes:roles.map((role,index)=>({role,shot:'real.png',text:'Keep work private',voiceover:'Keep work private',duration:index===0?2:15,shortDuration:index===0?.5:17}))};
+    await writeFile(join(cwd,'.launch/video/script.json'),JSON.stringify(data));
+    for(const selected of [['16x9'],['1x1']]) {
+      await expect(validateScript(cwd,data,selected)).resolves.toEqual(data);
+      expect((await voice(cwd,{dryRun:true,formats:selected})).requests).toHaveLength(4);
+    }
+    await expect(validateScript(cwd,data,['9x16'])).rejects.toThrow('paper pacing');
+    await expect(voice(cwd,{dryRun:true,formats:['9x16']})).rejects.toThrow('paper pacing');
+    const cli=JSON.parse((await run(process.execPath,['--import','tsx','src/cli.ts','--cwd',cwd,'--json','video','--format','16x9','voice','--dry-run'])).stdout);
+    expect(cli.ok).toBe(true); expect(cli.data.requests).toHaveLength(4);
   },30000);
 });

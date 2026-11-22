@@ -69,10 +69,10 @@ export async function validateScript(cwd: string, data: unknown, selected: reado
   const result = validateFile('video-script', data);
   if (!result.valid) throw new Error(result.errors.join('; '));
   const script = data as Script;
-  const style = await loadStyle(cwd,script.style);
-  if ((style.id !== 'midnight' || style.custom) && script.scenes.some(scene => [scene.duration, ...(scene.role ? [sceneDuration(scene,'9x16',true)] : [])].some(duration => duration < style.pacing.min || duration > style.pacing.max))) throw new Error(`Scene duration outside ${style.id} pacing (${style.pacing.min}–${style.pacing.max}s)`);
-  const duration = totalDuration(script);
   const modern = script.scenes.some(scene => scene.role);
+  const style = await loadStyle(cwd,script.style);
+  if ((style.id !== 'midnight' || style.custom) && script.scenes.some(scene => selected.map(format => sceneDuration(scene,format,modern)).some(duration => duration < style.pacing.min || duration > style.pacing.max))) throw new Error(`Scene duration outside ${style.id} pacing (${style.pacing.min}–${style.pacing.max}s)`);
+  const duration = totalDuration(script);
   if (!modern && (script.scenes.length < 6 || script.scenes.some(scene => scene.text.trim().split(/\s+/).length > 8))) throw new Error('Legacy scripts require 6–10 scenes and captions of 1–8 words');
   if (duration < (modern ? 45 : 30) || duration > 60) throw new Error(`Total duration including the 3-second end card must be ${modern ? '45' : '30'}–60 seconds`);
   if (modern) {

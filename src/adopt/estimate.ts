@@ -1,31 +1,60 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { defaultXApiCost, xCost } from '../connect/costs.js';
 import { parsePost } from '../copy/check.js';
 
 export function estimate(cwd: string, stage = 'all', formatCount = stage === 'demo' ? 1 : 3) {
   if (!['all', 'write', 'video', 'publish', 'demo'].includes(stage)) throw new Error('Stage must be all, write, video, publish or demo');
-  const text = (path: string) => existsSync(join(cwd, path)) ? readFileSync(join(cwd, path), 'utf8') : '';
+  const warnings: string[] = [];
+  const text = (path: string) => {
+    try { return readFileSync(join(cwd, path), 'utf8'); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') warnings.push(`Could not read ${path}`);
+      return '';
+    }
+  };
   const plan = text('.launch/plan.md');
   const channels = [...new Set([...plan.matchAll(/^\| ([a-z][a-z-]*) \| \d{4}-/gm)].map(m => m[1]))];
-  const posts = existsSync(join(cwd, '.launch/posts')) ? readdirSync(join(cwd, '.launch/posts')).filter(f => f.endsWith('.md')).map(f => text('.launch/posts/' + f)).join('\n') : '';
+  let posts = '';
+  try { posts = readdirSync(join(cwd, '.launch/posts')).filter(f => f.endsWith('.md')).map(f => text('.launch/posts/' + f)).join('\n'); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') warnings.push('Could not read .launch/posts'); }
   const inputTokens = Math.ceil((text('README.md') + text('.launch/product.json') + text('.launch/brief.md') + posts).length / 4);
   const outputTokens = channels.length * 600;
   const script = text('.launch/video/script.json');
-  const scenes = script ? (JSON.parse(script).scenes?.length ?? 0) : 6;
+  let scenes = 6;
+  if (script) {
+    try {
+      const data: unknown = JSON.parse(script);
+      if (!data || typeof data !== 'object' || !('scenes' in data) || !Array.isArray(data.scenes)) throw new Error('Invalid scenes');
+      scenes = data.scenes.length;
+    } catch { warnings.push('Could not read scenes from .launch/video/script.json; assuming 6 scenes'); }
+  }
   const xText = text('.launch/posts/x.md');
-  const xPost = xText ? parsePost(xText) : undefined;
+  let xPost;
+  if (xText) {
+    try { xPost = parsePost(xText); }
+    catch { warnings.push('Could not parse .launch/posts/x.md; assuming one X post with a URL'); }
+  }
   const parts = xPost ? xPost.body.split(/\r?\n---\r?\n/) : [''];
   const xPosts = channels.includes('x') ? parts.length : 0;
   const rates = parts.map(body => xCost({ title: xPost?.title ?? '', body, ...(!xPost ? { link: 'https://example.test' } : xPost.link ? { link: xPost.link } : {}) }));
-  return { stage, estimated: true, inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, channels,
+  return { stage, estimated: true, warnings, inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, channels,
     xPosts, xApiUsd: channels.includes('x') ? rates.reduce((sum, rate) => sum + (rate.includes('(with URL)') ? defaultXApiCost.withUrl : defaultXApiCost.create), 0) : 0,
     xPricing: rates,
     renderSeconds: scenes * formatCount * 2, scenes, formats: formatCount,
     assumptions: `Estimates only: chars/4 input tokens; 600 output tokens/channel; 2s/scene/format conservative render heuristic (bundled 6-scene square demo measured ~3–6s on Linux; hardware dependent), ${formatCount} formats. X direct API rates; no API or LLM calls.` };
 }
 export function printEstimate(cwd: string, stage: string, json?: boolean, formatCount?: number) {
-  const result = estimate(cwd, stage, formatCount);
-  if (!json) console.log(`Estimate: ~${result.totalTokens} agent tokens; X API ~$${result.xApiUsd.toFixed(3)}; render ~${result.renderSeconds}s (estimates only).`);
-  return result;
+  try {
+    const result = estimate(cwd, stage, formatCount);
+    if (!json) {
+      console.log(`Estimate: ~${result.totalTokens} agent tokens; X API ~$${result.xApiUsd.toFixed(3)}; render ~${result.renderSeconds}s (estimates only).`);
+      for (const warning of result.warnings) console.warn(`Estimate: ${warning}`);
+    }
+    return result;
+  } catch {
+    const result = { stage, estimated: false, warnings: ['Estimate unavailable; could not read estimation inputs'] };
+    if (!json) console.warn(result.warnings[0]);
+    return result;
+  }
 }

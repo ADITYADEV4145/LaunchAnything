@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { setup } from '../src/adopt/setup.js';
 import { importBrand, parseBrand } from '../src/adopt/brand.js';
-import { estimate } from '../src/adopt/estimate.js';
+import { estimate, printEstimate } from '../src/adopt/estimate.js';
 import { demo } from '../src/adopt/demo.js';
 import { telemetry, recordEvent, sanitizeEvent } from '../src/adopt/telemetry.js';
 import { phases } from '../src/selftest/index.js';
@@ -72,6 +72,20 @@ describe('adoption', () => {
     expect(estimate(cwd)).toEqual(estimate(cwd));
     expect(() => estimate(cwd, 'unknown')).toThrow('Stage');
   });
+
+  it('reports malformed optional inputs without blocking an unrelated command', async () => {
+    const cwd = await temp();
+    await mkdir(join(cwd, '.launch/video'), { recursive: true });
+    await mkdir(join(cwd, '.launch/posts'));
+    await writeFile(join(cwd, '.launch/video/script.json'), '{broken');
+    await writeFile(join(cwd, '.launch/posts/x.md'), '---\ninvalid: [\n---\nDraft');
+    const result = estimate(cwd, 'write');
+    expect(result.warnings).toHaveLength(2);
+    expect(result.scenes).toBe(6);
+    expect(printEstimate(cwd, 'write', true)).toMatchObject({ estimated: true, warnings: result.warnings });
+    const raw = execFileSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', '--cwd', cwd, 'video', 'script', '--json'], { encoding: 'utf8' });
+    expect(JSON.parse(raw)).toMatchObject({ ok: true });
+  }, 30000);
 
   it('defaults telemetry off, strips untrusted keys and respects opt-outs', async () => {
     const cwd = await temp(); vi.stubEnv('LIFTOFF_HOME', cwd); vi.stubEnv('DO_NOT_TRACK', ''); vi.stubEnv('LIFTOFF_TELEMETRY', '');

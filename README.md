@@ -200,10 +200,10 @@ type (no alpha), grounded caption length, ≥6% safe margins, clearance above th
 device, ≥4.5:1 rendered-pixel contrast and visible caption ink, unchanged captures,
 unchanged exported files, complete gallery order, and the banned-content OCR guard.
 OCR is reported skipped if Tesseract is unavailable. Check writes `store/check.json`
-Exports are staged and checked before replacing the entire gallery; failed renders
-or checks leave the previous PNGs, manifest and check report untouched.
 with pass/fail/skipped gates and fails on any failed gate. Re-export after changing
-captures or caption/claim references. Receipts are local provenance checks, not
+captures or caption/claim references. Exports are staged and checked before replacing
+the entire gallery; failed renders or checks leave the previous PNGs, manifest and
+check report untouched. Receipts are local provenance checks, not
 tamper-proof signatures. **App Store Connect and Google Play upload are out of
 scope: review screenshots and upload manually.**
 

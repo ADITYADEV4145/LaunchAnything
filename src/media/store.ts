@@ -216,7 +216,8 @@ export async function exportStore(cwd:string,targets:StoreTarget[]=parseStoreTar
     }
     await writeFile(join(dir,'manifest.json'),JSON.stringify(report,null,2));
     const checks=await checkStoreDirectory(cwd,dir);
+    await app.close(); app=undefined;
     await publishStore(dir,join(paths.media,'store'),paths.media);
     return {manifest:report,checks};
-  } finally {await app?.close();await rm(dir,{recursive:true,force:true});}
+  } finally {try {await app?.close();} finally {await rm(dir,{recursive:true,force:true});}}
 }

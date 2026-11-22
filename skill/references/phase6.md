@@ -46,6 +46,21 @@ T+1 and T+3 follow-ups need measured data from those checkpoints. The T+7 email 
 
 The repurposing plan records proposed local dates and times for LinkedIn, a carousel, and a vertical clip. Supply actual published `copy` on candidate posts to get text and a `repurpose-media.json` brief; pair the frames with real footage and review the resulting media before scheduling anything.
 
+To render drafts, run `liftoff results` first, then make a separate sources file for the selected post. Match the brief's channel, post ID and caption order. Supply one image per frame, relative to `.launch/media/` (PNG, JPEG or WebP). The clip uses that same image unless you supply a local `clip` (MP4 or WebM):
+
+```json
+{
+  "channel": "x",
+  "postId": "the-recorded-post-id",
+  "frames": [
+    { "image": "polished/overview.png" },
+    { "image": "polished/demo.png", "clip": "demo.mp4" }
+  ]
+}
+```
+
+Run `liftoff results --repurpose-media media-sources.json` with the same checkpoint and metrics input. This requires Chrome, Tesseract and FFmpeg/ffprobe. The PNGs, vertical MP4, image report and clip receipt are saved in a new `repurpose-assets-*` folder under that checkpoint, with paths in the CLI result and brief. The command does not change original launch assets or schedule posts. Check the selected footage for sensitive material and review the exports before approval.
+
 For Liftoff's own judge, preserve `.launch/posts/judge.json` for the drafts you actually published. Copy the verdict's `sourceHash` into `judgeSourceHash` on the corresponding channel and live post ID in the metrics import. Results uses the exact channel and draft hash, not the latest score for that channel alone. It compares the recorded aggregates with measured outcomes and suggests a conservative adjustment to the weights used to judge those drafts. If the weights differ across the linked verdicts, it records the scores without suggesting new weights.
 
 Review the checkpoint's `judge-calibration.json` before running `liftoff learn`. The next `liftoff judge` uses saved weights for that profile and rubric version in its reported 0–100 aggregate; every individual criterion must still score at least 8/10. Use `--history <file>` to select the same isolated history as `liftoff learn`.

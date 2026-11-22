@@ -1,8 +1,15 @@
 {
   "name": "Trailnote",
   "oneLiner": "A pocket trail journal with a simple daily note screen.",
-  "audience": "Walkers keeping a daily trail journal",
-  "problem": "Keep a small daily workflow understandable without complex setup.",
+  "audience": {
+    "who": "Walkers keeping a daily trail journal",
+    "where": [],
+    "uses": []
+  },
+  "problem": {
+    "summary": "Keep a small daily workflow understandable without complex setup.",
+    "pains": []
+  },
   "proofPoints": [
     "Includes a focused working interface",
     "Source is available in the repository",
@@ -31,5 +38,20 @@
         }
       ]
     }
-  ]
+  ],
+  "proof": [
+    {
+      "metric": "fixture benchmark checks",
+      "value": 1,
+      "unit": "checks",
+      "context": "Synthetic fixture benchmark, not a real product performance claim",
+      "source_file": ".launch/proof/fixture.json",
+      "source_pointer": "/results/checks"
+    }
+  ],
+  "money_moment": {
+    "before": "Manual fixture check",
+    "action": "Run fixture benchmark",
+    "after": "Recorded fixture check"
+  }
 }

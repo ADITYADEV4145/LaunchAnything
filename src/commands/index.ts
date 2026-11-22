@@ -1,4 +1,5 @@
 import { register as adapters } from './adapters.js';
+import { register as proof } from './proof.js';
 import { register as init } from './init.js';
 import { register as brief } from './brief.js';
 import { register as scan } from './scan.js';
@@ -30,6 +31,6 @@ import { register as audience } from './audience.js';
 export function registerCommands(program: Command) {
   adapters(program);
   voice(program);
-  for (const register of [research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
+  for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

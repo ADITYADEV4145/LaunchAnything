@@ -62,7 +62,9 @@ it('reports adapter schema and YAML errors with the file path', () => {
 });
 
 it('discovers and carries a single site through plan/write/check/review and approval-gated offline publish', async () => {
-  const cwd = temp(); add(cwd);
+  const cwd = temp();
+  cpSync(join(packageRoot(), 'fixtures/cli-tool'), cwd, { recursive: true });
+  add(cwd);
   const config = { profile: 'devtool', launchType: 'new-product', channels: ['betalist', 'x'],
     timezone: 'UTC', launchDate: '2026-07-14', profileConfirmed: true };
   writeFileSync(join(cwd, '.launch/config.json'), JSON.stringify(config));

@@ -18,8 +18,16 @@ it('reflows real output for phone and landscape targets without losing identifie
       const result=await renderTerminal(app,{text,highlight:'BLOCK'},{...target,minCapHeight:target.frame*target.floor,title:'Scope',accent:'#77e5b3'});
       expect(result.width).toBeLessThanOrEqual(target.width);expect(result.height).toBeLessThanOrEqual(target.height);
       expect(result.terminal.columns).toBeLessThanOrEqual(target.columns);
+      expect(result.terminal.capHeight).toBeGreaterThanOrEqual(target.frame*target.floor);
+      const box=result.terminal.box;
+      expect((box.x-1)/result.width).toBeGreaterThanOrEqual(.025);
+      expect((box.x-1)/result.width).toBeLessThanOrEqual(.03);
+      expect(result.width-box.x-box.width).toBe(box.x);
       expect(result.highlight).toBeDefined();
       const ocr=await ocrWords(result.png);
+      const body=ocr.words.filter(word=>word.y>=box.y-2&&word.y+word.height<=box.y+box.height+2);
+      expect(Math.min(...body.map(word=>word.x))/result.width).toBeGreaterThanOrEqual(.025);
+      expect(Math.max(...body.map(word=>word.x+word.width))).toBeLessThanOrEqual(result.width-box.x+2);
       expect(terminalCapHeight(ocr.words,target.frame,result.terminal.box)).toBeGreaterThanOrEqual(target.floor-.0005);
       expect(ocr.text).toContain('money.ts');expect(ocr.text).toContain('formatPrice');
     }

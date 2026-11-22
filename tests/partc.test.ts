@@ -256,3 +256,10 @@ it('counts one judge loop per draft version, whoever scored it', project((cwd, p
     scores: Object.fromEntries(criteria.map(c => [c, 5])), reasons: [] }));
   expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ source: 'model', attempts: 1, status: 'rewrite' });
 }));
+
+it('judge fails while drafts are missing or flagged', project((cwd, posts) => {
+  rmSync(join(posts, 'reddit.md'));
+  const result = judgePosts(cwd, ['x', 'reddit']);
+  expect(result.skipped).toEqual(['reddit']);
+  expect(result.passed).toBe(false);
+}));

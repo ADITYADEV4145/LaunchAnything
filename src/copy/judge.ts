@@ -131,6 +131,6 @@ export function judgePosts(cwd: string, selected?: string[]) {
   const fixes = join(dir, 'fixes.md');
   atomicWrite(cwd, fixes, rewrite.length ? '# Judge rewrite list\n\n' + rewrite.map(v => '## ' + v.channel + ' (loop ' + v.attempts + ' of ' + maxLoops + ')\n'
     + v.reasons.map(r => '- ' + r).join('\n')).join('\n\n') + '\n' : '# Judge rewrite list\n\nNothing to rewrite.\n');
-  return { passed: verdicts.every(v => v.status === 'pass'), verdicts, skipped, rewrite: rewrite.map(v => v.channel),
+  return { passed: !skipped.length && verdicts.every(v => v.status === 'pass'), verdicts, skipped, rewrite: rewrite.map(v => v.channel),
     flagged: verdicts.filter(v => v.status === 'flagged').map(v => v.channel), fixes };
 }

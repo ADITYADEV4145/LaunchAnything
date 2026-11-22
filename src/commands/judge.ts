@@ -8,8 +8,8 @@ export function register(program: Command) {
       const options = commandOptions(command);
       try {
         const result = judgePosts(options.cwd ?? process.cwd(), command.opts().channel);
-        if (result.rewrite.length) process.exitCode = 1;
-        if (options.json) console.log(JSON.stringify({ ok: !result.rewrite.length, command: 'judge', data: result }));
+        if (!result.passed) process.exitCode = 1;
+        if (options.json) console.log(JSON.stringify({ ok: result.passed, command: 'judge', data: result }));
         else output('judge', result);
       } catch (error) { output('judge', undefined, options.json, String(error)); }
     });

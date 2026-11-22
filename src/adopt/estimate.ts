@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { defaultXApiCost, xCost } from '../connect/costs.js';
+import { xCost, xCostDetails, type XApiCost } from '../connect/costs.js';
 import { parsePost } from '../copy/check.js';
 
 export function estimate(cwd: string, stage = 'all', formatCount = stage === 'demo' ? 1 : 3) {
@@ -37,10 +37,32 @@ export function estimate(cwd: string, stage = 'all', formatCount = stage === 'de
   }
   const parts = xPost ? xPost.body.split(/\r?\n---\r?\n/) : [''];
   const xPosts = channels.includes('x') ? parts.length : 0;
-  const rates = parts.map(body => xCost({ title: xPost?.title ?? '', body, ...(!xPost ? { link: 'https://example.test' } : xPost.link ? { link: xPost.link } : {}) }));
+  let pricing: XApiCost = {};
+  const config = text('.launch/config.json');
+  if (config) {
+    try {
+      const data = JSON.parse(config);
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid config');
+      if (data.xApiCost !== undefined) {
+        if (!data.xApiCost || typeof data.xApiCost !== 'object' || Array.isArray(data.xApiCost)) throw new Error('Invalid pricing');
+        pricing = data.xApiCost;
+      }
+    } catch {
+      warnings.push('Could not read X API pricing from .launch/config.json; cost unknown');
+      pricing = { create: null, withUrl: null };
+    }
+  }
+  const rates = channels.includes('x') ? parts.map(body => {
+    const post = { title: xPost?.title ?? '', body, ...(!xPost ? { link: 'https://example.test' } : xPost.link ? { link: xPost.link } : {}) };
+    try { return { label: xCost(post, pricing), amount: xCostDetails(post, pricing).amount }; }
+    catch {
+      warnings.push('Invalid X API cost configuration; cost unknown');
+      return { label: 'cost unknown — set it in config', amount: null };
+    }
+  }) : [];
   return { stage, estimated: true, warnings, inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, channels,
-    xPosts, xApiUsd: channels.includes('x') ? rates.reduce((sum, rate) => sum + (rate.includes('(with URL)') ? defaultXApiCost.withUrl : defaultXApiCost.create), 0) : 0,
-    xPricing: rates,
+    xPosts, xApiUsd: rates.some(rate => rate.amount === null) ? null : rates.reduce((sum, rate) => sum + rate.amount!, 0),
+    xPricing: rates.map(rate => rate.label),
     renderSeconds: scenes * formatCount * 2, scenes, formats: formatCount,
     assumptions: `Estimates only: chars/4 input tokens; 600 output tokens/channel; 2s/scene/format conservative render heuristic (bundled 6-scene square demo measured ~3–6s on Linux; hardware dependent), ${formatCount} formats. X direct API rates; no API or LLM calls.` };
 }
@@ -48,7 +70,7 @@ export function printEstimate(cwd: string, stage: string, json?: boolean, format
   try {
     const result = estimate(cwd, stage, formatCount);
     if (!json) {
-      console.log(`Estimate: ~${result.totalTokens} agent tokens; X API ~$${result.xApiUsd.toFixed(3)}; render ~${result.renderSeconds}s (estimates only).`);
+      console.log(`Estimate: ~${result.totalTokens} agent tokens; X API ${result.xApiUsd === null ? 'cost unknown' : '~$' + result.xApiUsd.toFixed(3)}; render ~${result.renderSeconds}s (estimates only).`);
       for (const warning of result.warnings) console.warn(`Estimate: ${warning}`);
     }
     return result;

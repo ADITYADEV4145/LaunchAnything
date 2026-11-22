@@ -89,6 +89,26 @@ describe('adoption', () => {
     expect(() => estimate(cwd, 'unknown')).toThrow('Stage');
   });
 
+  it('uses configured X prices and preserves explicitly unknown or invalid prices', async () => {
+    const cwd = await temp();
+    await mkdir(join(cwd, '.launch/posts'), { recursive: true });
+    await writeFile(join(cwd, '.launch/plan.md'), '| x | 2026-09-25 |');
+    await writeFile(join(cwd, '.launch/posts/x.md'), '---\ntitle: Draft\nclaims: []\nmedia: []\n---\nHello\n---\nSee https://example.test');
+    const config = join(cwd, '.launch/config.json');
+    await writeFile(config, JSON.stringify({ xApiCost: { create: 0.03, withUrl: 0.4 } }));
+    expect(estimate(cwd)).toMatchObject({ xPosts: 2, xApiUsd: 0.43 });
+    await writeFile(config, JSON.stringify({ xApiCost: { create: 0, withUrl: null } }));
+    expect(estimate(cwd)).toMatchObject({ xPosts: 2, xApiUsd: null });
+    expect(estimate(cwd).xPricing).toContain('cost unknown — set it in config');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    printEstimate(cwd, 'publish');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('cost unknown'));
+    await writeFile(config, JSON.stringify({ xApiCost: { create: -1 } }));
+    expect(estimate(cwd)).toMatchObject({ xApiUsd: null, warnings: ['Invalid X API cost configuration; cost unknown'] });
+    await writeFile(config, '{broken');
+    expect(estimate(cwd)).toMatchObject({ xApiUsd: null, warnings: ['Could not read X API pricing from .launch/config.json; cost unknown'] });
+  });
+
   it('reports malformed optional inputs without blocking an unrelated command', async () => {
     const cwd = await temp();
     await mkdir(join(cwd, '.launch/video'), { recursive: true });

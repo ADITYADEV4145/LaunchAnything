@@ -14,7 +14,7 @@ import { mediaBrand, mediaFrame, mediaHost } from './assets.js';
 import { assertClean, ocrWords } from './banned.js';
 
 export const storeTargets = {
-  'appstore-6.9': {width:1290,height:2796}, 'appstore-6.5': {width:1242,height:2688},
+  'appstore-6.9': {width:1320,height:2868}, 'appstore-6.5': {width:1242,height:2688},
   play: {width:1080,height:1920}, 'product-hunt': {width:1270,height:760},
   og: {width:1200,height:630}, x: {width:1600,height:900},
 } as const;

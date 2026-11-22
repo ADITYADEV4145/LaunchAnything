@@ -178,7 +178,7 @@ Legacy shots without new fields retain their original rendering path.
 
 `shots export` uses the real capture manifest and storyboard, shares media polish's
 phone/browser/terminal frames, and puts the money moment first. It defaults to all
-six targets: `appstore-6.9` (1290×2796), `appstore-6.5` (1242×2688), `play`
+six targets: `appstore-6.9` (1320×2868), `appstore-6.5` (1242×2688), `play`
 (1080×1920), `product-hunt` (1270×760), `og` (1200×630), and `x` (1600×900).
 Select a comma list with `--targets`; `--style midnight` is the default video-style
 palette and typography. Brand colors/logo apply to the shared device frame.

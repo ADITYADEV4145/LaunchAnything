@@ -47,7 +47,7 @@ describe('store screenshot pure gates',()=>{
     expect(parseStoreTargets()).toEqual(Object.keys(storeTargets));
     expect(parseStoreTargets('og,play,og')).toEqual(['og','play']);
     for(const value of ['',',','unknown','og,','toString','../og']) expect(()=>parseStoreTargets(value)).toThrow('Targets');
-    expect(Object.values(storeTargets)).toEqual([{width:1290,height:2796},{width:1242,height:2688},{width:1080,height:1920},{width:1270,height:760},{width:1200,height:630},{width:1600,height:900}]);
+    expect(Object.values(storeTargets)).toEqual([{width:1320,height:2868},{width:1242,height:2688},{width:1080,height:1920},{width:1270,height:760},{width:1200,height:630},{width:1600,height:900}]);
   });
   it('resolves sourced claim ids and feature names without inventing or shortening copy',()=>{
     expect(groundedCaption(product,{claim:'local'})).toEqual({claim:'local',caption:'Keep work private'});

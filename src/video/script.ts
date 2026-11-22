@@ -94,8 +94,8 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
       try { await access(join(launchDir(cwd).media, footage)); source = footage; } catch { /* Still captures remain valid scene sources. */ }
     }
     const readingSeconds = Math.ceil((.5 + words(shot.caption ?? '').length / 3) * 12) / 12;
-    const duration = shot.purpose === 'hook' ? Math.max(3, readingSeconds) : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
-    const shortDuration = shot.purpose === 'hook' ? Math.max(3, readingSeconds) : Math.max(duration * .5, readingSeconds);
+    const duration = shot.purpose === 'hook' ? readingSeconds : Math.round(base[shot.purpose!] / weight * 44 * 12) / 12;
+    const shortDuration = shot.purpose === 'hook' ? readingSeconds : Math.max(duration * .5, readingSeconds);
     scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
   }
   const script = await validateScript(cwd, { scenes });

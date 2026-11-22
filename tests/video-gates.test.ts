@@ -66,6 +66,22 @@ describe('video gates',() => {
     expect(endCardGate(script,6.26).status).toBe('fail');
     expect(endCardGate(script,NaN).status).toBe('fail');
   });
+  it('keeps a readable short hook within a near-cap vertical storyboard',async()=>{
+    const cwd=await mkdtemp(join(tmpdir(),'video-hook-cap-')); dirs.push(cwd);
+    await mkdir(join(cwd,'.launch/media/polished'),{recursive:true});
+    const roles=['hook','before','action','after','proof','proof','proof','proof','proof','cta'];
+    const shots=roles.map((purpose,index)=>({id:`${purpose}-${index}`,purpose,card:true,moneyMoment:purpose==='after',viewport:{width:800,height:600},caption:purpose==='hook'?'Private':purpose==='cta'?'Keep work private':'Keep every local change safely stored on your device'}));
+    await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots}));
+    await writeFile(join(cwd,'.launch/media/polished/frame.png'),'captured image');
+    vi.spyOn(polishing,'polish').mockResolvedValue(shots.map(shot=>({id:shot.id,file:'frame.png',theme:'light'})) as never);
+    const generated=await scriptFromShots(cwd);
+    expect(generated.scenes[0].duration).toBeCloseTo(5/6);
+    expect(generated.scenes[0].shortDuration).toBe(generated.scenes[0].duration);
+    expect(totalDuration(generated,'9x16')).toBeGreaterThan(34);
+    expect(totalDuration(generated,'9x16')).toBeLessThanOrEqual(35);
+    expect(totalDuration(generated,'9x16')+3-generated.scenes[0].duration).toBeGreaterThan(35);
+    for(const format of ['16x9','9x16']) expect(readcheck({scenes:generated.scenes.map(scene=>({...scene,duration:sceneDuration(scene,format,true)}))}).status).toBe('pass');
+  });
   it('normalizes transcription words and skips absent audio',async () => {
     expect(transcriptCoverage('Hello, WORLD!','hello world')).toBe(1);
     expect(transcriptCoverage('one two three four five','one two three four')).toBe(.8);

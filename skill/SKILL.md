@@ -64,6 +64,10 @@ authors or sync signup data. See [phase0b.md](references/phase0b.md).
 
 Run `liftoff doctor --json` before starting. Prefer relevant installed skills or MCP
 tools, but missing optional integrations must not block the built-in planning path.
+For media, inspect versions, requiredFor and installHint: Tesseract and Chrome are
+required for storyboards; FFmpeg/ffprobe for animations and videos. VHS is optional
+(HTML fallback when absent), but an installed VHS requires ttyd. Never download
+tools without the user's permission merely because doctor reports them missing.
 
 ## init
 
@@ -105,8 +109,11 @@ Later-phase agents must read brief.md as their single messaging source.
 ## selftest gates
 
 Run `liftoff selftest --through 1` to exercise all three fixture repositories.
-Phase 5 also has fixture checks. Higher cumulative gates still fail at the
-unimplemented phases 2–4 (and phase 6).
+Run `liftoff selftest --through 7 --json` for the cumulative gate, including Part D
+on cli-tool and saas-next. It renders real fixture captures and both video cuts,
+checks exact dimensions/five carousel slides, rejects unsafe frames with cleanup,
+and runs the heuristic judge. Phase 7 is the dedicated slower media regression
+gate; through 6 retains the baseline workflow. No voice API or GroundWork run is included.
 
 ## write and check — phase 2
 
@@ -116,11 +123,44 @@ max, then a red flag). See references/phase2.md and scripts/blind-test.md.
 
 ## shots and images — phase 3
 
-Future: capture real product screenshots, redact secrets and compose launch images.
+Run `liftoff shots plan` from product.json money_moment, then review its 4–8 shots
+against the repository. Keep exactly one moneyMoment; replace every TODO command
+or route. `--force` deliberately replaces an existing plan. Keep setup hidden and
+never display fixture/tmp paths, pipes, credentials or debug output. Capture with
+`liftoff shots` (`--url` for a running web app), then `liftoff media polish` and
+`liftoff images` (which also polishes). Do not invent UI or product claims.
+
+Polished media and platform images use corner logo/wordmark branding. Set a local
+config.brandKit file (logo/colors/music), or media/logo.*; otherwise the product
+name is used. Images use the polished money moment; PH gets a gallery and IG gets
+five slides. Legacy shots without new fields keep the old rendering path.
+
+Run `liftoff media judge --json` after images and again after video. It safety-scans
+all images, raw captures and 1-fps video frames, scoring publishable images and
+rendered frames only. Read judge/report.json and view every contact sheet under
+.launch/media/judge/. Fix scores below 8; never weaken banned/provenance checks.
+For vision review, `--write-vision-template` writes current per-asset hashes.
+After actually viewing the assets, fill honest scores and save as vision.json.
+Valid SHA-256-bound scores override heuristics; stale hashes fail, and safety or
+money-moment provenance cannot be overridden. `--heuristic-only` is for local
+heuristic checks. Review gates finished media before human approval.
 
 ## video — phase 4
 
-Future: render real-footage demos and vertical cuts with optional-tool fallbacks.
+For a storyboard, run `liftoff video script --from-shots`, optionally `liftoff video voice --dry-run` then `liftoff video voice` (ElevenLabs key required), and `liftoff video --renderer ffmpeg`. Music defaults to a local generated pad; use `--music <file>` or `brandKit.music` to supply a bed. With Remotion installed, run `npx skills add remotion-dev/skills` and follow its video-shotcraft recipes; the same roles, branding, captions and highlights are passed to both renderers. No voice key means captions-only, not an error.
+
+Long cuts are 45–60s; vertical cuts 20–35s. Use `--format 16x9,9x16` and run
+`liftoff video check` for the same formats. Legacy scripts retain 30–60s. Never
+request new credentials: without a provisioned key, report captions-only.
+
+For standalone composition without shots.yaml, import renderCarousel from
+`launch-liftoff/dist/media/platform-images.js` and renderClip from
+`launch-liftoff/dist/video/clip.js`. Both need product.json and local sources.
+Carousel takes `{role, caption, source?}[]` and `{size?, outDir?, prefix?}`, returning
+`{files, report}`. Clip takes `{role?, caption, source, duration}[]` and
+`{format?, music?, voice?, outFile?, renderer?}`, returning `{file, duration, receipt}`.
+Voice is an indexed array of local audio paths. Clip uses supplied durations plus
+a three-second end card; neither renderer calls an API. See README's media section.
 
 ## review and publish — phase 5
 

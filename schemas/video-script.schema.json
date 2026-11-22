@@ -15,12 +15,15 @@
           "text": {
             "type": "string",
             "minLength": 1,
-            "pattern": "^\\S+(?:\\s+\\S+){0,7}$"
+            "pattern": "^\\S+(?:\\s+\\S+){0,11}$"
           },
           "duration": {
             "type": "number",
             "exclusiveMinimum": 0
           },
+          "role": { "enum": ["hook", "before", "action", "after", "proof", "cta"] },
+          "shortDuration": { "type": "number", "exclusiveMinimum": 0 },
+          "highlight": { "type": "object", "properties": { "x": {"type":"number", "minimum":0}, "y": {"type":"number", "minimum":0}, "width": {"type":"number", "exclusiveMinimum":0}, "height": {"type":"number", "exclusiveMinimum":0} }, "required": ["x", "y", "width", "height"], "additionalProperties": false },
           "voiceover": {
             "type": "string",
             "minLength": 1
@@ -33,12 +36,16 @@
         ],
         "additionalProperties": false
       },
-      "minItems": 6,
+      "minItems": 4,
       "maxItems": 10
     }
   },
   "required": [
     "scenes"
   ],
+  "allOf": [{
+    "if": { "properties": { "scenes": { "contains": { "required": ["role"] } } } },
+    "else": { "properties": { "scenes": { "minItems": 6, "items": { "properties": { "text": { "pattern": "^\\S+(?:\\s+\\S+){0,7}$" } } } } } }
+  }],
   "additionalProperties": false
 }

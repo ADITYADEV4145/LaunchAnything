@@ -16,6 +16,7 @@ import { register as write } from './write.js';
 import { register as check } from './check.js';
 import { register as shots } from './shots.js';
 import { register as images } from './images.js';
+import { register as media } from './media.js';
 import { register as video } from './video.js';
 import { register as review } from './review.js';
 import { register as publish } from './publish.js';
@@ -41,6 +42,6 @@ export function registerCommands(program: Command) {
   go(program);
   for (const register of [bench, setup, demo, estimate, telemetry]) register(program);
   voice(program);
-  for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, judge, drafts, shots, images, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
+  for (const register of [proof, research, audience, init, scan, validate, plan, brief, doctor, selftest, write, check, judge, drafts, shots, images, media, video, review, publish, results, learn, receipt, prelaunch, connect]) register(program);
   for (const register of [warroom, friends, followup, retro, release]) register(program);
 }

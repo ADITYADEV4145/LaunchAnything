@@ -7,7 +7,7 @@ import { validateFile } from '../core/schema.js';
 import { browser, runTerminal, start, escapeHtml, CaptureError } from './runtime.js';
 import { assertPrivate } from './privacy.js';
 import { guard, gif, ocrCheck } from './capture.js';
-interface Shot { id: string; route?: string; commands?: string[]; viewport: { width: number; height: number }; theme?: 'light' | 'dark'; record?: boolean; fullPage?: boolean; waitFor?: string; actions?: { type: string; selector: string; text?: string }[] }
+import { captureModernShot, modernShot, type MediaShot as Shot } from './modern-shot.js';
 export async function takeShots(cwd: string, options: { url?: string; command?: string; only?: string; ids?: Set<string> } = {}) {
   const paths = launchDir(cwd);
   const spec = parse(await readFile(paths.shots, 'utf8')) as { shots: Shot[]; baseUrl?: string; startCommand?: string; readyTimeoutMs?: number };
@@ -15,17 +15,20 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
   const selected = spec.shots.filter(s => (!options.only || s.id === options.only) && (!options.ids || options.ids.has(s.id)));
   if (!selected.length) throw new Error('No matching shots');
   if (new Set(spec.shots.map(s => s.id)).size !== spec.shots.length || spec.shots.some(s => !/^[\w-]+$/.test(s.id))) throw new Error('Shot IDs must be unique safe filenames');
-  let config: { redact?: string[] } = {}; try { config = JSON.parse(await readFile(paths.config, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+  let config: { redact?: string[]; brandKit?: string } = {}; try { config = JSON.parse(await readFile(paths.config, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
   const dir = join(paths.media, 'shots'); await mkdir(dir, { recursive: true });
   let previous: { id: string }[] = [];
   if (options.ids || options.only) {
     try { previous = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
     previous = previous.filter(s => spec.shots.some(shot => shot.id === s.id) && !selected.some(shot => shot.id === s.id));
+    await writeFile(join(dir,'manifest.json'),JSON.stringify(previous,null,2));
+  } else {
+    await rm(join(dir,'manifest.json'),{force:true});
   }
   let stop = () => {}; let url = options.url ?? spec.baseUrl;
   const app = await browser(); const manifest = [];
   try {
-    if (selected.some(s => !s.commands)) {
+    if (selected.some(s => !s.commands && !s.card)) {
       if (!url) {
         let dev = false; try { dev = Boolean(JSON.parse(await readFile(join(cwd, 'package.json'), 'utf8')).scripts?.dev); } catch { /* no package */ }
         const command = options.command ?? spec.startCommand ?? (dev ? 'npm run dev' : undefined);
@@ -33,7 +36,7 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
         url = 'http://127.0.0.1:3000'; stop = start(command, cwd);
       }
       const deadline = Date.now() + (spec.readyTimeoutMs ?? 30000);
-      const readyUrls = [...new Set([url, new URL(selected.find(s => !s.commands)!.route!, url).href])];
+      const readyUrls = [...new Set([url, new URL(selected.find(s => !s.commands && !s.card)!.route!, url).href])];
       while (true) {
         let ready = false;
         for (const candidate of readyUrls) {
@@ -45,6 +48,9 @@ export async function takeShots(cwd: string, options: { url?: string; command?: 
       }
     }
     for (const shot of selected) {
+      if (spec.shots.some(s => s.purpose) || modernShot(shot)) {
+        manifest.push(await captureModernShot(cwd, shot, app, dir, url, config)); continue;
+      }
       const pngPath = join(dir, `${shot.id}.png`); const gifPath = join(dir, `${shot.id}.gif`);
       await Promise.all([rm(pngPath, { force: true }), rm(gifPath, { force: true })]);
       const page = await app.newPage({ viewport: shot.viewport, colorScheme: shot.theme ?? 'light', deviceScaleFactor: 1 });

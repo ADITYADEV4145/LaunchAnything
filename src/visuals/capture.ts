@@ -7,7 +7,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const { GIFEncoder, quantize, applyPalette } = createRequire(import.meta.url)('gifenc') as typeof import('gifenc');
-export async function guard(page: Page, selectors: string[]) {
+export async function guard(page: Page, selectors: string[], inspect?: (text: string) => void) {
   let redactedCount = 0;
   const covered = new Set<Frame>();
   const depth = (frame: Frame): number => frame.parentFrame() ? 1 + depth(frame.parentFrame()!) : 0;
@@ -63,6 +63,7 @@ export async function guard(page: Page, selectors: string[]) {
     } catch {
       throw new Error('Privacy guard: unable to inspect frame; redact its iframe element or a containing element before capture');
     }
+    inspect?.(result.text); inspect?.(result.textContent);
     assertPrivate(result.text); assertPrivate(result.textContent); redactedCount += result.redactedCount;
   }
   return redactedCount;

@@ -6,6 +6,8 @@ import { browser, escapeHtml } from './runtime.js';
 import { platforms, checkImage, compositeColor, type Size } from './check.js';
 import { assertPrivate } from './privacy.js';
 import { ocrCheck } from './capture.js';
+import { storyboard } from '../media/assets.js';
+import { storyboardImages } from '../media/platform-images.js';
 async function optionalJson(path: string) { try { return JSON.parse(await readFile(path, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {}; throw e; } }
 async function dataImage(path: string) { const extension = extname(path).slice(1); return `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${(await readFile(path)).toString('base64')}`; }
 async function fallback(cwd: string): Promise<string | undefined> {
@@ -17,6 +19,7 @@ async function fallback(cwd: string): Promise<string | undefined> {
   }
 }
 export async function makeImages(cwd: string, options: { template?: string; size?: string; headline?: string } = {}) {
+  if (await storyboard(cwd)) return storyboardImages(cwd, options);
   const paths = launchDir(cwd); const product = JSON.parse(await readFile(paths.product, 'utf8'));
   const config = await optionalJson(paths.config); const brand = config.brandKit ? await optionalJson(resolve(cwd, config.brandKit)) : {};
   const colors = { background: '#101827', foreground: '#ffffff', accent: '#77e5b3', ...brand.colors };

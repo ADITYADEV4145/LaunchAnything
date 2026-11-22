@@ -12,6 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { citationId, grounded, spanPattern } from '../copy/citations.js';
 import type { Product } from '../copy/context.js';
 import { readJudgments, criteria, threshold, maxLoops, type Verdict } from '../copy/judge.js';
+import { judge, hasJudgeMedia } from '../media/judge.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
@@ -243,6 +244,7 @@ a{color:#1b4faf}
 `;
 
 export async function buildReview(cwd?: string) {
+  if (await hasJudgeMedia(cwd ?? process.cwd())) await judge(cwd ?? process.cwd());
   const verdicts = await readCopyVerdicts(launchDir(cwd).posts);
   const unavailable = verdicts.filter(entry => entry.sourceHash === null);
   const { paths, config, posts } = await loadReview(cwd, new Set(unavailable.map(entry => entry.channel)));

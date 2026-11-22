@@ -12,7 +12,7 @@ import { writeBriefs } from '../copy/write.js';
 import { checkPosts } from '../copy/check.js';
 import { takeShots } from '../visuals/shots.js';
 import { makeImages } from '../visuals/images.js';
-import { prepareFixtureVideo } from '../selftest/phase4.js';
+import { scriptFromShots } from '../video/script.js';
 import { render } from '../video/render.js';
 import { buildReview } from '../review/page.js';
 import { chromeAvailable } from './setup.js';
@@ -49,13 +49,23 @@ export async function demo(options: { dir?: string; onStage?: (stage: string, st
   });
   await run('check', () => { const result = checkPosts(cwd); if (!result.passed) throw new Error(JSON.stringify(result.issues)); });
   const chrome = await chromeAvailable();
+  const mediaReady = chrome && ['tesseract','ffmpeg','ffprobe'].every(tool => spawnSync(tool,[tool==='tesseract'?'--version':'-version'],{stdio:'ignore'}).status===0);
   await run('shots', async () => {
-    await writeFile(join(cwd, '.launch/shots.yaml'), 'shots:\n  - id: demo-terminal\n    commands: ["node bin/tasklight.js add Prepare launch", "node bin/tasklight.js list"]\n    viewport: {width: 1000, height: 650}\n');
+    const product = JSON.parse(await readFile(join(cwd,'.launch/product.json'),'utf8'));
+    const reset = `node -e "require('node:fs').writeFileSync('tasks.json','[]')"`;
+    const roles = ['hook','before','action','after','cta'];
+    const captions = [product.problem.summary,product.problem.summary,product.features[0].name,product.oneLiner,product.name];
+    await writeFile(join(cwd,'.launch/shots.yaml'),JSON.stringify({shots:roles.map((purpose,index)=>({
+      id:purpose,purpose,caption:String(captions[index]).split(/\s+/).slice(0,12).join(' '),viewport:{width:1200,height:700},
+      ...(['hook','cta'].includes(purpose)?{card:true}:{
+        setup:[reset,...(purpose==='after'?['node bin/tasklight.js add Prepare launch']:[])],
+        commands:[`node bin/tasklight.js ${purpose==='action'?'add Prepare launch':'list'}`],
+      }),...(purpose==='after'?{moneyMoment:true,highlight:{text:'Prepare launch'}}:{}),
+    }))}));
     await takeShots(cwd);
-  }, chrome ? undefined : 'Chrome missing; npx playwright install chromium');
-  await run('images', () => makeImages(cwd), chrome ? undefined : 'Chrome missing');
-  const ffmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
-  await run('video', async () => { await prepareFixtureVideo(cwd, 'cli-tool'); await render(cwd, 'ffmpeg', ['1x1']); }, ffmpeg ? undefined : 'ffmpeg missing; install FFmpeg');
+  }, mediaReady ? undefined : 'Media requires Chrome, Tesseract and FFmpeg/ffprobe; run liftoff doctor');
+  await run('images', () => makeImages(cwd), mediaReady ? undefined : 'Media dependencies missing');
+  await run('video', async () => { await scriptFromShots(cwd); await render(cwd, 'ffmpeg', ['1x1']); }, mediaReady ? undefined : 'Media dependencies missing');
   let reviewPath = '';
   await run('review', async () => { await linkDemoMedia(cwd); reviewPath = (await buildReview(cwd)).path; });
   return { dir: cwd, reviewPath, stages, durationMs: Date.now() - started, estimate: estimate(cwd, 'demo'), note: 'Offline prepared fixture copy; no accounts, LLM calls, posts or publishing.' };

@@ -13,17 +13,15 @@ export function restrictions(rules: { short_name: string; description: string }[
   const at = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(text);
   const start = range ? clock(range[1]!, range[2], range[3] ?? range[6]) : at ? clock(at[1]!, at[2], at[3]) : undefined;
   const end = range ? clock(range[4]!, range[5], range[6]) : start;
-  const mentions = [...text.matchAll(/\b(?:e[ds]?t|p[ds]?t|c[ds]?t|m[ds]?t|utc|gmt)\b/g)].map(m => zones[m[0]]!);
-  const time = range ?? at;
-  const suffix = time ? /^\s*[(\[]?\s*(?:in\s+)?([a-z][a-z0-9_+\/-]*)/.exec(text.slice(time.index! + time[0].length))?.[1] : undefined;
+  const mentions: string[] = [];
   let manualReview: string | undefined;
-  if (suffix && !zones[suffix] && !/^(?:in|on|and|or|only|every|during|for|with|please|use|post|posts|within|the|this|via|daily|weekly)$/.test(suffix)) {
-    try { new Intl.DateTimeFormat('en', { timeZone: suffix }); mentions.push(suffix); }
-    catch { manualReview = `Unrecognized rule timezone: ${suffix}`; }
+  for (const [zone] of text.matchAll(new RegExp(`(?<![\\w./:])${zonePattern}(?![\\w/])`, 'g'))) {
+    if (zones[zone]) mentions.push(zones[zone]!);
+    else if (zone.includes('/')) {
+      try { mentions.push(new Intl.DateTimeFormat('en', { timeZone: zone }).resolvedOptions().timeZone); }
+      catch { manualReview = `Unrecognized rule timezone: ${zone}`; }
+    } else manualReview = `Unrecognized rule timezone: ${zone}`;
   }
-  if (/\b(?:utc|gmt)\s*[+-]\s*\d/.test(text)) manualReview = 'Rule timezone offset needs manual review';
-  const unsupported = new RegExp(`\\b(?:${unsupportedZones.join('|')})\\b`).exec(text);
-  if (unsupported) manualReview = `Unrecognized rule timezone: ${unsupported[0]}`;
   if (new Set(mentions).size > 1) manualReview = 'Conflicting rule timezones';
   return { days: [...new Set(days)], megathread: /mega[- ]?thread/.test(text), start, end, timezone: mentions[0] ?? timezone, manualReview };
 }

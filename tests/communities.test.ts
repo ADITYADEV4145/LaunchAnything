@@ -149,6 +149,19 @@ describe('communities', () => {
     expect(report.recommended).toEqual(['builders']); expect(report.plan[0]).toMatchObject({ date: '2026-01-04', time: '14:00', timezone: 'UTC' });
     expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
   });
+  it.each(['at 9am Sundays', 'at 9am sharp on Sundays', 'at 9am, Sundays', 'at 9am Sundays; read https://www.reddit.com/r/builders/about/rules'])('does not treat prose after a clock as a zone: %s', async description => {
+    const rules = [{ short_name: 'Self-Promo Sunday', description }];
+    const limit = restrictions(rules, 'UTC'); expect(limit).toMatchObject({ days: [0], start: 540, end: 540, timezone: 'UTC' }); expect(limit.manualReview).toBeUndefined();
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));
+    const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, file);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual(['builders']); expect(report.plan[0]).toMatchObject({ date: '2026-01-04', time: '09:00', timezone: 'UTC' });
+    expect(result.markdown).toContain('## Needs manual review\nNone.'); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it.each([['ET', '14:00'], ['(ET)', '14:00'], ['Europe/Paris', '08:00']])('recognizes the zone token %s before trailing weekdays', (zone, time) => {
+    const limit = restrictions([{ short_name: 'Promo', description: `at 9am ${zone} Sundays` }], 'UTC');
+    expect(limit.manualReview).toBeUndefined(); expect(postingSlot('2026-01-04', limit, 'UTC')).toMatchObject({ date: '2026-01-04', time, timezone: 'UTC' });
+  });
   it.each([5, 6])('preserves the %s:30 UTC instant when New York repeats 01:30 at fall-back', async hour => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'America/New_York' }));
     const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday at ${hour}:30am UTC` }] };

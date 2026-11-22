@@ -147,7 +147,7 @@ export function inspectPost(draft: Post, channel: string, sourceProduct: Product
   if (sentences.some(sentence => {
     const clean = stripCitations(sentence).replace(/https?:\/\/\S+/g, '');
     return (/\d/.test(clean) || product.features.some(f => clean.toLowerCase().includes(f.name.toLowerCase())))
-      && !/\[claim:[^\]]+\]/.test(sentence);
+      && ![...sentence.matchAll(/\[claim:([^\]]+)\]/g)].some(m => !/^(?:pain|proof):/.test(m[1]) || !!product.claims.find(c => c.id === m[1])?.sources?.length);
   })) add('claims.uncited', 'A number or feature sentence lacks a citation', 'Add a citations entry (claim, proof or pain) for each factual sentence');
   templateIssues({ ...draft, channel }, rules, product, add);
   return issues;

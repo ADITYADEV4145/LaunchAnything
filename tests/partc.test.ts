@@ -242,3 +242,9 @@ it('refuses symlinked judge, draft and blind-test outputs', project((cwd, posts)
     expect(readFileSync(copy, 'utf8')).toBe(readFileSync(join(cwd, '.liftoff-fixture/phase2/good/show-hn.md'), 'utf8'));
   } finally { rmSync(outside, { recursive: true, force: true }); }
 }));
+
+it('does not accept an unsourced pain or proof as evidence for a number', project((cwd, posts) => {
+  edit(posts, 'github-release', s => s.replace('{ text: "Small daily task lists should not need a setup guide.", pain: 1 }',
+    '{ text: "Small daily task lists should not need a setup guide.", pain: 1 }\n  - { text: "It saves 40 minutes a day.", pain: 1 }').replace('Review the source', 'It saves 40 minutes a day. Review the source'));
+  expect(rulesFor(cwd, 'github-release')).toContain('claims.uncited');
+}));

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fetchCommunities, importEvidence, reportCommunities, checkCommunities, scoreEvidence } from '../src/communities/index.js';
 import type { Evidence } from '../src/communities/adapters.js';
-import { restrictions } from '../src/communities/schedule.js';
+import { restrictions, postingSlot, postingWindow } from '../src/communities/schedule.js';
 const fixture = JSON.parse(await readFile('fixtures/cli-tool/.liftoff-fixture/communities-evidence.json', 'utf8')) as Evidence[];
 const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
@@ -99,6 +99,55 @@ describe('communities', () => {
     const forbidden = { ...fixture[4]!.searchHits![0]!, file: 'replies/abcdef.md' }; await writeFile(join(cwd, '.launch/communities', forbidden.file), 'Groundwork https://example.com'); report.threads.push(forbidden);
     expect((await checkCommunities(cwd, report)).errors).toContain('Forbidden community reply promotes: replies/abcdef.md');
     report.recommended.push('low'); expect((await checkCommunities(cwd, report)).valid).toBe(false);
+  });
+  it.each([
+    ['ET', '2026-01-04', 'UTC', '14:00'], ['ET', '2026-07-05', 'UTC', '13:00'],
+    ['EST', '2026-07-05', 'UTC', '14:00'], ['EDT', '2026-01-04', 'UTC', '13:00'],
+    ['PT', '2026-01-04', 'UTC', '17:00'], ['PT', '2026-07-05', 'UTC', '16:00'],
+    ['CT', '2026-01-04', 'UTC', '15:00'], ['CT', '2026-07-05', 'UTC', '14:00'],
+    ['MT', '2026-01-04', 'UTC', '16:00'], ['MT', '2026-07-05', 'UTC', '15:00'],
+    ['UTC', '2026-01-04', 'America/New_York', '04:00'], ['GMT', '2026-07-05', 'America/Los_Angeles', '02:00'],
+  ])('converts %s rules on %s to %s using the posting date', (zone, date, timezone, time) => {
+    const limit = restrictions([{ short_name: 'Promo', description: `Only on Sunday 9am-5pm ${zone}` }], timezone);
+    expect(limit.manualReview).toBeUndefined();
+    const slot = postingSlot(date, limit, timezone); expect(slot).toEqual({ date, time, timezone });
+    expect(postingWindow(slot.date, slot.time, slot.timezone, limit)).toEqual({ day: true, time: true });
+    expect(postingWindow(slot.date, undefined, slot.timezone, limit).time).toBe(false);
+  });
+  it('preserves source-zone weekdays across date rollover and overnight windows', () => {
+    const late = restrictions([{ short_name: 'Promo', description: 'Only on Sunday from 11pm to 2am PT' }], 'UTC');
+    expect(postingSlot('2026-01-05', late, 'UTC')).toEqual({ date: '2026-01-05', time: '07:00', timezone: 'UTC' });
+    expect(postingWindow('2026-01-05', '09:00', 'UTC', late)).toEqual({ day: true, time: true });
+    expect(postingWindow('2026-01-05', '11:00', 'UTC', late).time).toBe(false);
+    const early = restrictions([{ short_name: 'Promo', description: 'Only on Sunday from 1am to 2am UTC' }], 'America/Los_Angeles');
+    expect(postingSlot('2026-01-03', early, 'America/Los_Angeles')).toEqual({ date: '2026-01-03', time: '17:00', timezone: 'America/Los_Angeles' });
+    expect(postingWindow('2026-01-03', '17:00', 'America/Los_Angeles', early)).toEqual({ day: true, time: true });
+    const local = restrictions([], 'America/New_York');
+    expect(postingSlot('2026-01-04', local, 'America/New_York')).toEqual({ date: '2026-01-04', time: undefined, timezone: 'America/New_York' });
+  });
+  it('writes converted plan times and gates times interpreted in the wrong zone', async () => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));
+    const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: 'Only on Sunday 9am-5pm ET' }] };
+    const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify(evidence)); await importEvidence(cwd, file);
+    await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.plan[0]).toMatchObject({ date: '2026-01-04', time: '14:00', timezone: 'UTC' });
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    report.plan[0].time = '09:00'; expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting time violates cited rule');
+    report.plan[0].timezone = 'America/New_York'; expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting timezone differs from config');
+  });
+  it('requires manual review for unrecognized or conflicting rule zones instead of scheduling them', async () => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));
+    for (const zone of ['IST', 'Europe/Imaginary', 'UTC+2', 'ET or PT']) {
+      const limit = restrictions([{ short_name: 'Promo', description: `Only on Sunday from 9am to 5pm ${zone}` }], 'UTC');
+      expect(limit.manualReview).toBeTruthy(); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    }
+    const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: 'Only on Sunday from 9am to 5pm IST' }] };
+    const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify(evidence)); await importEvidence(cwd, file);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]); expect(result.markdown).toContain('Unrecognized rule timezone: ist');
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    report.recommended.push('builders'); report.plan.push({ subreddit: 'builders', date: '2026-01-04', time: '09:00', timezone: 'UTC', angle: 'lesson', variant: 'value-first', file: 'posts/builders.md' });
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: rule timezone needs manual review');
   });
   it('fetches OAuth evidence and caches every external response', async () => {
     const cwd = await setup(); let calls = 0;

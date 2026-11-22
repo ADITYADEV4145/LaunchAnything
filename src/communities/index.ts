@@ -8,7 +8,7 @@ import { validateFile } from '../core/schema.js';
 import { loadPains } from '../research/index.js';
 import { adapter, type Evidence, type Post } from './adapters.js';
 import type { Fetch } from '../research/adapters.js';
-import { allowedDate, nextDate, restrictions, restrictionTime } from './schedule.js';
+import { nextDate, restrictions, postingSlot, postingWindow } from './schedule.js';
 import { assertSafePath } from '../copy/safe-path.js';
 import { readLocal, writeLocal } from '../audience/files.js';
 
@@ -85,18 +85,18 @@ export async function checkCommunities(cwd: string, supplied?: Report) {
   const data = supplied ?? await read<Report | null>(join(cwd, '.launch/communities.json'), null); const errors: string[] = [];
   if (!data) return { valid: false, errors: ['Missing communities.json'] };
   const schema = validateFile('communities', data); errors.push(...schema.errors); if (!schema.valid) return { valid: false, errors };
-  for (const sub of data.recommended) { const s = data.subreddits.find(s => s.subreddit === sub); if (!s || !s.citedRules.length || !s.rulesUrl || !Number.isInteger(s.painMentions) || s.painMentions < 1) errors.push(`${sub}: missing cited rule or positive pain count`); }
+  const timezone = (await read<{ timezone?: string }>(join(cwd, '.launch/config.json'), {})).timezone ?? 'UTC';
+  for (const sub of data.recommended) { const s = data.subreddits.find(s => s.subreddit === sub); if (!s || !s.citedRules.length || !s.rulesUrl || !Number.isInteger(s.painMentions) || s.painMentions < 1) errors.push(`${sub}: missing cited rule or positive pain count`); if (s && restrictions(s.citedRules, timezone).manualReview) errors.push(`${sub}: rule timezone needs manual review`); }
   for (const p of data.plan) {
     const s = data.subreddits.find(s => s.subreddit === p.subreddit);
     if (!s || !['allowed', 'restricted'].includes(s.selfPromotion) || s.eligibility === 'fails' || s.painMentions < 1) { errors.push(`${p.subreddit}: not eligible for posting`); continue; }
-    const limit = restrictions(s.citedRules, p.timezone ?? 'UTC');
-    if (!allowedDate(p.date, limit.days)) errors.push(`${p.subreddit}: posting day violates cited rule`);
+    const limit = restrictions(s.citedRules, timezone);
+    if (limit.manualReview) { errors.push(`${p.subreddit}: rule timezone needs manual review`); continue; }
+    if (p.timezone !== undefined && p.timezone !== timezone) errors.push(`${p.subreddit}: posting timezone differs from config`);
+    const window = postingWindow(p.date, p.time, timezone, limit);
+    if (!window.day) errors.push(`${p.subreddit}: posting day violates cited rule`);
     if (limit.megathread && p.destination !== 'megathread') errors.push(`${p.subreddit}: must post in the megathread`);
-    if (limit.start !== undefined) {
-      const minute = p.time && /^\d{2}:\d{2}$/.test(p.time) ? Number(p.time.slice(0, 2)) * 60 + Number(p.time.slice(3)) : -1;
-      const inWindow = limit.end! < limit.start ? minute >= limit.start || minute <= limit.end! : minute >= limit.start && minute <= limit.end!;
-      if (minute < 0 || !inWindow) errors.push(`${p.subreddit}: posting time violates cited rule`);
-    }
+    if (!window.time) errors.push(`${p.subreddit}: posting time violates cited rule`);
   }
   if (new Set(data.plan.map(p => p.date)).size !== data.plan.length) errors.push('More than one subreddit per day');
   if (data.threads.length > 10) errors.push('More than 10 replies');
@@ -121,19 +121,19 @@ export async function reportCommunities(cwd: string) {
   for (const file of files.filter(f => f.endsWith('.json'))) { const value = await read<Evidence | null>(path(cwd, 'raw/reddit/' + file), null); const check = validateFile('community-evidence', value); if (!check.valid) throw new Error(check.errors.join('; ')); evidence.push(value!); }
   const names = pains.pains.map(p => p.name); const quotes = pains.pains.flatMap(p => p.quotes.map(q => q.url));
   const subreddits = evidence.map(e => scoreEvidence(e, names, quotes, founder.reddit ?? {}, timezone)).sort((a, b) => Number(a.selfPromotion === 'forbidden') - Number(b.selfPromotion === 'forbidden') || b.score - a.score || a.subreddit.localeCompare(b.subreddit));
-  const eligible = subreddits.filter(s => ['allowed', 'restricted'].includes(s.selfPromotion) && s.eligibility !== 'fails' && s.painMentions > 0).slice(0, 5);
+  const eligible = subreddits.filter(s => ['allowed', 'restricted'].includes(s.selfPromotion) && s.eligibility !== 'fails' && s.painMentions > 0 && !restrictions(s.citedRules, timezone).manualReview).slice(0, 5);
   const plan: Report['plan'] = [];
   let date = config.launchDate ?? new Date().toISOString().slice(0, 10);
   for (const [i, sub] of eligible.entries()) {
     const limit = restrictions(sub.citedRules, timezone);
-    while (!allowedDate(date, limit.days)) date = nextDate(date);
+    const slot = postingSlot(date, limit, timezone);
     const file = `posts/${sub.subreddit}.md`;
     const variant = sub.selfPromotion === 'allowed' ? 'standard' : 'value-first';
     const destination = limit.megathread ? 'megathread' : 'standalone post';
     const angle = `${names[i % names.length] ?? pains.idea}: lesson for r/${sub.subreddit}`;
     await draft(cwd, file, `Not sent. Founder posts by hand. One subreddit per day.\n\n# ${angle}\n\nDestination: ${destination}. Follow the cited rule and verify the current thread before posting.\n\nI'm Aditya and I built ${pains.idea}.\n\n${variant === 'value-first' ? 'Lesson to share (edit before posting): describe the workaround, what failed, and a reproducible improvement. No product link; add one only after verifying the cited rule allows it.' : 'Share a concrete example and useful steps for this community before describing the project.'}\n\nCommunity context: r/${sub.subreddit}. Edit this draft to address the readers’ specific problem.\n`);
-    plan.push({ subreddit: sub.subreddit, date, time: restrictionTime(limit.start), timezone: limit.timezone, destination, angle, variant, file });
-    date = nextDate(date);
+    plan.push({ subreddit: sub.subreddit, ...slot, destination, angle, variant, file });
+    date = nextDate(slot.date);
   }
   const hn = await read<Post[]>(path(cwd, 'hn.json'), []);
   const hnAsking = hn.filter(p => asksForSolution(p) && names.some(n => normalize(p.title + ' ' + (p.selftext ?? '')).includes(normalize(n))));
@@ -161,7 +161,7 @@ export async function reportCommunities(cwd: string) {
   const section = (title: string, entries: string[]) => lines.push('', `## ${title}`, ...(entries.length ? entries : ['None.']));
   section('Low signal', subreddits.filter(s => s.painMentions < 1).map(s => `- r/${s.subreddit}: pain count 0; not recommended.`));
   section('Do not post', subreddits.filter(s => s.selfPromotion === 'forbidden').map(s => `### r/${s.subreddit}\n${citation(s)}`));
-  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown').map(s => `- r/${s.subreddit}: no matching promotion rule; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
+  section('Needs manual review', [...subreddits.filter(s => s.selfPromotion === 'unknown' || restrictions(s.citedRules, timezone).manualReview).map(s => `- r/${s.subreddit}: ${restrictions(s.citedRules, timezone).manualReview ?? 'no matching promotion rule'}; pain count ${s.painMentions}. [Rules](${s.rulesUrl})`), ...omittedReplies.map(p => `- [${p.title}](${p.url}): generated reply contains prohibited language; no draft created.`)]);
   const hnCount = new Set(data.other.filter(o => o.kind === 'hn').map(o => o.url)).size;
   section('Other communities', [
     ...(hnCount ? [`- [Hacker News](https://news.ycombinator.com/) — news.ycombinator.com (hn); ${hnCount} cited thread${hnCount === 1 ? '' : 's'}.`] : []),

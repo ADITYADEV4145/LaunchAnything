@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fetchCommunities, importEvidence, reportCommunities, checkCommunities, scoreEvidence } from '../src/communities/index.js';
@@ -10,6 +10,14 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['communities.md', 'communities.json', 'communities/replies', 'communities/posts'])('refuses symlink report destination %s without modifying the target', async destination => {
+    const cwd = await setup(); const outside = await mkdtemp(join(tmpdir(), 'communities-outside-')); dirs.push(outside);
+    const marker = join(outside, 'untouched'); await writeFile(marker, 'unchanged');
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify(fixture[0])); await importEvidence(cwd, capture);
+    await symlink(destination.endsWith('.md') || destination.endsWith('.json') ? marker : outside, join(cwd, '.launch', destination));
+    await expect(reportCommunities(cwd)).rejects.toThrow('Unsafe symlink');
+    expect(await readFile(marker, 'utf8')).toBe('unchanged'); expect(await readdir(outside)).toEqual(['untouched']);
+  });
   it('lists only solution-seeking HN threads, groups sources, and labels empty sections', async () => {
     const cwd = await setup();
     const posts = [

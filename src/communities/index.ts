@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -9,10 +9,12 @@ import { loadPains } from '../research/index.js';
 import { adapter, type Evidence, type Post } from './adapters.js';
 import type { Fetch } from '../research/adapters.js';
 import { allowedDate, nextDate, restrictions, restrictionTime } from './schedule.js';
+import { assertSafePath } from '../copy/safe-path.js';
+import { readLocal, writeLocal } from '../audience/files.js';
 
 const path = (cwd: string, file: string) => join(cwd, '.launch/communities', file);
 async function read<T>(file: string, fallback: T): Promise<T> { try { return JSON.parse(await readFile(file, 'utf8')); } catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return fallback; throw e; } }
-async function save(cwd: string, file: string, value: unknown) { const target = path(cwd, file); await mkdir(join(target, '..'), { recursive: true }); await writeFile(target, JSON.stringify(value, null, 2)); }
+async function save(cwd: string, file: string, value: unknown) { writeLocal(cwd, path(cwd, file), JSON.stringify(value, null, 2)); }
 const subFor = (url: string) => { const u = new URL(url); return /^(www\.|old\.|oauth\.)?reddit\.com$/.test(u.hostname) ? /^\/r\/(\w+)/i.exec(u.pathname)?.[1]?.toLowerCase() : undefined; };
 const normalize = (s: string) => s.normalize('NFKC').replace(/\p{Cf}/gu, '').replace(/\p{Pd}/gu, '-').replace(/\s+/gu, ' ').trim().toLowerCase();
 const asksForSolution = (p: Post) => !/^\s*(?:show|launch)\s+hn\b/i.test(p.title) && (/^\s*ask\s+hn\b/i.test(p.title) || /is there a (tool|way)|looking for|alternative to|how do (you|i)|recommend|\?/i.test(p.title + ' ' + (p.selftext ?? '')));
@@ -69,7 +71,7 @@ export function scoreEvidence(e: Evidence, names: string[], quotes: string[], fo
 type Scored = ReturnType<typeof scoreEvidence>;
 interface OtherCommunity { url: string; host: string; kind: string }
 export interface Report { subreddits: Scored[]; recommended: string[]; plan: { subreddit: string; date: string; time?: string; timezone?: string; destination?: string; angle: string; variant: string; file: string }[]; threads: (Post & { file: string })[]; other: OtherCommunity[] }
-async function draft(cwd: string, file: string, body: string) { try { return await readFile(path(cwd, file), 'utf8'); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; await mkdir(join(path(cwd, file), '..'), { recursive: true }); await writeFile(path(cwd, file), body); return body; } }
+async function draft(cwd: string, file: string, body: string) { const target = path(cwd, file); const existing = readLocal(cwd, target); if (existing !== undefined) return existing; writeLocal(cwd, target, body); return body; }
 export async function checkCommunities(cwd: string, supplied?: Report) {
   const data = supplied ?? await read<Report | null>(join(cwd, '.launch/communities.json'), null); const errors: string[] = [];
   if (!data) return { valid: false, errors: ['Missing communities.json'] };
@@ -102,6 +104,7 @@ export async function checkCommunities(cwd: string, supplied?: Report) {
   return { valid: !errors.length, errors };
 }
 export async function reportCommunities(cwd: string) {
+  for (const file of ['.launch/communities.json', '.launch/communities.md', '.launch/communities/replies', '.launch/communities/posts']) assertSafePath(cwd, join(cwd, file));
   const pains = await loadPains(cwd); const config = await read<{ timezone?: string; launchDate?: string }>(join(cwd, '.launch/config.json'), {});
   const founder = await read(path(cwd, 'founder-api.json'), await read<{ reddit?: { karma?: number; accountAgeDays?: number } }>(path(cwd, 'founder.json'), {}));
   const timezone = config.timezone ?? 'UTC'; const evidence: Evidence[] = [];
@@ -154,5 +157,5 @@ export async function reportCommunities(cwd: string) {
   ]);
   section('Threads asking for this', threads.map(p => `- [${p.title}](${p.url}) — [editable reply](communities/${p.file})`));
   section('Cross-post plan', plan.map(p => `- ${p.date}${p.time ? ` ${p.time} ${p.timezone}` : ''}: r/${p.subreddit} — ${p.angle}; ${p.variant}; ${p.destination}; [editable draft](communities/${p.file})`));
-  const markdown = lines.join('\n') + '\n'; await writeFile(join(cwd, '.launch/communities.json'), JSON.stringify(data, null, 2)); await writeFile(join(cwd, '.launch/communities.md'), markdown); return { path: '.launch/communities.md', markdown, ...check };
+  const markdown = lines.join('\n') + '\n'; writeLocal(cwd, join(cwd, '.launch/communities.json'), JSON.stringify(data, null, 2)); writeLocal(cwd, join(cwd, '.launch/communities.md'), markdown); return { path: '.launch/communities.md', markdown, ...check };
 }

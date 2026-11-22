@@ -61,3 +61,14 @@ it('reports missing media dependencies with install hints and no misleading vers
   const report=await doctor(tmpdir(),tmpdir());
   for(const name of ['tesseract','vhs','ttyd','ffprobe','chrome']) expect(report.tools[name]).toMatchObject({available:false,version:null,installHint:expect.any(String)});
 });
+
+it('reports optional Piper and honors the binary override',async()=>{
+  vi.stubEnv('LIFTOFF_PIPER_BIN','/custom/piper');
+  try {
+    vi.mocked(spawnSync).mockReturnValue({status:0} as ReturnType<typeof spawnSync>);
+    expect((await doctor(tmpdir(),tmpdir())).tools.piper).toMatchObject({available:true,required:false});
+    expect(spawnSync).toHaveBeenCalledWith('/custom/piper',['--help'],expect.objectContaining({cwd:expect.any(String)}));
+    vi.mocked(spawnSync).mockReturnValue({status:1} as ReturnType<typeof spawnSync>);
+    expect((await doctor(tmpdir(),tmpdir())).tools.piper.available).toBe(false);
+  } finally { vi.unstubAllEnvs(); }
+});

@@ -6,10 +6,11 @@ import { validateFile } from '../core/schema.js';
 import { storyboard } from '../media/assets.js';
 import { polish } from '../media/polish.js';
 import { loadStyle } from './styles.js';
+import { findLogo, titleCardSeconds } from './brand.js';
 
 export type SceneRole = 'hook' | 'before' | 'action' | 'after' | 'proof' | 'cta';
 export interface Scene { shot: string; text: string; duration: number; voiceover?: string; role?: SceneRole; shortDuration?: number; highlight?: {x:number;y:number;width:number;height:number} }
-export interface Script { scenes: Scene[]; style?: string }
+export interface Script { scenes: Scene[]; style?: string; title?: string; tagline?: string; titleCardSeconds?: number; resolution?: string }
 export interface Gate { id: string; name: string; status: 'pass' | 'fail' | 'skipped'; detail: string }
 export const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 function minimumHookDuration(text: string) {
@@ -34,7 +35,7 @@ export function chromeLint(script: Script): Gate {
 export const endCardSeconds = 3;
 export const shortCutBudgetSeconds = 34.5;
 export function sceneDuration(scene: Scene, format = '16x9', storyboard = Boolean(scene.role)) { return format === '9x16' && storyboard ? scene.shortDuration ?? scene.duration * .5 : scene.duration; }
-export function totalDuration(script: Script, format = '16x9') { return script.scenes.reduce((n, s) => n + sceneDuration(s, format, script.scenes.some(scene => scene.role)), 0) + endCardSeconds; }
+export function totalDuration(script: Script, format = '16x9') { return script.scenes.reduce((n, s) => n + sceneDuration(s, format, script.scenes.some(scene => scene.role)), 0) + endCardSeconds + (script.titleCardSeconds ?? 0); }
 export interface Shot { id: string; route: string; viewport: {width: number; height: number}; record?: boolean; theme?: 'light' | 'dark'; waitFor?: string; actions?: {type: string; selector: string; text?: string}[] }
 export async function shots(cwd: string): Promise<Shot[]> {
   try {
@@ -69,12 +70,14 @@ export async function validateScript(cwd: string, data: unknown, selected: reado
   const result = validateFile('video-script', data);
   if (!result.valid) throw new Error(result.errors.join('; '));
   const script = data as Script;
+  if (await findLogo(cwd)) script.titleCardSeconds = titleCardSeconds;
+  else delete script.titleCardSeconds;
   const modern = script.scenes.some(scene => scene.role);
   const style = await loadStyle(cwd,script.style);
   if ((style.id !== 'midnight' || style.custom) && script.scenes.some(scene => selected.map(format => sceneDuration(scene,format,modern)).some(duration => duration < style.pacing.min || duration > style.pacing.max))) throw new Error(`Scene duration outside ${style.id} pacing (${style.pacing.min}–${style.pacing.max}s)`);
   const duration = totalDuration(script);
   if (!modern && (script.scenes.length < 6 || script.scenes.some(scene => scene.text.trim().split(/\s+/).length > 8))) throw new Error('Legacy scripts require 6–10 scenes and captions of 1–8 words');
-  if (duration < (modern ? 45 : 30) || duration > 60) throw new Error(`Total duration including the 3-second end card must be ${modern ? '45' : '30'}–60 seconds`);
+  if (duration < (modern ? 45 : 30) || duration > 60) throw new Error(`Total duration including the 3-second end card${script.titleCardSeconds ? ' and 2.5-second title card' : ''} must be ${modern ? '45' : '30'}–60 seconds`);
   if (modern) {
     const vertical = selected.includes('9x16');
     const hookLimit = Math.max(3, minimumHookDuration(script.scenes[0].text));
@@ -106,7 +109,7 @@ export async function scriptFromShots(cwd: string): Promise<Script> {
     const shortDuration = shot.purpose === 'hook' ? duration : Math.max(duration * .5, readingSeconds);
     scenes.push({ shot: source, text: shot.caption ?? '', voiceover: shot.caption, role: shot.purpose as SceneRole, duration, shortDuration, ...(shot.moneyMoment && capture.highlight ? { highlight: capture.highlight } : {}) });
   }
-  let excess = totalDuration({scenes},'9x16') - shortCutBudgetSeconds;
+  let excess = totalDuration({scenes,titleCardSeconds:await findLogo(cwd) ? titleCardSeconds : 0},'9x16') - shortCutBudgetSeconds;
   for (const scene of scenes) {
     if (excess <= 1e-8) break;
     if (scene.role === 'hook') continue;
@@ -130,6 +133,6 @@ function timestamp(seconds: number) {
   return `${String(Math.floor(ms / 3600000)).padStart(2,'0')}:${String(Math.floor(ms / 60000) % 60).padStart(2,'0')}:${String(Math.floor(ms / 1000) % 60).padStart(2,'0')},${String(ms % 1000).padStart(3,'0')}`;
 }
 export function srt(script: Script) {
-  let time = 0;
+  let time = script.titleCardSeconds ?? 0;
   return script.scenes.map((scene, i) => { const start = time; time += scene.duration; return `${i + 1}\n${timestamp(start)} --> ${timestamp(time)}\n${scene.text}\n`; }).join('\n');
 }

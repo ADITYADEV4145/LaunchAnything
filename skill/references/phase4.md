@@ -27,10 +27,19 @@ then `liftoff video record --url http://localhost:3000 --json`. Recording perfor
 the supplied actions against that URL; use safe local demo data, never posting
 or submitting anything externally. Recordings go to `.launch/media/<id>.webm`.
 
+`liftoff video voice` uses ElevenLabs when `ELEVENLABS_API_KEY` is set. Without
+that key, it can synthesize offline using Piper: install `piper-tts`, provision an
+English (or other appropriate language) model and its `.onnx.json` companion,
+then set `LIFTOFF_PIPER_MODEL=/path/to/voice.onnx`. Optionally set
+`LIFTOFF_PIPER_BIN` to the executable path. `--dry-run` plans without synthesizing.
+Local synthesis writes indexed WAVs and `vo/receipt.json` with engine/model
+provenance. A configured but unusable Piper model or binary fails clearly.
+
 If an ElevenLabs or other TTS MCP is connected, use it yourself to generate each
 scene's optional voiceover line into `.launch/video/vo/0.wav`, `1.mp3`, etc.
 Indices are zero-based. No connected TTS? Skip audio: captions and SRT still ship.
-Rendering trims VO to scene durations, positions it on the scene timeline and
+Rendering rejects VO longer than its scene (allowing 50ms codec padding); extend
+the scene or shorten narration before rendering. It positions VO on the scene timeline and
 normalizes the mix toward -14 LUFS. Check the result; sparse VO can differ from
 the target. Credit only **Aditya** in metadata.
 
@@ -54,6 +63,14 @@ terminal can opt out of browser chrome via `.launch/media/manifest.json` with
 card with the product name, description/oneLiner, homepage URL (product metadata
 or package.json), and optional `.launch/media/logo.*` (PNG/JPG/JPEG/WebP/SVG), or
 a generated monogram. SRT covers only the footage scenes.
+
+When `.launch/media/logo.*` exists, both renderers prepend a 2.5-second title
+card and show a corner logo watermark throughout the footage. SVG logos are
+rasterized locally in Chrome. Optional script `title` and `tagline` override the
+title card's product name and one-liner. The title card counts toward duration
+limits; captions and narration start after it. Without a logo, timing is unchanged.
+Set script `resolution: "1080p"` for native 1920×1080 landscape rendering (and
+proportionally larger square/portrait formats); the default remains `720p`.
 
 The independent project is bundled at `templates/video/remotion/`. Install its
 dependencies in your working repository to use it (Remotion is not a CLI runtime

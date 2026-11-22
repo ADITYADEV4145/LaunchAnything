@@ -11,7 +11,7 @@ export async function branding(cwd: string): Promise<Branding> {
   let pkg: Record<string, unknown> = {};
   try { product = JSON.parse(await readFile(launchDir(cwd).product,'utf8')); } catch { /* Product metadata is optional. */ }
   try { pkg = JSON.parse(await readFile(join(cwd,'package.json'),'utf8')); } catch { /* Not every product is a Node project. */ }
-  return {name:String(product.name ?? 'Product'),tagline:String(product.description ?? product.oneLiner ?? ''),homepage:String(product.homepage ?? product.url ?? pkg.homepage ?? '').replace(/^https?:\/\//,'').replace(/\/$/,'')};
+  return {name:String(product.name ?? 'Product'),tagline:String(product.oneLiner ?? product.description ?? ''),homepage:String(product.homepage ?? product.url ?? pkg.homepage ?? '').replace(/^https?:\/\//,'').replace(/\/$/,'')};
 }
 const xml = (s: string) => s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 export function wrapText(text: string, limit: number): string[] {

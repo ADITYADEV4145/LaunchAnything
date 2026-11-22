@@ -4,7 +4,7 @@ import { AbsoluteFill, Composition, Img, OffthreadVideo, Sequence, interpolate, 
 type Layout = {plate:string;caption:string;src:string;bare?:boolean;accent?:string;highlight?:{x:number;y:number;width:number;height:number};frame:{x:number;y:number;width:number;height:number;kind:string;detail?:{x:number;y:number;width:number;height:number;fraction:number}}};
 type Scene = {src:string;text:string;duration:number;role?:string;card?:boolean;layouts:Record<string,Layout>};
 type VideoStyle = {palette:{background:string[]};camera:'static-push'|'push-in'|'pan';transition:'cut'|'fade'|'slide'};
-type Props = {scenes:Scene[];endCards:Record<string,string>;endCardSeconds:number;style?:VideoStyle};
+type Props = {scenes:Scene[];endCards:Record<string,string>;endCardSeconds:number;style?:VideoStyle;resolution?:string};
 const defaults:Props={scenes:[],endCards:{},endCardSeconds:3};
 function Shot({scene,style:theme}:{scene:Scene;style?:VideoStyle}) {
   const frame=useCurrentFrame();
@@ -37,6 +37,6 @@ function Video(props:Props) {
   })}<Sequence from={Math.round(elapsed*12)} durationInFrames={Math.round(props.endCardSeconds*12)}><Img src={staticFile(props.endCards[`${width}x${height}`])} style={{width,height}}/></Sequence></AbsoluteFill>;
 }
 function Root() {
-  return <>{[['Demo',1280,720],['Short',720,1280],['Square',720,720]].map(([id,width,height])=><Composition key={id} id={String(id)} component={Video} width={Number(width)} height={Number(height)} fps={12} durationInFrames={360} defaultProps={defaults} calculateMetadata={({props})=>({durationInFrames:Math.round((props.scenes.reduce((n,s)=>n+s.duration,0)+props.endCardSeconds)*12)})}/>)}</>;
+  return <>{[['Demo',1280,720],['Short',720,1280],['Square',720,720]].map(([id,width,height])=><Composition key={id} id={String(id)} component={Video} width={Number(width)} height={Number(height)} fps={12} durationInFrames={360} defaultProps={defaults} calculateMetadata={({props})=>({width:Number(width)*(props.resolution==='1080p'?1.5:1),height:Number(height)*(props.resolution==='1080p'?1.5:1),durationInFrames:Math.round((props.scenes.reduce((n,s)=>n+s.duration,0)+props.endCardSeconds)*12)})}/>)}</>;
 }
 registerRoot(Root);

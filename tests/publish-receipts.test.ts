@@ -67,3 +67,19 @@ it.each([
     expect(isLiveReceiptFor({ ...receipt, url }, post, 'unrelated', destination)).toBe(false);
   }
 });
+
+it('matches Reddit share-link subreddits without trusting unscoped short links', () => {
+  const post = { channel: 'reddit', hash: 'a'.repeat(64) }, identity = 'go:approval';
+  const receipt: PublishReceipt = { channel: 'reddit', id: `manual:reddit:${post.hash}`, status: 'published' };
+  const destination = 'https://www.reddit.com/r/SideProject/comments/';
+  for (const host of ['www.reddit.com', 'reddit.com', 'old.reddit.com']) {
+    const shared = { ...receipt, url: `https://${host}/r/sideproject/s/abc123?share_id=example` };
+    expect(isLiveReceiptFor(shared, post, identity, destination)).toBe(true);
+    expect(isLiveReceiptFor(shared, { ...post, hash: 'b'.repeat(64) }, identity, destination)).toBe(false);
+  }
+  for (const url of ['https://www.reddit.com/r/other/s/abc123', 'https://example.test/r/SideProject/s/abc123',
+    'https://www.reddit.com/r/SideProject/s/', 'https://redd.it/abc123', 'https://www.redd.it/abc123']) {
+    expect(isLiveReceiptFor({ ...receipt, url }, post, identity, destination)).toBe(false);
+  }
+  expect(isLiveReceiptFor({ ...receipt, id: identity, url: 'https://redd.it/abc123' }, post, identity, destination)).toBe(false);
+});

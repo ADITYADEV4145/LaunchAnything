@@ -18,7 +18,8 @@ async function fixture() {
 }
 
 it.each([['mcp', 'product-hunt'], ['browser', 'product-hunt'], ['browser', 'show-hn'], ['browser', 'reddit'],
-  ['manual', 'product-hunt'], ['manual', 'show-hn'], ['manual', 'reddit']])('recognizes a %s %s receipt without a go identity', async (producer, channel) => {
+  ['manual', 'product-hunt'], ['manual', 'show-hn'], ['manual', 'reddit'],
+  ['manual', 'reddit', 'https://www.reddit.com/r/SideProject/s/abc123']])('recognizes a %s %s receipt without a go identity', async (producer, channel, sharedUrl) => {
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-go-manual-')); temporary.push(cwd);
   const { work, paths } = await groundworkGoFixture(cwd);
   const { posts } = await loadReview(work, undefined, () => '2026-01-06T15:00:00.000Z');
@@ -30,8 +31,8 @@ it.each([['mcp', 'product-hunt'], ['browser', 'product-hunt'], ['browser', 'show
     account: 'fixture-founder', profile: '/fixture/chrome', connectedAt: ''
   }))));
   const receipt = { channel, id: `${producer}:${channel}:${hash}`,
-    status: 'published', url: channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : channel === 'reddit'
-      ? 'https://www.reddit.com/r/SideProject/comments/123/launch/' : 'https://news.ycombinator.com/item?id=123' };
+    status: 'published', url: sharedUrl ?? (channel === 'product-hunt' ? 'https://www.producthunt.com/posts/groundwork' : channel === 'reddit'
+      ? 'https://www.reddit.com/r/SideProject/comments/123/launch/' : 'https://news.ycombinator.com/item?id=123') };
   await writeFile(paths.published, JSON.stringify({ posts: [receipt] }));
   const preview = await go(work);
   expect('timeline' in preview && preview.timeline.find(row => row.channel === 'github-release')?.status).toBe('queued');

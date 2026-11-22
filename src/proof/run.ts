@@ -65,6 +65,12 @@ export async function runProof(cwd: string, options: { skipRun?: boolean; timeou
     benchmark, repo, name: benchmark.name + (repo === null ? '' : '-' + (index + 1)),
   })));
   if (new Set(jobs.map(job => job.name)).size !== jobs.length) throw new Error('Benchmark output names collide; choose distinct benchmark names');
+  for (const benchmark of config.proof.benchmarks) {
+    if (!benchmark.repos || benchmark.repos.length < 2) continue;
+    const resultPaths = benchmark.repos.map(repo => resolve(cwd, benchmark.results.replaceAll('{repo}', repo)));
+    if (new Set(resultPaths).size !== resultPaths.length)
+      throw new Error('Invalid benchmark config: multiple repos require distinct results paths after {repo} substitution');
+  }
   const records = [];
   for (const { benchmark, repo, name } of jobs) {
     const substitute = (value: string) => value.replaceAll('{repo}', repo ?? '');

@@ -72,6 +72,18 @@ describe('proof run', () => {
     config([{ ...benchmark, command: 'node -e "setTimeout(()=>{},10000)"' }]);
     await expect(runProof(cwd, { timeout: 0.05 })).rejects.toThrow('timed out');
   });
+  it('rejects shared multi-repo results before running any benchmark', async () => {
+    for (const [repos, results] of [
+      [['one', 'two'], 'results.json'],
+      [['one', 'nested/../one'], '{repo}.json'],
+    ] as [string[], string][]) {
+      config([benchmark, { ...benchmark, name: 'multi', repos, results }]);
+      await expect(runProof(cwd)).rejects.toThrow('multiple repos require distinct results paths after {repo} substitution');
+      expect(existsSync(join(cwd, 'results.json'))).toBe(false);
+      expect(existsSync(join(cwd, '.launch/proof/checks.json'))).toBe(false);
+      await expect(runProof(cwd, { skipRun: true })).rejects.toThrow('multiple repos require distinct results paths');
+    }
+  });
   it('rejects absent/invalid results, unresolved pointers and non-scalar metrics', async () => {
     config([{ ...benchmark, command: undefined }]);
     await expect(runProof(cwd)).rejects.toThrow('missing or invalid JSON');

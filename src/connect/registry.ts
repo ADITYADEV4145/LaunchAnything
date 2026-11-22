@@ -14,9 +14,12 @@ export const platforms = [...social, 'devto', 'github-release', 'show-hn', 'redd
 export function routes(platform: string): Route[] {
   if (platform === 'product-hunt') return ['mcp', 'browser'];
   if (platform === 'x') return ['mcp', 'postiz', 'buffer'];
+  if (platform === 'linkedin') return ['postiz', 'buffer', 'api'];
   return social.includes(platform) ? ['postiz', 'buffer'] : ['devto', 'github-release'].includes(platform) ? ['api'] : ['show-hn', 'reddit', 'product-hunt'].includes(platform) ? ['browser'] : [];
 }
-export function validateConnection(input: Pick<Connection, 'platform' | 'route' | 'server'>) {
+export function validateConnection(input: Pick<Connection, 'platform' | 'route' | 'server' | 'profile'>) {
+  if (input.platform === 'linkedin' && (!['postiz', 'buffer', 'api'].includes(input.route) || input.server || input.profile))
+    throw new Error('LinkedIn requires the official API directly or through Postiz/Buffer; browser and website-driving MCP servers are forbidden');
   if (!routes(input.platform).includes(input.route)) throw new Error(`Unsupported route ${input.route} for ${input.platform}`);
   if (input.route === 'mcp' && input.server !== undefined && input.server !== officialServers[input.platform as keyof typeof officialServers])
     throw new Error('Only the official platform MCP server is allowed');

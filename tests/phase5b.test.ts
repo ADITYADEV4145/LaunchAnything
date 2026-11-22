@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { stringify } from 'yaml';
 import { phase5bGate } from '../src/selftest/phase5b.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
-import { connect, connections, removeConnection } from '../src/connect/registry.js';
+import { connect, connections, removeConnection, requireConnection } from '../src/connect/registry.js';
 import { MockBrowser } from '../src/connect/browser.js';
 import { fillForm, forms } from '../src/connect/forms.js';
 import { assistedReminder, instagramPayload, productHuntDate, productHuntPayload } from '../src/connect/payloads.js';
@@ -161,6 +161,29 @@ it('validates route and token without persisting invalid connections', async () 
   await expect(connect({ platform: 'devto', route: 'api', account: 'me' }, '', keys, home)).rejects.toThrow('Token required');
   await expect(connect({ platform: 'reddit', route: 'browser', account: 'me' }, undefined, keys, home)).rejects.toThrow('--profile');
   expect(await connections(home)).toEqual([]);
+});
+it.each(['postiz', 'buffer', 'api'] as const)('allows LinkedIn official API route %s without website automation', async route => {
+  const { cwd, home } = await approvedPost('linkedin');
+  await connect({ platform: 'linkedin', route, account: 'urn:li:person:owner' }, 'secret', new MemoryKeychain(), home);
+  const browser = vi.fn();
+  const result = await assistedPublish(cwd, { home, browser });
+  expect(result.posts[0]).toMatchObject({ status: 'manual', id: expect.stringContaining(route === 'api' ? 'linkedin-api:' : route + ':') });
+  expect(browser).not.toHaveBeenCalled();
+  if (route === 'api') {
+    const request = JSON.parse(await readFile(new URL('linkedin-api-request.json', result.posts[0].url), 'utf8'));
+    expect(request).toMatchObject({ url: 'https://api.linkedin.com/rest/posts', body: { author: 'urn:li:person:owner' } });
+    expect(JSON.stringify(request)).not.toContain('secret');
+  }
+});
+it.each([{ route: 'browser' }, { route: 'mcp' }, { route: 'buffer', server: 'https://website-driver.test/mcp' },
+  { route: 'api', profile: '/chrome' }])('rejects LinkedIn website automation at connect and dispatch: %j', async input => {
+  const { cwd, home } = await approvedPost('linkedin');
+  const connection = { platform: 'linkedin', account: 'owner', ...input, route: input.route as Route };
+  await expect(connect(connection, 'secret', new MemoryKeychain(), home)).rejects.toThrow('LinkedIn requires the official API');
+  await mkdir(home, { recursive: true });
+  await writeFile(join(home, 'connections.json'), JSON.stringify([{ ...connection, connectedAt: new Date().toISOString() }]));
+  await expect(requireConnection('linkedin', undefined, home)).rejects.toThrow('website-driving MCP');
+  await expect(assistedPublish(cwd, { home })).rejects.toThrow('LinkedIn requires the official API');
 });
 it('serializes concurrent connects and removes across keychain waits', async () => {
   const home = await workspace();

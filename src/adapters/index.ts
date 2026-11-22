@@ -7,7 +7,7 @@ import { readOptional, validate } from '../review/posts.js';
 import type { ReviewPost } from '../review/posts.js';
 import { assistedReminder } from '../connect/payloads.js';
 
-export type AdapterName = 'postiz' | 'buffer' | 'ayrshare' | 'github-release' | 'devto' | 'email' | 'manual';
+export type AdapterName = 'postiz' | 'buffer' | 'ayrshare' | 'github-release' | 'devto' | 'email' | 'manual' | 'linkedin-api';
 type ReceiptStatus = 'manual' | 'scheduled' | 'published' | 'failed' | 'cancelled';
 export interface PublishReceipt {
   channel: string;
@@ -42,6 +42,7 @@ const manualOnly = new Set(['show-hn', 'reddit', 'product-hunt']);
 const social = ['x', 'linkedin', 'tiktok', 'reels', 'shorts', 'instagram'];
 const supported: Record<AdapterName, string[]> = {
   postiz: social, buffer: social, ayrshare: social,
+  'linkedin-api': ['linkedin'],
   'github-release': ['github-release'], devto: ['devto'], email: ['email'], manual: [],
 };
 const envKeys: Partial<Record<AdapterName, string[]>> = {
@@ -140,7 +141,7 @@ function offlineAdapter(name: AdapterName): PublishAdapter {
   };
 }
 
-const adapters = Object.fromEntries([...integrations, 'email', 'manual'].map(name =>
+const adapters = Object.fromEntries([...integrations, 'email', 'manual', 'linkedin-api'].map(name =>
   [name, offlineAdapter(name as AdapterName)])) as Record<AdapterName, PublishAdapter>;
 
 export function getAdapter(channel: string, id?: string): PublishAdapter {

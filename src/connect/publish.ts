@@ -29,11 +29,13 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
   for (const post of selected) {
     requireApproval(post, approvals, config.approvers);
     const connection = await requireConnection(post.channel, options.account, options.home);
-    const route = connection.route === 'api' ? post.channel : connection.route;
+    const route = connection.route === 'api' ? post.channel === 'linkedin' ? 'linkedin-api' : post.channel : connection.route;
     const adapter = ['browser', 'mcp'].includes(connection.route) ? undefined : getAdapter(post.channel, route + ':');
     if (adapter) {
       if (adapter.name !== route) throw new Error(`${post.channel}: unsupported connected route ${connection.route}`);
       adapter.validate(post);
+      if (route === 'linkedin-api' && !/^urn:li:(person|organization):[A-Za-z0-9_-]+$/.test(connection.account))
+        throw new Error('LinkedIn direct API requires your author urn:li:person:ID or urn:li:organization:ID');
     } else if (connection.route === 'mcp') {
       if (post.channel === 'product-hunt' && !/^https?:\/\//i.test(post.link ?? '')) throw new Error('Product Hunt MCP requires a product link');
     } else if (!Object.hasOwn(forms, post.channel)) throw new Error(`${post.channel}: no browser form available`);
@@ -61,6 +63,12 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
       receipt = await mcpDraft(platform, client, post, paths.root);
     } else if (adapter) {
       receipt = await adapter.schedule(post, cwd);
+      if (adapter.name === 'linkedin-api') await writeFile(new URL('linkedin-api-request.json', receipt.url), JSON.stringify({
+        method: 'POST', url: 'https://api.linkedin.com/rest/posts',
+        instruction: 'Offline request only. Use your OS-keychain token and a supported LinkedIn-Version header with the official API; never automate the website.',
+        body: { author: connection.account, commentary: [post.title, post.body, post.link].filter(Boolean).join('\n\n'), visibility: 'PUBLIC',
+          distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false },
+      }, null, 2) + '\n');
       if (instagram) await writeFile(new URL('instagram-payload.json', receipt.url), JSON.stringify(instagram, null, 2) + '\n');
     } else {
       await writeFile(join(paths.root, `${post.channel}-assisted.ics`), assistedReminder(post.channel, post.scheduledAt));

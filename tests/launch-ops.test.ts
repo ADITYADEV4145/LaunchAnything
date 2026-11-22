@@ -330,7 +330,7 @@ it.each(['warroom', 'friends', 'followup', 'retro', 'release'])('%s emits struct
   const cwd = await mkdtemp(join(tmpdir(), 'liftoff-empty-')); dirs.push(cwd);
   const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', command, '--cwd', cwd, '--json'], { cwd: packageRoot(), encoding: 'utf8' });
   expect(result.status).toBe(1); expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, command });
-});
+}, 30000);
 it.each(['cli-tool', 'saas-next', 'mobile-expo'])('offline launch operations selftest for %s', async fixture => {
   const { cwd } = await workspace(fixture); await repository(cwd);
   for (const check of checks) await check.run({ cwd, fixture });

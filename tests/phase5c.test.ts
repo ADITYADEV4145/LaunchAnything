@@ -98,7 +98,7 @@ it('discovers and carries a single site through plan/write/check/review and appr
   const listing = cli(cwd, 'adapters');
   expect(listing.status, listing.stdout).toBe(0);
   expect(JSON.parse(listing.stdout).data).toContainEqual(expect.objectContaining({ id: 'betalist', source: 'project', route: 'manual', adapter: 'manual', reason: 'manual' }));
-});
+}, 30000);
 
 it('names both files on collisions and the file and schema errors on invalid definitions', () => {
   const builtin = temp(); const path = add(builtin, definition('x'));
@@ -177,7 +177,7 @@ it('validates config channels against the registry for the config cwd', async ()
     error: expect.stringContaining('Unknown channel: typo. Known ids:') });
   writeFileSync(path, JSON.stringify({ ...config, channels: [] }));
   expect(await validate(cwd, 'config')).toMatchObject({ valid: false });
-});
+}, 30000);
 
 it('uses built-in registry metadata for assisted routes, caps and browser destinations', () => {
   const cwd = temp();

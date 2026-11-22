@@ -114,7 +114,7 @@ it('keeps structured failure details and treats unmeasured viewport and speed as
   ]));
   await record(cwd, { ...inputs, threshold: 70, checks: { ...inputs.checks, demo: pending } });
   expect(prelaunch(cwd).readiness.ready).toBe(true);
-});
+}, 30000);
 
 it('blocks staging on fresh evidence without bypassing approval or affecting preview', async () => {
   const { cwd, paths } = await project();

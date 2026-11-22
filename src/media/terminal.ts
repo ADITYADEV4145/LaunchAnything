@@ -64,9 +64,10 @@ export async function renderTerminal(app: Browser, transcript: TerminalTranscrip
 }
 
 export function terminalCapHeight(words: OcrWord[], frameHeight: number, box?: TerminalRegion): number | undefined {
+  if (!box) return undefined;
   const valid = words.filter(word => word.conf >= 0 && word.text.length > 1);
-  const terminal = box ? valid.filter(word => word.x >= box.x - 2 && word.x + word.width <= box.x + box.width + 2 && word.y >= box.y - 2 && word.y + word.height <= box.y + box.height + 2) : valid.filter(word => /grounding|\.(?:ts|js|py)\b|\([^)]*\)/i.test(word.text));
-  if (!terminal.length) return box ? 0 : undefined;
+  const terminal = valid.filter(word => word.x >= box.x - 2 && word.x + word.width <= box.x + box.width + 2 && word.y >= box.y - 2 && word.y + word.height <= box.y + box.height + 2);
+  if (!terminal.length) return 0;
   const heights = terminal.map(word => word.height).sort((a, b) => a - b);
   return heights[Math.min(heights.length - 1, Math.floor(heights.length * .8))] / frameHeight;
 }

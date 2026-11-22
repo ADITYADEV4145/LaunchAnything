@@ -57,7 +57,12 @@ it('fails tiny terminal text even when the main caption is readable, including v
     await page.setContent(`<body style="margin:0;background:#101827;color:white;font-family:Arial"><header style="position:absolute;left:36px;top:40px;font-size:32px">Scope</header><pre style="position:absolute;left:50px;top:400px;font-size:13px">${Array(6).fill('BLOCK grounding: inspect the missing export in local source').join('\n')}</pre><div style="position:absolute;left:36px;top:900px;width:640px;border-left:5px solid #77e5b3;font-size:60px;font-weight:bold;padding:15px">Catch unknown exports before they ship</div></body>`);
     await page.screenshot({path});
   } finally { await app.close(); }
+  const box={x:50,y:400,width:640,height:300};
+  const records=JSON.parse(await readFile(join(cwd,'.launch/media/images/report.json'),'utf8'));
+  records.push({file:'portrait.png',terminal:{box}});
+  await writeFile(join(cwd,'.launch/media/images/report.json'),JSON.stringify(records));
   await exec('ffmpeg',['-y','-v','error','-loop','1','-i',path,'-t','1','-r','12','-c:v','libx264','-pix_fmt','yuv420p','-threads','1',join(cwd,'.launch/video/portrait.mp4')]);
+  await writeFile(join(cwd,'.launch/video/portrait.mp4.json'),JSON.stringify({scenes:[{duration:1,terminal:{box}}]}));
   await expect(judge(cwd)).rejects.toThrow('terminal text cap height below 2.2%');
   const saved=await report(cwd);
   const item=saved.items.find(item=>item.file.endsWith('/portrait.png'))!;
@@ -66,6 +71,16 @@ it('fails tiny terminal text even when the main caption is readable, including v
   expect(saved.items.find(item=>item.video)?.terminalCapHeight).toBeLessThan(.022);
   await overrides(cwd,saved.items);
   await expect(judge(cwd)).rejects.toThrow('terminal text cap height below 2.2%');
+},120000);
+
+it('does not mistake parenthesized web UI labels for terminal text without terminal metadata',async()=>{
+  const cwd=await fixture();const path=join(cwd,'.launch/media/images/web.png');
+  await picture(path,'Catch unknown exports<span style="position:absolute;left:80px;top:450px;font-size:12px">Download (CSV)</span>');
+  await exec('ffmpeg',['-y','-v','error','-loop','1','-i',path,'-t','1','-r','12','-c:v','libx264','-pix_fmt','yuv420p','-threads','1',join(cwd,'.launch/video/web.mp4')]);
+  const result=await judge(cwd);
+  expect(result.ok).toBe(true);
+  expect(result.items.find(item=>item.file.endsWith('/web.png'))!.terminalCapHeight).toBeUndefined();
+  expect(result.items.find(item=>item.video?.endsWith('/web.mp4'))!.terminalCapHeight).toBeUndefined();
 },120000);
 
 it('fails banned video frames with timestamps and rule names, without reproducing OCR content',async()=>{

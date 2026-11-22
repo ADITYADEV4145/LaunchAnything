@@ -7,6 +7,7 @@ import { fileHash, formats, type Format, parseFormats, run } from './render.js';
 import { chromeLint, endCardSeconds, loadScript, readcheck, srt, totalDuration, sceneDuration, words, type Gate, type Script } from './script.js';
 
 import { loadStyle, styleGate } from './styles.js';
+import { narrationFiles } from './voice.js';
 
 async function gate(id: string, name: string, work: () => Promise<string>): Promise<Gate> {
   try { return {id,name,status:'pass',detail:await work()}; }
@@ -49,9 +50,11 @@ export function transcriptCoverage(script: string, transcript: string) {
   const expected = words(script), actual = new Set(words(transcript));
   return expected.length ? expected.filter(word => actual.has(word)).length / expected.length : 1;
 }
-export async function voiceGate(video: string, script: Script, narrated = true): Promise<Gate> {
+export async function voiceGate(cwd: string, video: string, script: Script, narrated = true): Promise<Gate> {
   const skipped = (detail: string): Gate => ({id:'G6',name:'voice-stt',status:'skipped',detail});
-  if (!narrated || !script.scenes.some(scene => scene.voiceover?.trim())) return skipped('No narration in rendered audio');
+  if (!narrated) return skipped('No narration in rendered audio');
+  const takes = await narrationFiles(cwd,script.scenes);
+  if (!takes.some(Boolean)) return skipped('No narration in rendered audio');
   let binary: string | undefined;
   for (const name of ['whisper','whisper-cli']) {
     for (const directory of (process.env.PATH ?? '').split(delimiter)) {
@@ -67,7 +70,7 @@ export async function voiceGate(video: string, script: Script, narrated = true):
       let offset = 0;
       for (const [index,scene] of script.scenes.entries()) {
         const start = offset; offset += scene.duration;
-        if (!scene.voiceover?.trim()) continue;
+        if (!takes[index] || !scene.voiceover?.trim()) continue;
         const output = join(work,`${index}`), audio = `${output}.wav`;
         await run('ffmpeg',['-y','-v','error','-ss',String(start),'-i',video,'-t',String(scene.duration),'-map','0:a:0','-vn','-ac','1','-ar','16000',audio]);
         if (binary!.endsWith('whisper-cli')) await run(binary!,['-f',audio,'-otxt','-of',output]);
@@ -111,7 +114,7 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
     if (receipt.sha256 !== await fileHash(path) || receipt.script !== JSON.stringify(script)) throw new Error(`Stale video caption receipt: ${path}`);
     if (receipt.captions !== 'burned' && !probe.streams.some((s: {codec_type:string}) => s.codec_type === 'subtitle')) throw new Error(`Captions not present: ${path}`);
     let loudness: number | undefined;
-    const gates = [...await motionGates(path),readcheck(timedScript,timedCaptions),chromeLint(script),endCardGate(timedScript,info.duration),await voiceGate(path,timedScript,info.audio && receipt.audio?.mode !== 'music-only')];
+    const gates = [...await motionGates(path),readcheck(timedScript,timedCaptions),chromeLint(script),endCardGate(timedScript,info.duration),await voiceGate(cwd,path,timedScript,info.audio && receipt.audio?.mode !== 'music-only')];
     if (distinct) gates.push(distinct);
     if (info.audio) gates.push(await gate('loudness','loudness',async () => {
       const {stderr} = await run('ffmpeg',['-hide_banner','-i',path,'-af','ebur128','-f','null','-']);

@@ -69,6 +69,8 @@ card and show a corner logo watermark throughout the footage. SVG logos are
 rasterized locally in Chrome. Optional script `title` and `tagline` override the
 title card's product name and one-liner. The title card counts toward duration
 limits; captions and narration start after it. Without a logo, timing is unchanged.
+Set script `resolution: "1080p"` for native 1920×1080 landscape rendering (and
+proportionally larger square/portrait formats); the default remains `720p`.
 
 The independent project is bundled at `templates/video/remotion/`. Install its
 dependencies in your working repository to use it (Remotion is not a CLI runtime

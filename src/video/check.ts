@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { launchDir } from '../core/launch-dir.js';
-import { fileHash, formats, type Format, parseFormats, run } from './render.js';
+import { fileHash, formats, formatSpec, type Format, parseFormats, run } from './render.js';
 import { chromeLint, endCardSeconds, loadScript, readcheck, srt, totalDuration, sceneDuration, words, type Gate, type Script } from './script.js';
 
 import { loadStyle, styleGate } from './styles.js';
@@ -84,12 +84,13 @@ export async function voiceGate(cwd: string, video: string, script: Script, narr
   });
 }
 
-export function checkProbe(probe: {format: {duration: string}; streams: {codec_type: string; width?: number; height?: number}[]}, format: Format, storyboard = false) {
+export function checkProbe(probe: {format: {duration: string}; streams: {codec_type: string; width?: number; height?: number}[]}, format: Format, storyboard = false, resolution?: string) {
   const duration = Number(probe.format.duration);
   const platforms = Object.entries({'youtube-shorts':60, x:140, 'product-hunt':180}).map(([platform,maxSeconds]) => ({platform,maxSeconds,compliant:Number.isFinite(duration) && duration <= maxSeconds,required:platform === 'youtube-shorts' ? format === '9x16' : platform === 'x' ? format !== '9x16' : format === '16x9'}));
   if (!Number.isFinite(duration) || duration < (storyboard ? format === '9x16' ? 20 : 45 : 30) || (storyboard && duration > (format === '9x16' ? 35 : 60)) || platforms.some(p => p.required && !p.compliant)) throw new Error(`Duration ${duration}s invalid for ${format}: ${JSON.stringify(platforms)}`);
   const video = probe.streams.find(s => s.codec_type === 'video');
-  if (video?.width !== formats[format].width || video?.height !== formats[format].height) throw new Error(`Incorrect resolution for ${format}`);
+  const spec = formatSpec(format,resolution);
+  if (video?.width !== spec.width || video?.height !== spec.height) throw new Error(`Incorrect resolution for ${format}`);
   return {duration, platforms, width:video.width, height:video.height, audio:probe.streams.some(s => s.codec_type === 'audio')};
 }
 export async function check(cwd: string, selected: Format[] = parseFormats()) {
@@ -106,7 +107,7 @@ export async function check(cwd: string, selected: Format[] = parseFormats()) {
     const modern = script.scenes.some(scene => scene.role);
     const timedScript = {...script,scenes:script.scenes.map(scene => ({...scene,duration:sceneDuration(scene,format,modern)}))};
     const timedCaptions = modern ? await readFile(join(dir,`captions-${format}.srt`),'utf8') : captions;
-    const info = checkProbe(probe, format, modern);
+    const info = checkProbe(probe, format, modern, script.resolution);
     if (modern && (await readFile(join(dir, `captions-${format}.srt`), 'utf8')).trim() !== srt(timedScript).trim()) throw new Error(`Captions SRT out of date for ${format}`);
     const expected = totalDuration(script, format);
     if (Math.abs(info.duration - expected) > 0.25) throw new Error(`Rendered duration differs from script: ${path}`);

@@ -3,6 +3,7 @@
   "$id": "https://launch-liftoff.dev/schemas/video-script.schema.json",
   "type": "object",
   "properties": {
+    "resolution": { "enum": ["720p", "1080p"] },
     "title": { "type": "string", "minLength": 1 },
     "tagline": { "type": "string", "minLength": 1 },
     "titleCardSeconds": { "type": "number", "enum": [0, 2.5] },

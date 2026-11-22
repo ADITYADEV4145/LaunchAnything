@@ -23,16 +23,17 @@ export async function brandVideo(cwd: string, work: string, silent: string, widt
   const brand = await branding(cwd);
   const style = await loadStyle(cwd, options.style);
   const image = await dataImage(logo);
+  const badge = `<img style="position:absolute;right:2vw;top:2vh;width:7vw;height:7vh;object-fit:contain;background:#101827ed;border-radius:8px;padding:6px" src="${escapeHtml(image)}">`;
   const app = await browser();
   const title = join(work, 'brand-title.png'), watermark = join(work, 'brand-watermark.png');
   try {
     const page = await app.newPage({ viewport: { width, height } });
     await page.route('**/*', route => route.abort());
-    await page.setContent(`<body style="margin:0;background:${style.palette.background[0]};color:${style.palette.text};font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center"><img style="width:28vw;height:28vh;object-fit:contain" src="${escapeHtml(image)}"><h1 style="font-size:7vh;margin:3vh 5vw 1vh;max-width:90vw;overflow-wrap:anywhere">${escapeHtml(options.title ?? brand.name)}</h1><p style="font-size:3.5vh;max-width:86vw;margin:1vh 0">${escapeHtml(options.tagline ?? brand.tagline)}</p></body>`);
+    await page.setContent(`<body style="margin:0;background:${style.palette.background[0]};color:${style.palette.text};font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center"><img style="width:28vw;height:28vh;object-fit:contain" src="${escapeHtml(image)}"><h1 style="font-size:7vh;margin:3vh 5vw 1vh;max-width:90vw;overflow-wrap:anywhere">${escapeHtml(options.title ?? brand.name)}</h1><p style="font-size:3.5vh;max-width:86vw;margin:1vh 0">${escapeHtml(options.tagline ?? brand.tagline)}</p>${badge}</body>`);
     await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode())); });
     if (!await page.locator('body').evaluate(el => el.scrollHeight <= innerHeight)) throw new Error('Title card text does not fit; shorten title or tagline');
     await page.screenshot({ path: title });
-    await page.setContent(`<body style="margin:0;background:transparent"><img style="position:absolute;right:2vw;top:2vh;width:7vw;height:7vh;object-fit:contain;background:#101827ed;border-radius:8px;padding:6px" src="${escapeHtml(image)}"></body>`);
+    await page.setContent(`<body style="margin:0;background:transparent">${badge}</body>`);
     await page.evaluate(async () => { await Promise.all([...document.images].map(image => image.decode())); });
     await page.screenshot({ path: watermark, omitBackground: true });
   } finally { await app.close(); }

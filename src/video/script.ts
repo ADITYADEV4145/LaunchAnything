@@ -10,7 +10,7 @@ import { findLogo, titleCardSeconds } from './brand.js';
 
 export type SceneRole = 'hook' | 'before' | 'action' | 'after' | 'proof' | 'cta';
 export interface Scene { shot: string; text: string; duration: number; voiceover?: string; role?: SceneRole; shortDuration?: number; highlight?: {x:number;y:number;width:number;height:number} }
-export interface Script { scenes: Scene[]; style?: string; title?: string; tagline?: string; titleCardSeconds?: number }
+export interface Script { scenes: Scene[]; style?: string; title?: string; tagline?: string; titleCardSeconds?: number; resolution?: string }
 export interface Gate { id: string; name: string; status: 'pass' | 'fail' | 'skipped'; detail: string }
 export const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 function minimumHookDuration(text: string) {

@@ -27,6 +27,11 @@ export const formats = {
   '1x1': { width: 720, height: 720, file: 'square-1x1.mp4', composition: 'Square' },
 } as const;
 export type Format = keyof typeof formats;
+export function formatSpec(format: Format, resolution?: string) {
+  if (resolution && !['720p','1080p'].includes(resolution)) throw new Error('Resolution must be 720p or 1080p');
+  const spec = formats[format];
+  return resolution === '1080p' ? {...spec,width:Math.round(spec.width*1.5),height:Math.round(spec.height*1.5)} : spec;
+}
 export function parseFormats(value = '16x9,9x16,1x1'): Format[] {
   const selected = [...new Set(value.split(','))];
   if (!selected.length || selected.some(f => !(f in formats))) throw new Error('Format must be 16x9,9x16,1x1');
@@ -58,7 +63,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     const results = [];
     for (const format of selected) {
       const scenes = await Promise.all(script.scenes.map(async scene => ({ role: scene.role, caption: scene.text, source: await resolveShot(cwd, scene.shot), duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)), highlight: scene.highlight })));
-      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music, style:script.style, title:script.title, tagline:script.tagline });
+      const result = await renderClip(cwd, scenes, { format, renderer: renderer as 'auto' | 'ffmpeg' | 'remotion', voice: voices, music: options.music, style:script.style, title:script.title, tagline:script.tagline, resolution:script.resolution });
       await writeFile(`${result.file}.json`, JSON.stringify({ ...result.receipt, script: JSON.stringify(script) }, null, 2));
       await writeFile(join(dir, `captions-${format}.srt`), srt({ ...script, scenes: script.scenes.map(scene => ({ ...scene, duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)) })) }));
       results.push(result);
@@ -102,7 +107,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
       return target;
     };
     for (const format of selected) {
-      const {width,height} = formats[format];
+      const {width,height} = formatSpec(format,script.resolution);
       assets[format] = [];
       for (const [i,scene] of script.scenes.entries()) {
         const focus=width<=height?focused[i]:undefined;
@@ -128,20 +133,22 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
           for (const file of [asset.plate,asset.caption]) await cp(file,join(work,'public',basename(file)));
           const src=`${format}-${i}.${asset.source.split('.').pop()}`;
           await cp(asset.source,join(work,'public',src));
-          layouts[`${formats[format].width}x${formats[format].height}`]={...asset,src,plate:basename(asset.plate),caption:basename(asset.caption)};
+          const spec = formatSpec(format,script.resolution);
+          layouts[`${spec.width}x${spec.height}`]={...asset,src,plate:basename(asset.plate),caption:basename(asset.caption)};
         }
         return { ...s, src: `${i}.${ext}`, layouts };
       }));
       const endLayouts: Record<string,string> = {};
       for (const format of selected) {
         await cp(endCards[format],join(work,'public',basename(endCards[format])));
-        endLayouts[`${formats[format].width}x${formats[format].height}`]=basename(endCards[format]);
+        const spec = formatSpec(format,script.resolution);
+        endLayouts[`${spec.width}x${spec.height}`]=basename(endCards[format]);
       }
-      await writeFile(join(work, 'props.json'), JSON.stringify({scenes, endCards:endLayouts, endCardSeconds, style}));
+      await writeFile(join(work, 'props.json'), JSON.stringify({scenes, endCards:endLayouts, endCardSeconds, style, resolution:script.resolution}));
       entry = join(work, 'src', 'index.tsx');
     }
     for (const format of selected) {
-      const spec = formats[format];
+      const spec = formatSpec(format,script.resolution);
       const silent = join(work, `${format}.mp4`);
       if (cli) {
         await run(cli, ['render', entry, spec.composition, silent, '--props', join(work, 'props.json'), '--concurrency', '2', '--log', 'error', '--codec', 'h264'], work);

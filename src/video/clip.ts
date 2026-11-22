@@ -5,7 +5,7 @@ import { packageRoot } from '../core/package-root.js';
 import { browser, escapeHtml } from '../visuals/runtime.js';
 import { mediaBrand, homepageHost, optionalJson } from '../media/assets.js';
 import { assertClean, ocrWords } from '../media/banned.js';
-import { formats, fileHash, remotionCli, run, type Format } from './render.js';
+import { formats, formatSpec, fileHash, remotionCli, run, type Format } from './render.js';
 import { assertNarrationFits, mixAudio } from './audio.js';
 import { brandVideo, findLogo, titleCardSeconds } from './brand.js';
 import type { SceneRole } from './script.js';
@@ -14,7 +14,7 @@ import { terminalSource, renderTerminal, type TerminalTranscript, type TerminalM
 import { captionContrast, loadStyle, motionFilter } from './styles.js';
 
 export interface ClipScene { role?: SceneRole; caption: string; source: string; duration: number; highlight?: { x: number; y: number; width: number; height: number }; terminal?: TerminalTranscript }
-export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion'; style?: string; title?: string; tagline?: string }
+export interface ClipOptions { format?: Format; music?: string; voice?: (string | undefined)[]; outFile?: string; renderer?: 'auto' | 'ffmpeg' | 'remotion'; style?: string; title?: string; tagline?: string; resolution?: string }
 export interface ClipFrame { x: number; y: number; width: number; height: number; kind: string }
 export interface ClipReceipt {
   sha256: string; format: Format; captions: 'burned'; renderer: 'ffmpeg' | 'remotion'; duration: number;
@@ -28,7 +28,7 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
   const format = options.format ?? '16x9';
   if (!(format in formats)) throw new Error('Unknown clip format');
   if (options.renderer && !['auto', 'ffmpeg', 'remotion'].includes(options.renderer)) throw new Error('Unknown clip renderer');
-  const spec = formats[format]; const { width, height } = spec;
+  const spec = formatSpec(format,options.resolution); const { width, height } = spec;
   const style = await loadStyle(cwd,options.style);
   const themed = style.id !== 'midnight' || style.custom;
   if (themed && scenes.some(scene => scene.duration < style.pacing.min || scene.duration > style.pacing.max)) throw new Error(`Scene duration outside ${style.id} pacing (${style.pacing.min}–${style.pacing.max}s)`);
@@ -106,7 +106,7 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
       const end = assets.at(-1)!;
       const endCard = join(work, 'public', 'end.png');
       await run('ffmpeg', ['-y', '-v', 'error', '-i', end.plate, '-i', end.caption, '-filter_complex', 'overlay', '-frames:v', '1', '-threads', '1', endCard]);
-      await writeFile(join(work, 'props.json'), JSON.stringify({ scenes: propsScenes, endCards: { [`${width}x${height}`]: 'end.png' }, endCardSeconds: 3, logo: brand.logo, style }));
+      await writeFile(join(work, 'props.json'), JSON.stringify({ scenes: propsScenes, endCards: { [`${width}x${height}`]: 'end.png' }, endCardSeconds: 3, logo: brand.logo, style, resolution:options.resolution }));
       await run(cli, ['render', join(work, 'src/index.tsx'), spec.composition, silent, '--props', join(work, 'props.json'), '--concurrency', '2', '--log', 'error', '--codec', 'h264'], work);
     } else {
       await writeFile(join(work, 'concat.txt'), pieces.map(path => `file '${path.replaceAll("'", "'\\''")}'`).join('\n'));

@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PNG } from 'pngjs';
 import { voice } from '../src/video/voice.js';
-import { render, run } from '../src/video/render.js';
+import { formatSpec, render, run } from '../src/video/render.js';
 import { renderClip } from '../src/video/clip.js';
 import { validateScript, srt, totalDuration } from '../src/video/script.js';
-import { endCardGate } from '../src/video/check.js';
+import { checkProbe, endCardGate } from '../src/video/check.js';
 import { assertNarrationFits } from '../src/video/audio.js';
 
 const dirs: string[] = [];
@@ -83,6 +83,7 @@ it('renders a large SVG logo title and corner watermark throughout legacy and cl
   const result=await render(cwd,'ffmpeg',['1x1']);
   const title=await frame(cwd,result.files[0],1);
   expect(pink(title,360,240)).toBe(true);
+  expect(pink(title,680,40)).toBe(true);
   for (const second of [3,8,13,18,23,26]) {
     const scene=await frame(cwd,result.files[0],second);
     expect(pink(scene,680,40)).toBe(true);
@@ -94,6 +95,17 @@ it('renders a large SVG logo title and corner watermark throughout legacy and cl
   expect(pink(await frame(cwd,clip.file,3),680,40)).toBe(true);
   await writeFile(join(cwd,'.launch/media/logo.svg'),'invalid SVG');
   await expect(renderClip(cwd,[{caption:'Find the source',source:'.launch/media/capture.png',duration:1}],{renderer:'ffmpeg'})).rejects.toThrow();
+},120000);
+it('supports native 1080p composition and validates the requested output resolution',async()=>{
+  const {cwd}=await fixture();
+  expect(formatSpec('16x9','1080p')).toMatchObject({width:1920,height:1080});
+  expect(()=>formatSpec('16x9','invalid')).toThrow('Resolution');
+  const clip=await renderClip(cwd,[{caption:'Find the source',source:'.launch/media/capture.png',duration:1}],{renderer:'ffmpeg',resolution:'1080p'});
+  const probe=JSON.parse((await run('ffprobe',['-v','error','-show_streams','-show_format','-of','json',clip.file])).stdout);
+  expect(probe.streams[0]).toMatchObject({width:1920,height:1080});
+  probe.format.duration='45';
+  expect(checkProbe(probe,'16x9',false,'1080p')).toMatchObject({width:1920,height:1080});
+  expect(()=>checkProbe(probe,'16x9')).toThrow('Incorrect resolution');
 },120000);
 it('rejects overlong narration instead of trimming speech, including clips and legacy videos',async()=>{
   const {cwd}=await fixture(); const audio=join(cwd,'long.wav');

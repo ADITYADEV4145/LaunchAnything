@@ -13,6 +13,11 @@ import { assistedPublish } from '../connect/publish.js';
 import { reserveCap } from '../connect/caps.js';
 import { loadReview } from '../review/posts.js';
 import type { Check } from './types.js';
+import { MockMcpClient, productHuntTools } from '../connect/mcp.js';
+import { buildReview } from '../review/page.js';
+import { publish } from '../adapters/publish.js';
+import { liveUrls, published as launchPublished } from '../launch-ops/common.js';
+import { collect } from '../results/collect.js';
 
 export async function phase5bGate(cwd: string) {
   const workspace = join(cwd, '.liftoff-fixture', 'phase5b-work');
@@ -59,6 +64,42 @@ export async function phase5bGate(cwd: string) {
     assert.equal(await readFile(new URL(staged.posts[0].url!), 'utf8'), 'Own account\n\nLocal launch.\n');
     assert.equal(JSON.parse(await readFile(paths.published, 'utf8')).posts.length, 2);
     assert.equal(browser.actions.length, count);
+    const xPath = join(paths.posts, 'x.md');
+    const source = await readFile(xPath, 'utf8');
+    await writeFile(xPath, source + 'Edited after approval.\n');
+    await assert.rejects(assistedPublish(workspace, { ...options, channel: 'x' }), /not approved/);
+    await writeFile(xPath, source);
+    const receipts = await readFile(paths.published, 'utf8');
+    assert.equal((await publish(workspace)).mode, 'dry-run');
+    assert.equal(await readFile(paths.published, 'utf8'), receipts);
+    const review = await buildReview(workspace);
+    const html = await readFile(review.path, 'utf8');
+    assert.ok(html.includes('$0.015'));
+    assert.ok(html.indexOf('X API cost before approval') < html.indexOf('data-action="approve"', html.indexOf('X API cost before approval')));
+    const launch = await launchPublished(workspace);
+    assert.ok(liveUrls(launch).includes('https://news.ycombinator.com/item?id='));
+    const seen: unknown[] = [];
+    await collect(workspace, { now: new Date('2026-07-15T12:00:00Z'), readStatus: async post => { seen.push(post); return { views: 1 }; } });
+    assert.deepEqual(seen, launch);
+    await assert.rejects(connect({ platform: 'linkedin', route: 'browser', account: 'owner', profile: workspace }, undefined, keychain, home), /official API/);
+    await assert.rejects(connect({ platform: 'linkedin', route: 'mcp', account: 'owner' }, token, keychain, home), /website-driving MCP/);
+    await writeFile(join(paths.posts, 'product-hunt.md'), '---\ntitle: Own product\nmedia: []\nclaims: []\nlink: https://example.test\n---\nLocal product launch.\n');
+    const { posts: phPosts } = await loadReview(workspace);
+    await writeFile(paths.approvals, JSON.stringify({ approvals: phPosts.map(p => ({ channel: p.channel, hash: p.hash, name: 'Owner', time: new Date().toISOString() })) }));
+    await connect({ platform: 'product-hunt', account: 'owner' }, token, keychain, home);
+    const ph = new MockMcpClient('product-hunt');
+    const drafted = await assistedPublish(workspace, { home, channel: 'product-hunt', keychain, mcp: async () => ph });
+    assert.equal(drafted.posts[0].status, 'manual');
+    assert.deepEqual(ph.calls.map(call => call.name), productHuntTools);
+    await assert.rejects(ph.callTool('submit_launch', {}), /refused/);
+    await connect({ platform: 'x', account: 'owner' }, token, keychain, home);
+    const x = new MockMcpClient('x', [{ name: 'unverified_write_tool' }]);
+    const fallback = await assistedPublish(workspace, { home, channel: 'x', keychain, mcp: async () => x });
+    assert.equal(x.discoveries, 2);
+    assert.equal(x.calls.length, 0);
+    assert.equal(fallback.posts[0].status, 'manual');
+    assert.ok((await readFile(new URL(fallback.posts[0].url!), 'utf8')).includes('Local launch.'));
+    assert.equal(JSON.parse(await readFile(new URL('failure.json', fallback.posts[0].url), 'utf8')).attempts, 2);
     for (const hook of hooks) assert.equal(hook.mock.callCount(), 0);
   } finally { for (const hook of hooks) hook.mock.restore(); }
   async function scan(dir: string): Promise<void> {

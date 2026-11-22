@@ -20,6 +20,8 @@ import type { Route } from '../src/connect/registry.js';
 import { HttpMcpClient, MockMcpClient, mcpDraft, officialServers, productHuntTools } from '../src/connect/mcp.js';
 import { xCost } from '../src/connect/costs.js';
 import { buildReview } from '../src/review/page.js';
+import { liveUrls, published as launchPublished } from '../src/launch-ops/common.js';
+import { collect } from '../src/results/collect.js';
 
 const temp: string[] = [];
 async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-5b-')); temp.push(path); return path; }
@@ -180,6 +182,30 @@ it('retains the browser-published URL and status after later offline staging', a
   expect(staged.posts[0].id).not.toBe(published.id);
   expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toEqual([published, ...staged.posts]);
   expect(published).toMatchObject({ status: 'published', url: 'https://news.ycombinator.com/item?id=123' });
+});
+it.each(['copy', 'media'])('refuses assisted dispatch after approved %s changes before any external action', async changed => {
+  const { cwd, paths, home } = await approvedPost('reddit', ['gallery.png'], { subreddit: 'r/test' });
+  await connect({ platform: 'reddit', route: 'browser', account: 'owner', profile: cwd }, undefined, new MemoryKeychain(), home);
+  if (changed === 'copy') {
+    const path = join(paths.posts, 'reddit.md');
+    await writeFile(path, (await readFile(path, 'utf8')).replace('Caption.', 'Edited after approval.'));
+  } else await writeFile(join(paths.media, 'gallery.png'), 'Changed approved bytes');
+  const browser = vi.fn(), mcp = vi.fn();
+  await expect(assistedPublish(cwd, { home, browser, mcp })).rejects.toThrow('exact post and media hash not approved');
+  expect(browser).not.toHaveBeenCalled(); expect(mcp).not.toHaveBeenCalled();
+  await expect(readFile(join(paths.root, 'publish-caps.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+it('exposes a Phase 5b published URL to launch-day and results readers', async () => {
+  const { cwd, paths, home } = await approvedPost('show-hn', [], { link: 'https://example.test' });
+  await connect({ platform: 'show-hn', route: 'browser', account: 'owner', profile: cwd }, undefined, new MemoryKeychain(), home);
+  const url = 'https://news.ycombinator.com/item?id=456';
+  const result = await assistedPublish(cwd, { home, browser: async () => new MockBrowser(url) });
+  expect(await launchPublished(cwd)).toEqual(result.posts);
+  expect(liveUrls(await launchPublished(cwd))).toContain(url);
+  const observed: unknown[] = [];
+  await collect(cwd, { now: new Date('2026-07-15T12:00:00Z'), readStatus: async post => { observed.push(post); return { views: 5 }; } });
+  expect(observed).toEqual(result.posts);
+  expect(await readFile(paths.report, 'utf8')).toContain(url);
 });
 it('validates route and token without persisting invalid connections', async () => {
   const home = await workspace();

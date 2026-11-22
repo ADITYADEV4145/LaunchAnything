@@ -38,6 +38,7 @@ Selftest retains its per-check report in data even when some checks fail.
 | 3 | shots, images | Stubs |
 | 4 | video | Stub |
 | 5 | review, publish | Local approval and staging; no external posting |
+| 5b | connect, publish --confirm --assist | Own accounts; official PH draft MCP, X discovery/manual fallback, browser-assisted HN/Reddit |
 | 6 | results, learn, receipt | Stubs |
 
 Doctor lists skill names, MCP server names (never configuration values), and executable
@@ -94,4 +95,10 @@ Never publish without human approval of the exact post and media hash. Never aut
 to Hacker News or Reddit, and never auto-reply. Optional integrations need fallbacks.
 Scan is offline by default; GitHub stars require --github or LIFTOFF_ALLOW_NETWORK=1.
 Publish is a no-network preview by default; --confirm stages local artifacts only.
+`--confirm --assist` opts into connected-account assistance: official Product Hunt
+draft/readiness/preview (never submit), official X capability discovery with manual
+fallback, or browser filling without Submit. LinkedIn accepts official API routes
+only; direct API/Postiz/Buffer dispatch remains offline staging. See the
+[own-account guide](skill/references/phase5b.md) for X review costs, keychain setup,
+retry/manual recovery, caps and URL receipts. Tests and selftests use mocks only.
 MIT; author Aditya.

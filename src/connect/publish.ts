@@ -52,41 +52,65 @@ export async function assistedPublish(cwd: string | undefined, options: AssistOp
     queue.push({ post, connection, adapter, instagram });
   }
   const receipts: PublishReceipt[] = [];
+  const warnings: string[] = [];
   for (const { post, connection, adapter, instagram } of queue) {
     await reserveCap(paths.root, post.channel, connection.account, options.now);
-    let receipt: PublishReceipt;
-    if (connection.route === 'mcp') {
-      const token = await (options.keychain ?? osKeychain()).get(`${post.channel}:${connection.account}`);
-      if (!token) throw new Error('MCP token unavailable; reconnect your own account');
-      const platform = post.channel as McpPlatform;
-      const client = await (options.mcp?.(platform, token) ?? Promise.resolve(new HttpMcpClient(platform, token)));
-      receipt = await mcpDraft(platform, client, post, paths.root);
-    } else if (adapter) {
-      receipt = await adapter.schedule(post, cwd);
-      if (adapter.name === 'linkedin-api') await writeFile(new URL('linkedin-api-request.json', receipt.url), JSON.stringify({
-        method: 'POST', url: 'https://api.linkedin.com/rest/posts',
-        instruction: 'Offline request only. Use your OS-keychain token and a supported LinkedIn-Version header with the official API; never automate the website.',
-        body: { author: connection.account, commentary: [post.title, post.body, post.link].filter(Boolean).join('\n\n'), visibility: 'PUBLIC',
-          distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false },
-      }, null, 2) + '\n');
-      if (instagram) await writeFile(new URL('instagram-payload.json', receipt.url), JSON.stringify(instagram, null, 2) + '\n');
-    } else {
-      await writeFile(join(paths.root, `${post.channel}-assisted.ics`), assistedReminder(post.channel, post.scheduledAt));
-      const driver = await (options.browser ?? chromeBrowser)(connection.profile!);
-      let cleanup: (() => Promise<void>) | undefined;
-      try {
-        cleanup = await fillForm(driver, post, paths.root);
-        const url = await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, options.timeout ?? 600000);
-        receipt = { channel: post.channel, id: `browser:${post.channel}:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
-      } finally {
-        try { await driver.close(); }
-        finally { await cleanup?.(); }
+    const dispatch = async (): Promise<PublishReceipt> => {
+      let receipt: PublishReceipt | undefined;
+      if (connection.route === 'mcp') {
+        const token = await (options.keychain ?? osKeychain()).get(`${post.channel}:${connection.account}`);
+        if (!token) throw new Error('MCP token unavailable; reconnect your own account');
+        const platform = post.channel as McpPlatform;
+        const client = await (options.mcp?.(platform, token) ?? Promise.resolve(new HttpMcpClient(platform, token)));
+        receipt = await mcpDraft(platform, client, post, paths.root);
+      } else if (adapter) {
+        receipt = await adapter.schedule(post, cwd);
+        if (adapter.name === 'linkedin-api') await writeFile(new URL('linkedin-api-request.json', receipt.url), JSON.stringify({
+          method: 'POST', url: 'https://api.linkedin.com/rest/posts',
+          instruction: 'Offline request only. Use your OS-keychain token and a supported LinkedIn-Version header with the official API; never automate the website.',
+          body: { author: connection.account, commentary: [post.title, post.body, post.link].filter(Boolean).join('\n\n'), visibility: 'PUBLIC',
+            distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false },
+        }, null, 2) + '\n');
+        if (instagram) await writeFile(new URL('instagram-payload.json', receipt.url), JSON.stringify(instagram, null, 2) + '\n');
+      } else {
+        await writeFile(join(paths.root, `${post.channel}-assisted.ics`), assistedReminder(post.channel, post.scheduledAt));
+        const driver = await (options.browser ?? chromeBrowser)(connection.profile!);
+        let cleanup: (() => Promise<void>) | undefined;
+        try {
+          cleanup = await fillForm(driver, post, paths.root);
+          const url = await driver.waitForUrl(forms[post.channel as BrowserPlatform].result, options.timeout ?? 600000);
+          receipt = { channel: post.channel, id: `browser:${post.channel}:${post.hash}`, url, status: 'published', scheduledAt: post.scheduledAt };
+        } finally {
+          try { await driver.close(); }
+          catch (error) { if (!receipt) throw error; warnings.push(`${post.channel}: browser close failed after URL capture`); }
+          finally {
+            try { await cleanup?.(); }
+            catch (error) { if (!receipt) throw error; warnings.push(`${post.channel}: approved upload cleanup failed`); }
+          }
+        }
+      }
+      return receipt;
+    };
+    let receipt: PublishReceipt | undefined;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try { receipt = await dispatch(); break; }
+      catch {
+        if (attempt === 1) {
+          receipt = await getAdapter(post.channel).schedule(post, cwd);
+          const reason = connection.route === 'mcp' && post.channel === 'x'
+            ? 'No verified official X post-create tool available. Discovery never authorizes an unfamiliar write tool.'
+            : 'Assisted dispatch failed twice. Inspect the destination for an existing post before using the paste file.';
+          await writeFile(new URL('failure.json', receipt.url), JSON.stringify({ attempts: 2, status: 'manual', reason }, null, 2) + '\n');
+          warnings.push(`${post.channel}: ${reason} Retained manual paste file: ${receipt.url}`);
+        }
       }
     }
+    if (!receipt) throw new Error(`${post.channel}: unable to retain a publish receipt`);
     const previous = await readReceipts(cwd);
-    const merged = previous.posts.filter(p => p.channel !== receipt.channel || p.id !== receipt.id);
+    const current = receipt;
+    const merged = previous.posts.filter(p => p.channel !== current.channel || p.id !== current.id);
     await writeFile(paths.published, JSON.stringify({ posts: [...merged, receipt] }, null, 2) + '\n');
     receipts.push(receipt);
   }
-  return { mode: 'assisted', posts: receipts };
+  return { mode: 'assisted', posts: receipts, warnings };
 }

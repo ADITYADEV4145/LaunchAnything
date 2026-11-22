@@ -384,10 +384,45 @@ it.each(['published', 'timeout', 'close failure'])('keeps approved uploads throu
     if (outcome === 'close failure') throw new Error('Close failed');
   };
   const result = assistedPublish(cwd, { home, browser: async () => browser });
-  if (outcome === 'published') expect((await result).posts[0].status).toBe('published');
-  else await expect(result).rejects.toThrow(outcome === 'timeout' ? 'Timed out' : 'Close failed');
+  if (outcome === 'timeout') expect((await result).posts[0].status).toBe('manual');
+  else expect((await result).posts[0].status).toBe('published');
   expect(closed).toBe(true);
   await expect(readFile(uploaded)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+it.each(['empty', 'unverified', 'failure'])('retains a manual X paste file after two %s discovery attempts', async state => {
+  const { cwd, paths, home } = await approvedPost('x', ['gallery.png']);
+  const keys = new MemoryKeychain();
+  await connect({ platform: 'x', account: 'owner' }, 'token', keys, home);
+  const client = new MockMcpClient('x', state === 'unverified' ? [{ name: 'create_tweet' }] : []);
+  if (state === 'failure') client.listTools = vi.fn(async () => { client.discoveries++; throw new Error('token must never be logged'); });
+  const result = await assistedPublish(cwd, { home, keychain: keys, mcp: async () => client });
+  expect(client.discoveries).toBe(2); expect(client.calls).toEqual([]);
+  expect(result.posts[0].status).toBe('manual');
+  expect(await readFile(new URL(result.posts[0].url!), 'utf8')).toContain('Caption.');
+  expect(await readFile(new URL('attachment-1.png', result.posts[0].url), 'utf8')).toBe('fixture media');
+  expect(JSON.parse(await readFile(new URL('failure.json', result.posts[0].url), 'utf8'))).toMatchObject({ attempts: 2, status: 'manual' });
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toEqual(result.posts);
+  expect(result.warnings.join(' ')).not.toContain('token');
+  expect(JSON.parse(await readFile(join(paths.root, 'publish-caps.json'), 'utf8'))).toHaveLength(1);
+});
+it.each(['transient', 'permanent'])('retries failed dispatch once and preserves %s outcomes', async state => {
+  const { cwd, paths, home } = await approvedPost('product-hunt', [], { link: 'https://example.test' });
+  const keys = new MemoryKeychain();
+  await connect({ platform: 'product-hunt', account: 'owner' }, 'token', keys, home);
+  const client = new MockMcpClient('product-hunt');
+  const respond = client.respond;
+  let attempts = 0;
+  client.respond = (name, args) => {
+    if (name === 'start_launch' && (++attempts === 1 || state === 'permanent')) throw new Error('Transient failure');
+    return respond(name, args);
+  };
+  const result = await assistedPublish(cwd, { home, keychain: keys, mcp: async () => client });
+  expect(attempts).toBe(2);
+  expect(client.calls.filter(call => call.name === 'start_launch').map(call => call.args.idempotency_key)[0])
+    .toBe(client.calls.filter(call => call.name === 'start_launch').map(call => call.args.idempotency_key)[1]);
+  if (state === 'transient') expect(result.posts[0].id).toMatch(/^mcp:/);
+  else expect(await readFile(new URL(result.posts[0].url!), 'utf8')).toContain('Caption.');
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts).toEqual(result.posts);
 });
 it('builds Instagram assets and first comment and refuses missing assets', () => {
   expect(instagramPayload({ gallery: ['a.png', 'b.png'], verticalVideo: '9x16.mp4', caption: 'Launch', hashtags: ['build', '#local'], coverFrame: 2 })).toMatchObject({

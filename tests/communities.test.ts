@@ -11,6 +11,20 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['any day except Friday', 'not on Friday', 'no posting on Friday', 'excluding Friday', 'any day other than Friday', 'any day except Friday and Saturday'])('excludes negated posting days: %s', async condition => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
+    const rules = [{ short_name: 'Promotions', description: `Self-promotion allowed; ${condition}` }]; const limit = restrictions(rules, 'UTC');
+    expect(limit.manualReview).toBeUndefined(); expect(limit.days).not.toContain(5); expect(limit.days).toContain(0);
+    const slot = postingSlot('2026-01-02', limit, 'UTC'); expect(new Date(slot.date).getUTCDay()).not.toBe(5); expect(postingWindow('2026-01-02', undefined, 'UTC', limit).day).toBe(false);
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.plan).toHaveLength(1); report.plan[0].date = '2026-01-02';
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting day violates cited rule');
+  });
+  it.each(['not only on Friday', 'Friday is not allowed', 'no restrictions on Friday', 'no affiliate links and post on Friday', 'Monday through Friday', 'Sunday except Sunday'])('fails closed on ambiguous or contradictory day rules: %s', description => {
+    const limit = restrictions([{ short_name: 'Promotions', description }], 'UTC');
+    expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-02', limit, 'UTC')).toThrow();
+  });
   it.each(['UTC', 'ET'])('accepts 24:00 as an end-of-day boundary in %s', async zone => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-04', timezone: 'UTC' }));
     const rules = [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday 18:00-24:00 ${zone}` }]; const limit = restrictions(rules, 'UTC');

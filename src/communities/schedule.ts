@@ -11,8 +11,25 @@ export function restrictions(rules: { short_name: string; description: string }[
     .replace(/(?<![\w/])\/?[ru]\/[\w-]+(?:\/[\w/-]+)?/gi, ' ');
   const text = source.replace(/[A-Z]/g, letter => letter.toLowerCase())
     .replace(/\b\d+\s*:\s*\d+\s+(?:contribution\s+)?ratio\b|\bratio(?:\s+of)?\s*:?\s*\d+\s*:\s*\d+\b|\b\d+\s*:\s*1\b/g, token => ' '.repeat(token.length));
-  const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
-  if (/\bweekends?\b/.test(text)) days.push(0, 6);
+  let manualReview: string | undefined;
+  const dayToken = `(?:(?:${weekdays.join('|')})s?|weekends?|weekdays?)`;
+  const dayList = `${dayToken}(?:\\s*(?:,\\s*(?:(?:and|or)\\s+)?|(?:and|or)\\s+)${dayToken})*`;
+  const dayNumbers = (value: string) => weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(value) || /\bweekends?\b/.test(value) && [0, 6].includes(i) || /\bweekdays?\b/.test(value) && i > 0 && i < 6 ? [i] : []);
+  const positiveDays: number[][] = []; const excludedDays = new Set<number>();
+  for (const clause of text.split(/[.;!?\n]+/)) {
+    if (!new RegExp(`\\b${dayToken}\\b`).test(clause) && !/\b(?:any|every)\s+day\b/.test(clause)) continue;
+    if (new RegExp(`\\b${dayToken}\\s*(?:[-–]|to|through)\\s*${dayToken}\\b`).test(clause)) manualReview = 'Unclear posting-day polarity';
+    const rest = clause.replace(new RegExp(`\\b(except(?:\\s+for)?|not\\s+on|no\\b[^.;!?\\n]*?\\bon|excluding|other\\s+than)\\s+(?:on\\s+)?(${dayList})\\b`, 'g'), (match, cue: string, list: string) => {
+      if (/^no\b/.test(cue) && /\b(?:and|or|but|restrictions?|limits?|bans?)\b/.test(cue)) manualReview = 'Unclear posting-day polarity';
+      for (const day of dayNumbers(list)) excludedDays.add(day);
+      return ' '.repeat(match.length);
+    });
+    if (/\b(?:not|no|except|excluding|other than|unless|without|never)\b/.test(rest)) manualReview = 'Unclear posting-day polarity';
+    const positive = dayNumbers(rest); if (positive.length) positiveDays.push(positive);
+  }
+  const constrainedDays = positiveDays.length > 0 || excludedDays.size > 0;
+  const days = constrainedDays ? weekdays.flatMap((_, i) => positiveDays.every(positive => positive.includes(i)) && !excludedDays.has(i) ? [i] : []) : [];
+  if (constrainedDays && !days.length) manualReview = 'Conflicting posting days';
   const clock = (hour: string, minute?: string, period?: string) => {
     const h = Number(hour); const m = Number(minute ?? 0);
     if (h < (period ? 1 : 0) || h > (period ? 12 : 23) || m > 59) return undefined;
@@ -25,7 +42,6 @@ export function restrictions(rules: { short_name: string; description: string }[
   const start = range ? clock(range[1]!, range[2], range[3]) : at ? clock(at[1]!, at[2], at[3]) : undefined;
   const end = range ? range[4] === '24' && range[5] === '00' && !range[6] ? 1440 : clock(range[4]!, range[5], range[6]) : start;
   const mentions: string[] = [];
-  let manualReview: string | undefined;
   for (const [zone] of text.matchAll(new RegExp(`(?<![\\w./:])${zonePattern}(?![\\w/])`, 'g'))) {
     if (zones[zone]) mentions.push(zones[zone]!);
     else if (zone.includes('/')) {

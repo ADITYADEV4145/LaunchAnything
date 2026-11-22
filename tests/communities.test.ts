@@ -11,6 +11,33 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each([false, true])('enforces general Sunday-only rules for promotion and rejects Friday (reverse=%s)', async reverse => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
+    const rules = [{ short_name: 'Posting', description: 'All posts only on Sundays' }, { short_name: 'Promotion', description: 'Self-promotion is allowed' }];
+    if (reverse) rules.reverse();
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    expect((await reportCommunities(cwd)).valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.subreddits[0].citedRules).toEqual(rules);
+    expect(report.plan[0]).toMatchObject({ date: '2026-01-04', destination: 'standalone post' });
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    report.plan[0].date = '2026-01-02';
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting day violates cited rule');
+  });
+  it.each([
+    { short_name: 'Posting', description: 'All posts only on Sundays, including jobs and questions' },
+    { short_name: 'Hiring', description: 'All posts only on Sundays' },
+    { short_name: 'Hiring', description: 'Rules for all posts: only on Sundays' },
+    { short_name: 'Questions and promotion', description: 'Only on Sundays' },
+    { short_name: 'Posting hours', description: '9am-5pm UTC' },
+  ])('keeps general, promotion, and unspecified subjects: %j', rule => {
+    const rules = [rule]; expect(scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC').citedRules).toEqual(rules);
+  });
+  it.each(['Jobs', 'Hiring', 'Memes', 'Questions', 'Help posts', 'Support requests', 'Bug reports', 'Posts about jobs', 'All posts about hiring', 'Please submit your questions'])('excludes an explicitly different subject even if its thread rule classified the sub: %s', subject => {
+    const promotion = { short_name: 'Promotion', description: 'Self-promotion is allowed' };
+    const rules = [promotion, { short_name: subject, description: 'Only in the megathread' }];
+    expect(scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC').citedRules).toEqual([promotion]);
+  });
   it.each(['Job listings', 'Hiring posts', 'Memes', 'Questions'])('does not route promotion drafts to the weekly thread for %s', async content => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
     const promotion = { short_name: 'Promotion', description: 'Self-promotion is allowed' };
@@ -33,18 +60,18 @@ describe('communities', () => {
     const rules = [{ short_name: 'Posting', description }];
     expect(scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC').citedRules).toEqual(rules);
   });
-  it.each([{ rules: [] }, { rules: [{ short_name: 'Conduct', description: 'Be kind' }] }])('has no promotion citations for unclassified unrelated rules: %j', ({ rules }) => {
+  it.each([{ rules: [] }, { rules: [{ short_name: 'Conduct', description: 'Be kind' }] }])('keeps empty or unclassified general rules unchanged: %j', ({ rules }) => {
     const scored = scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC');
-    expect(scored.selfPromotion).toBe('unknown'); expect(scored.citedRules).toEqual([]);
+    expect(scored.selfPromotion).toBe('unknown'); expect(scored.citedRules).toEqual(rules);
   });
   it.each([false, true])('intersects every rule regardless of promotion priority or order (reverse=%s)', async reverse => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
     const url = 'https://reddit.com/r/builders/comments/abc/weekly_thread';
     const rules = [
       { short_name: 'Promotion', description: 'Self-promotion is allowed' },
-      { short_name: 'Promotion hours', description: '9am-5pm' }, { short_name: 'Promotion window', description: '10am-4pm' },
-      { short_name: 'Promotion days', description: 'Only on Sundays' }, { short_name: 'Promotion exceptions', description: 'Not on Friday' },
-      { short_name: 'Promotion zone', description: 'ET' }, { short_name: 'Thread', description: `Self-promo only in ${url}` },
+      { short_name: 'Hours', description: '9am-5pm' }, { short_name: 'Window', description: '10am-4pm' },
+      { short_name: 'Days', description: 'Only on Sundays' }, { short_name: 'Exceptions', description: 'Not on Friday' },
+      { short_name: 'Zone', description: 'ET' }, { short_name: 'Thread', description: `Self-promo only in ${url}` },
     ];
     if (reverse) rules.reverse();
     const evidence = { ...fixture[0]!, rules }; expect(scoreEvidence(evidence, ['pain tracking'], [], {}, 'UTC').citedRules).toEqual(rules);
@@ -71,7 +98,7 @@ describe('communities', () => {
     ['at 9am', 'Use Singapore'],
     ['Self-promo only in https://reddit.com/r/builders/comments/a/weekly_thread', 'Self-promo only in https://reddit.com/r/builders/comments/b/weekly_thread'],
   ])('never schedules incompatible or unresolved separate restrictions: %s / %s', async (first, second) => {
-    const cwd = await setup(); const rules = [{ short_name: 'Promotion', description: 'Self-promotion allowed' }, { short_name: 'Promotion', description: first }, { short_name: 'Promotion', description: second }];
+    const cwd = await setup(); const rules = [{ short_name: 'Promotion', description: 'Self-promotion allowed' }, { short_name: 'First', description: first }, { short_name: 'Second', description: second }];
     const limit = restrictions(rules, 'UTC'); expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
     const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
     const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));

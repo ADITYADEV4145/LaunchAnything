@@ -55,15 +55,23 @@ export async function fetchCommunities(cwd: string, queries: string[] = [], opti
   return { needsBrowser, other, note: 'Nothing posted or sent. Use your agent browser to capture missing evidence and import it.' };
 }
 type Verdict = 'allowed' | 'restricted' | 'forbidden' | 'unknown';
+function unrelatedContentRule(rule: Evidence['rules'][number]) {
+  const parts = [rule.short_name, rule.description]; const text = parts.join('\n');
+  if (/\b(?:self[-\s]?promo(?:tion)?|promotions?|advertising|your\s+(?:projects?|products?))\b/i.test(text)) return false;
+  if (/\b(?:all|any|every)\s+(?:posts?|submissions?|content)\b(?!\s+(?:about|for|regarding)\b)|(?:^|[.;!?\n])\s*(?:posts?|submissions?)\s+in\s+general\b/i.test(text)) return false;
+  const content = 'jobs?(?:[- ]+(?:listings?|postings?|offers?|requests?|ads?))?|hiring|recruiting|recruitment|memes?|questions?|help[- ]+(?:posts?|requests?|threads?)|support[- ]+(?:posts?|requests?|questions?)|bug[- ]+reports?|feature[- ]+requests?|surveys?|polls?|classifieds';
+  const subject = new RegExp(`^(?:(?:please\\s+)?(?:post|put|submit|keep|share|ask)\\s+)?(?:(?:all|any|your|the)\\s+)?(?:(?:posts?|threads?|submissions?)\\s+(?:about|for|regarding)\\s+)?(?:${content})\\b`, 'i');
+  return parts.some(part => subject.test(part.trim()));
+}
 export function scoreEvidence(e: Evidence, names: string[], quotes: string[], founder: { karma?: number; accountAgeDays?: number }, timezone: string) {
   const matches = (p: Post) => names.some(name => { const text = normalize(p.title + ' ' + (p.selftext ?? '')); const terms = normalize(name).match(/[\p{L}\p{N}]{4,}/gu) ?? []; return text.includes(normalize(name)) || terms.length > 0 && terms.every(t => text.includes(t)); });
   const quoteUrls = quotes.filter(u => subFor(u) === e.subreddit.toLowerCase());
   const fetchedUrls = [...new Set([...e.topPosts, ...(e.searchHits ?? [])].filter(matches).map(p => p.url))];
   const matchedUrls = [...new Set([...quoteUrls, ...fetchedUrls])];
   const painMentions = quoteUrls.length + fetchedUrls.length;
-  let selfPromotion: Verdict = 'unknown'; let classifiedRules: Evidence['rules'] = [];
-  for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) { const found = e.rules.filter(r => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(r.short_name + '\n' + r.description))); if (found.length) { selfPromotion = verdict; classifiedRules = found; break; } }
-  const citedRules = e.rules.filter(r => classifiedRules.includes(r) || /\b(?:self[-\s]?promo(?:tion)?|promotions?|advertising|your\s+(?:projects?|products?)|links?)\b/i.test(r.short_name + '\n' + r.description));
+  let selfPromotion: Verdict = 'unknown';
+  for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) { const found = e.rules.some(r => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(r.short_name + '\n' + r.description))); if (found) { selfPromotion = verdict; break; } }
+  const citedRules = e.rules.filter(r => !unrelatedContentRule(r));
   const text = e.rules.map(r => r.short_name + ' ' + r.description).join('\n');
   const karma = Math.max(0, ...[...text.matchAll(/(\d+)\s+(?:comment\s+)?karma/gi)].map(m => Number(m[1])));
   const age = Math.max(0, ...[...text.matchAll(/account\s+(?:must be\s+)?(?:at least\s+)?(\d+)\s+(days|months)/gi)].map(m => Number(m[1]) * (m[2]!.toLowerCase() === 'months' ? 30 : 1)));

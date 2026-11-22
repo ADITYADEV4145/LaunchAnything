@@ -3,13 +3,14 @@ import { join, resolve } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { checked, missing, readJson, withWriteLock, writeJson, writeLocal } from './files.js';
 import { githubStarsDelta } from './github.js';
-import { manualObservations, normalizeObservation, postKey, record, summarize, type ObservedPost,
+import { manualObservations, normalizeObservation, postKey, record, summarize, type ManualObservation, type ObservedPost,
   type PostObservation, type PublishedPost, type ResultConfig } from './metrics.js';
 import { renderReplies, renderReport } from './report.js';
 import { attribute } from './attribution.js';
 import { calibrate, calibrationInput } from './calibration.js';
 import { feedbackDrafts, mineFeedback } from './feedback.js';
 import { followupDrafts, shippedFix } from './followup.js';
+import { linkJudgeEvidence } from './judge-evidence.js';
 import { repurpose, type RepurposeMedia } from './repurpose.js';
 import { localDate } from './time.js';
 
@@ -43,8 +44,12 @@ export async function collect(cwd: string, options: {
   const importPath = options.metricsPath === undefined ? join(paths.root, 'metrics.json') : resolve(cwd, options.metricsPath);
   const imported = await readJson(importPath, options.metricsPath === undefined);
   const input = imported === undefined ? {} : record(imported);
-  const manual = imported === undefined ? new Map<string, PostObservation>() : manualObservations(imported, published);
+  const manual = imported === undefined ? new Map<string, ManualObservation>() : manualObservations(imported, published);
+  const nativeJudgments = await linkJudgeEvidence(cwd, paths.posts, manual);
+  if (nativeJudgments && input.calibration !== undefined) throw new Error('judgeSourceHash uses the built-in copy rubric; omit calibration.');
+  const rubric = nativeJudgments ? nativeJudgments.rubric : calibrationInput(input.calibration);
   const warnings: string[] = [];
+  if (nativeJudgments && !rubric) warnings.push('Linked judge verdicts use different weights. Recorded scores are preserved; no calibration weights will be suggested.');
   const posts: ObservedPost[] = [];
   for (const post of published) {
     let adapter: PostObservation = {};
@@ -54,10 +59,12 @@ export async function collect(cwd: string, options: {
     } catch {
       warnings.push(`Status metrics unavailable for ${post.channel}; using any imported counts instead.`);
     }
-    const entered = manual.get(postKey(post.channel, post.id));
-    const fields = Object.fromEntries(Object.entries(entered ?? {}).filter(([, value]) => value !== undefined));
+    const key = postKey(post.channel, post.id);
+    const { judgeSourceHash: _sourceHash, ...entered } = manual.get(key) ?? {};
+    const fields = Object.fromEntries(Object.entries(entered).filter(([, value]) => value !== undefined));
     posts.push({ ...post, ...adapter, ...fields,
-      metrics: { ...adapter.metrics, ...entered?.metrics },
+      metrics: { ...adapter.metrics, ...entered.metrics },
+      judge: nativeJudgments ? nativeJudgments.evidence.get(key) : (entered.judge ?? adapter.judge),
     });
   }
   let starsDelta: number | undefined;
@@ -69,7 +76,6 @@ export async function collect(cwd: string, options: {
   const attribution = attribute(posts, input.attribution);
   if (attribution.posts.some(post => Object.keys(post.metrics).length === 0))
     warnings.push(`Some posts have no recorded metrics. Add counts in ${importPath} or pass --metrics.`);
-  const rubric = calibrationInput(input.calibration);
   const calibration = calibrate(attribution.posts, rubric);
   const results = summarize(attribution.posts, now, starsDelta);
   const { snapshot, details, drafts } = checkpointPaths(cwd, config.launchDate, checkpoint);

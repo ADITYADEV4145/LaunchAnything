@@ -196,6 +196,8 @@ it('blind test randomizes A/B, records only supplied answers and needs 80% of re
   expect(ready.ready).toBe(true);
   const data = JSON.parse(readFileSync(join(cwd, '.launch/blind-test.json'), 'utf8'));
   expect(data.testers).toHaveLength(3);
+  expect(() => prepareBlindTest(cwd, 3)).toThrow('--force');
+  expect(JSON.parse(readFileSync(join(cwd, '.launch/blind-test.json'), 'utf8'))).toEqual(data);
   const sheet = readFileSync(ready.sheets![0], 'utf8');
   expect(sheet).toContain('Which would you click?');
   expect(sheet).not.toMatch(/liftoff|plain claude/i);

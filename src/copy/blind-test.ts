@@ -42,8 +42,8 @@ function liftoffText(cwd: string, channel: Channel) {
 export function prepareBlindTest(cwd: string, testers = 5, force = false) {
   if (!Number.isInteger(testers) || testers < 3 || testers > 5) throw new Error('Use 3 to 5 testers');
   const p = paths(cwd), existing = read(cwd);
-  if (existing?.testers.some(t => Object.keys(t.answers).length) && !force)
-    throw new Error('Answers are already recorded; pass --force to start a new test');
+  if (existing && !force)
+    throw new Error('Tester sheets already exist and may have been sent; pass --force to start a new test');
   for (const path of [join(p.root, 'plain'), join(p.root, 'sheets'), p.prompt, p.json]) assertSafePath(cwd, path);
   mkdirSync(join(p.root, 'plain'), { recursive: true });
   mkdirSync(join(p.root, 'sheets'), { recursive: true });

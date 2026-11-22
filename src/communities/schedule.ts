@@ -14,7 +14,7 @@ function unknownTimeContext(source: string) {
     if (/[\p{L}\p{N}]/u.test(prefix)) return `Unrecognized rule timezone or place: ${match[0]}`;
   }
 }
-export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
+function parseRestriction(rules: { short_name: string; description: string }[], timezone: string) {
   const raw = rules.flatMap(r => [r.short_name, r.description]).join('\n\n');
   const urlPattern = /\b(?:(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s<>]*)?)/gi;
   const threadUrls = [...new Set([...raw.matchAll(urlPattern)].filter(m => /mega[-_]?thread|weekly[-_/]|self[-_]promo|promo[-_]thread/i.test(m[0]) || /\bonly\s+in\s*$/i.test(raw.slice(0, m.index))).map(m => m[0].replace(/[).,;]+$/, '')))];
@@ -31,11 +31,14 @@ export function restrictions(rules: { short_name: string; description: string }[
   for (const clause of text.split(/[.;!?\n]+/)) {
     if (!new RegExp(`\\b${dayToken}\\b`).test(clause) && !/\b(?:any|every)\s+day\b/.test(clause)) continue;
     if (new RegExp(`\\b${dayToken}\\s*(?:[-–]|to|through)\\s*${dayToken}\\b`).test(clause)) manualReview = 'Unclear posting-day polarity';
-    const rest = clause.replace(new RegExp(`\\b(except(?:\\s+for)?|not\\s+on|no\\b[^.;!?\\n]*?\\bon|excluding|other\\s+than)\\s+(?:on\\s+)?(${dayList})\\b`, 'g'), (match, cue: string, list: string) => {
+    let negativeStart: number | undefined;
+    const rest = clause.replace(new RegExp(`\\b(except(?:\\s+for)?|not\\s+on|no\\b[^.;!?\\n]*?\\bon|excluding|other\\s+than)\\s+(?:on\\s+)?(${dayList})\\b`, 'g'), (match, cue: string, list: string, offset: number) => {
+      negativeStart ??= offset;
       if (/^no\b/.test(cue) && /\b(?:and|or|but|restrictions?|limits?|bans?)\b/.test(cue)) manualReview = 'Unclear posting-day polarity';
       for (const day of dayNumbers(list)) excludedDays.add(day);
       return ' '.repeat(match.length);
     });
+    if (negativeStart !== undefined && /[\p{L}\p{N}/&]/u.test(rest.slice(negativeStart))) manualReview = 'Unclear posting-day polarity';
     if (/\b(?:not|no|except|excluding|other than|unless|without|never)\b/.test(rest)) manualReview = 'Unclear posting-day polarity';
     const positive = dayNumbers(rest); if (positive.length) positiveDays.push(positive);
   }
@@ -68,7 +71,31 @@ export function restrictions(rules: { short_name: string; description: string }[
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed || unparsedTime) manualReview ??= unknownTimeContext(source);
   if (threadUrls.length && !threadUrl) manualReview = 'Unresolved thread destination; manual review required';
-  return { days: [...new Set(days)], megathread: threadUrls.length > 0 || /mega[-_ ]?thread|weekly[-_ ]thread|(?:self[-_ ]promo|promo)[-_ ]thread/i.test(raw), threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview };
+  return { days, megathread: threadUrls.length > 0 || /mega[-_ ]?thread|weekly[-_ ]thread|(?:self[-_ ]promo|promo)[-_ ]thread/i.test(raw), threadUrl, start, end, timezone: mentions[0] ?? timezone, manualReview, explicitTimezone: mentions.length > 0, source, hasTime: Boolean(parsed || unparsedTime) };
+}
+export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
+  let limits = rules.map(rule => parseRestriction([rule], timezone));
+  const explicitZones = [...new Set(limits.filter(limit => limit.explicitTimezone).map(limit => limit.timezone))];
+  const zone = explicitZones[0] ?? timezone;
+  if (zone !== timezone) limits = rules.map(rule => parseRestriction([rule], zone));
+  let manualReview = limits.find(limit => limit.manualReview)?.manualReview;
+  if (explicitZones.length > 1) manualReview = 'Conflicting rule timezones';
+  if (limits.some(limit => limit.hasTime)) manualReview ??= unknownTimeContext(limits.map(limit => limit.source).join('\n\n'));
+  const dayLimits = limits.filter(limit => limit.days.length);
+  const days = dayLimits.length ? weekdays.flatMap((_, day) => dayLimits.every(limit => limit.days.includes(day)) ? [day] : []) : [];
+  if (dayLimits.length && !days.length) manualReview = 'Conflicting posting days';
+  const windows = [...new Map(limits.flatMap(limit => limit.start === undefined || limit.end === undefined ? [] : [[`${limit.start}:${limit.end}`, { start: limit.start, end: limit.end }] as const])).values()];
+  let start = windows[0]?.start; let end = windows[0]?.end;
+  if (windows.length > 1) {
+    if (windows.some(window => window.end < window.start)) manualReview = 'Multiple overnight windows need manual review';
+    else {
+      start = Math.max(...windows.map(window => window.start)); end = Math.min(...windows.map(window => window.end));
+      if (start > end) manualReview = 'Conflicting posting windows';
+    }
+  }
+  const threadUrls = [...new Set(limits.flatMap(limit => limit.threadUrl ? [limit.threadUrl] : []))];
+  if (threadUrls.length > 1) manualReview = 'Conflicting thread destinations';
+  return { days, megathread: limits.some(limit => limit.megathread), threadUrl: threadUrls[0], start, end, timezone: zone, manualReview };
 }
 export function allowedDate(date: string, days: number[]) { return !days.length || days.includes(new Date(date + 'T12:00:00Z').getUTCDay()); }
 export function nextDate(date: string, days = 1) { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }

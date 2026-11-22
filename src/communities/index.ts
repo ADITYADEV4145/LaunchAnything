@@ -61,8 +61,8 @@ export function scoreEvidence(e: Evidence, names: string[], quotes: string[], fo
   const fetchedUrls = [...new Set([...e.topPosts, ...(e.searchHits ?? [])].filter(matches).map(p => p.url))];
   const matchedUrls = [...new Set([...quoteUrls, ...fetchedUrls])];
   const painMentions = quoteUrls.length + fetchedUrls.length;
-  let selfPromotion: Verdict = 'unknown'; let citedRules: Evidence['rules'] = [];
-  for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) { const found = e.rules.filter(r => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(r.short_name + '\n' + r.description))); if (found.length) { selfPromotion = verdict; citedRules = found; break; } }
+  let selfPromotion: Verdict = 'unknown'; const citedRules = e.rules;
+  for (const verdict of ['forbidden', 'restricted', 'allowed'] as const) { const found = e.rules.some(r => rulebook[verdict]!.some(s => new RegExp(s, 'i').test(r.short_name + '\n' + r.description))); if (found) { selfPromotion = verdict; break; } }
   const text = e.rules.map(r => r.short_name + ' ' + r.description).join('\n');
   const karma = Math.max(0, ...[...text.matchAll(/(\d+)\s+(?:comment\s+)?karma/gi)].map(m => Number(m[1])));
   const age = Math.max(0, ...[...text.matchAll(/account\s+(?:must be\s+)?(?:at least\s+)?(\d+)\s+(days|months)/gi)].map(m => Number(m[1]) * (m[2]!.toLowerCase() === 'months' ? 30 : 1)));

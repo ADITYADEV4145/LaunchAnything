@@ -11,6 +11,51 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each([false, true])('intersects every rule regardless of promotion priority or order (reverse=%s)', async reverse => {
+    const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-01-02', timezone: 'UTC' }));
+    const url = 'https://reddit.com/r/builders/comments/abc/weekly_thread';
+    const rules = [
+      { short_name: 'Promotion', description: 'Self-promotion is allowed' },
+      { short_name: 'Hours', description: '9am-5pm' }, { short_name: 'Window', description: '10am-4pm' },
+      { short_name: 'Days', description: 'Only on Sundays' }, { short_name: 'Exceptions', description: 'Not on Friday' },
+      { short_name: 'Zone', description: 'ET' }, { short_name: 'Thread', description: `Self-promo only in ${url}` },
+    ];
+    if (reverse) rules.reverse();
+    const evidence = { ...fixture[0]!, rules }; expect(scoreEvidence(evidence, ['pain tracking'], [], {}, 'UTC').citedRules).toEqual(rules);
+    const limit = restrictions(rules, 'UTC'); expect(limit).toMatchObject({ days: [0], start: 600, end: 960, timezone: 'America/New_York', megathread: true, threadUrl: url, manualReview: undefined });
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify(evidence)); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.subreddits[0].citedRules).toEqual(rules);
+    expect(report.plan[0]).toMatchObject({ date: '2026-01-04', time: '15:00', destination: `megathread: ${url}` });
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    const original = { ...report.plan[0] };
+    Object.assign(report.plan[0], { time: '14:00', instant: '2026-01-04T14:00:00.000Z' });
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting time violates cited rule');
+    Object.assign(report.plan[0], original, { date: '2026-01-05', instant: '2026-01-05T15:00:00.000Z' });
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting day violates cited rule');
+    Object.assign(report.plan[0], original, { destination: 'standalone post' });
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: must post in the megathread');
+    Object.assign(report.plan[0], original, { timezone: 'America/New_York' });
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting timezone differs from config');
+  });
+  it.each([
+    ['9am-10am UTC', '11am-12pm UTC'], ['Only on Sunday', 'Only on Saturday'],
+    ['9am-5pm ET', '10am-4pm PT'], ['at 9am', 'Singapore time'],
+    ['9am-5pm ET', 'from 18 to 21 in ET'], ['11pm-2am UTC', '10pm-3am UTC'],
+    ['at 9am', 'Use Singapore'],
+    ['Self-promo only in https://reddit.com/r/builders/comments/a/weekly_thread', 'Self-promo only in https://reddit.com/r/builders/comments/b/weekly_thread'],
+  ])('never schedules incompatible or unresolved separate restrictions: %s / %s', async (first, second) => {
+    const cwd = await setup(); const rules = [{ short_name: 'Promotion', description: 'Self-promotion allowed' }, { short_name: 'First', description: first }, { short_name: 'Second', description: second }];
+    const limit = restrictions(rules, 'UTC'); expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it('keeps empty restrictions unconstrained and deduplicates identical windows', () => {
+    expect(restrictions([], 'UTC')).toMatchObject({ days: [], start: undefined, end: undefined, megathread: false, timezone: 'UTC', manualReview: undefined });
+    const rule = { short_name: 'Hours', description: '9am-5pm UTC' };
+    expect(restrictions([rule, rule], 'UTC')).toMatchObject({ start: 540, end: 1020, manualReview: undefined });
+  });
   it.each(['Singapore time: 9am', 'at 9am; timezone Singapore', 'at 9am; time zone is Singapore', 'at 9am; use Singapore for scheduling', 'at 9am ET Singapore'])('fails closed on rule-wide timezone context: %s', async description => {
     const cwd = await setup(); const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
     expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
@@ -33,7 +78,7 @@ describe('communities', () => {
     expect(result.valid).toBe(true); expect(report.plan).toHaveLength(1); report.plan[0].date = '2026-01-02';
     expect((await checkCommunities(cwd, report)).errors).toContain('builders: posting day violates cited rule');
   });
-  it.each(['not only on Friday', 'Friday is not allowed', 'no restrictions on Friday', 'no affiliate links and post on Friday', 'Monday through Friday', 'Sunday except Sunday'])('fails closed on ambiguous or contradictory day rules: %s', description => {
+  it.each(['not only on Friday', 'Friday is not allowed', 'no restrictions on Friday', 'no affiliate links and post on Friday', 'Monday through Friday', 'Sunday except Sunday', 'any day except Friday/Saturday', 'any day except Friday/holidays'])('fails closed on ambiguous or contradictory day rules: %s', description => {
     const limit = restrictions([{ short_name: 'Promotions', description }], 'UTC');
     expect(limit.manualReview).toBeDefined(); expect(() => postingSlot('2026-01-02', limit, 'UTC')).toThrow();
   });

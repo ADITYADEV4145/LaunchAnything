@@ -77,7 +77,13 @@ function parseRestriction(rules: { short_name: string; description: string }[], 
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed || unparsedTime) manualReview ??= unknownTimeContext(source);
-  const onlyThread = /\bonly\s+(?:allowed\s+)?(?:in|on)\b/i.test(tokenized) && (urls.length > 0 || /\bthis\s+(?:post|thread|megathread)\b/i.test(tokenized));
+  const unresolvedExclusive = [...source.matchAll(/\bonly\s+(?:allowed\s+)?(in|on)\b/gi)].some(match => {
+    const target = source.slice(match.index + match[0].length).trimStart();
+    const knownDay = match[1]!.toLowerCase() === 'on' && new RegExp(`^(?:the\\s+)?${dayToken}\\b`, 'i').test(target);
+    const knownThread = /^(?:the\s+)?(?:mega[-_\s]?threads?|weekly[-_\s]+(?:posts?|threads?))\b/i.test(target);
+    return !knownDay && !knownThread;
+  });
+  const onlyThread = unresolvedExclusive || /\bonly\s+(?:allowed\s+)?(?:in|on)\b/i.test(tokenized) && (urls.length > 0 || /\bthis\s+(?:post|thread|megathread)\b/i.test(tokenized));
   const megathread = onlyThread || threadMention.test(source) || /\b(?:in|at|use|outside(?:\s+of)?|anywhere\s+but)\s*<url-\d+>/i.test(tokenized);
   const threadUrls = megathread ? [...new Set(urls)] : [];
   const authorizedUrls = urls.every((_, i) => clauses.some(clause => directsTo(clause, `<url-${i}>`)));

@@ -12,6 +12,36 @@ async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-'
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
   it.each(['only in', 'only on', 'only allowed in'].flatMap(phrase => [
+    'the pinned post', 'the stickied post', 'the sticky post',
+    'the pinned thread', 'the stickied thread', 'the sticky thread',
+    'the comments', 'the comments of the announcement',
+    'the lounge', 'the designated location', '',
+  ].map(target => `Follow 9:1. ${phrase} ${target}.`)))('fails closed for an unverified exclusive promotion target: %s', async description => {
+    const cwd = await setup(); const rules = [{ short_name: 'Self-promotion', description }];
+    expect(scoreEvidence({ ...fixture[0]!, rules }, [], [], {}, 'UTC').selfPromotion).toBe('restricted');
+    const limit = restrictions(rules, 'UTC');
+    expect(limit).toMatchObject({ megathread: true, threadUrl: undefined, manualReview: 'Unresolved thread destination; manual review required' });
+    expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); expect(result.valid).toBe(true);
+    const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]);
+    expect(result.markdown).toContain('## Needs manual review\n- r/builders:');
+    expect(result.markdown).toContain(`> Self-promotion: ${description}`);
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    expect((await checkCommunities(cwd, { ...report, recommended: ['builders'] })).valid).toBe(false);
+  });
+  it.each([
+    'Self-promotion is allowed only in the lounge',
+    'Follow 9:1. Only on Sundays and only in the lounge',
+    'Follow 9:1. Only on Sundays. Only in the lounge',
+    'Follow 9:1. Only in the comments of https://reddit.com/r/builders/comments/a/discussion',
+  ])('does not let a recognized day or link hide an unknown exclusive target: %s', description => {
+    const limit = restrictions([{ short_name: 'Self-promotion', description }], 'UTC');
+    expect(limit.megathread).toBe(true); expect(limit.manualReview).toBeDefined();
+    expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+  });
+  it.each(['only in', 'only on', 'only allowed in'].flatMap(phrase => [
     `[this post](https://reddit.com/r/builders/comments/a/discussion)`,
     `[the destination](https://reddit.com/r/builders/comments/a/discussion)`,
     `[this post, please](https://reddit.com/r/builders/comments/a/discussion)`,

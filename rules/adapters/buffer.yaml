@@ -1,0 +1,29 @@
+id: buffer
+name: Buffer
+priority: 1
+channels:
+  - x
+  - linkedin
+  - tiktok
+  - reels
+  - shorts
+  - instagram
+envKeys:
+  - BUFFER_ACCESS_TOKEN
+  - BUFFER_API_KEY
+mcpAliases:
+  - buffer
+  - buffer-mcp
+  - mcp-buffer
+connectionRoute: buffer
+connectionChannels:
+  - x
+  - linkedin
+  - instagram
+  - facebook
+  - tiktok
+  - youtube
+  - threads
+  - bluesky
+  - reels
+  - shorts

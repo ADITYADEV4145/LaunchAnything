@@ -1,0 +1,9 @@
+id: manual
+name: Manual
+priority: 6
+channels: []
+envKeys: []
+mcpAliases:
+  - manual
+  - manual-mcp
+  - mcp-manual

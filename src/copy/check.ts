@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { validateFile } from '../core/schema.js';
 import { context, type Product } from './context.js';
-import { channels, loadPlatform } from './platforms.js';
+import { loadPlatform } from './platforms.js';
 import { assertSafePath, atomicWrite } from './safe-path.js';
 import { extractLinks } from './links.js';
 import { aiTells } from '../voice/ai-tells.js';
@@ -37,7 +37,7 @@ const resultsValidator = new Ajv2020({ allErrors: true }).compile({
   type: 'object', additionalProperties: false, required: ['posts'], properties: {
     posts: { type: 'array', items: { type: 'object', additionalProperties: false,
       required: ['channel','sourceHash','issues'], properties: {
-        channel: { enum: channels },
+        channel: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' },
         sourceHash: { anyOf: [{ type: 'null' }, { type: 'string', pattern: '^[a-f0-9]{64}$' }] },
         issues: { type: 'array', items: { type: 'object', additionalProperties: false,
           required: ['rule','message'], properties: { rule: { type: 'string' }, message: { type: 'string' } } } }
@@ -73,8 +73,8 @@ export function similarity(a: string, b: string) {
   if (!x.size || !y.size) return 0;
   return [...x].filter(s => y.has(s)).length / new Set([...x, ...y]).size;
 }
-export function inspectPost(post: Post, channel: string, product: Product): Issue[] {
-  const rules = loadPlatform(channel), issues: Issue[] = [];
+export function inspectPost(post: Post, channel: string, product: Product, cwd?: string): Issue[] {
+  const rules = loadPlatform(channel, cwd), issues: Issue[] = [];
   const add = (rule: string, message: string, fix: string) => issues.push({ channel, rule, message, fix });
   const title = stripCitations(post.title), body = stripCitations(post.body);
   if (post.channel !== channel) add('post.channel', 'Channel does not match filename', 'Set channel to ' + channel);
@@ -173,7 +173,7 @@ export function checkPosts(cwd: string, selected?: string[]) {
       const source = readFileSync(path);
       hashes.set(channel, createHash('sha256').update(source).digest('hex'));
       const post = parsePost(source.toString('utf8'));
-      issues.push(...inspectPost(post, channel, ctx.product));
+      issues.push(...inspectPost(post, channel, ctx.product, cwd));
       const config = ctx.config as typeof ctx.config & { accounts?: Record<string, string> };
       if (post.account && post.account !== config.accounts?.[channel])
         issues.push({ channel, rule: 'honesty.account', message: 'Account is not the configured user-owned account', fix: 'Use config.accounts.' + channel });

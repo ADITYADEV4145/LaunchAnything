@@ -1,0 +1,10 @@
+id: email
+name: Email
+priority: 5
+channels:
+  - email
+envKeys: []
+mcpAliases:
+  - email
+  - email-mcp
+  - mcp-email

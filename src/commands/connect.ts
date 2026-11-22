@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+import { resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { commandOptions, output } from '../core/output.js';
 import { connect, connections, platforms, removeConnection, routes, type Route } from '../connect/registry.js';
@@ -11,16 +12,18 @@ export function register(program: Command) {
     .option('--profile <path>', 'Your Chrome user data directory').option('--list', 'List connected accounts')
     .option('--remove', 'Remove the selected connection and keychain token')
     .action(async (platform: string | undefined, options: { route?: Route; account?: string; tokenEnv?: string; profile?: string; list?: boolean; remove?: boolean }, command: Command) => {
-      const { json } = commandOptions(command);
+      const globals = commandOptions(command);
+      const { json } = globals;
+      const cwd = resolve(globals.cwd ?? process.cwd());
       if (options.list) { output('connect', await connections(), json); return; }
       const prompt = process.stdin.isTTY && !json ? createInterface({ input: process.stdin, output: process.stdout }) : undefined;
       try {
         platform ??= await prompt?.question(`Platform (${platforms.join(', ')}): `);
-        if (!platform || !routes(platform).length) throw new Error('Choose a supported platform');
+        if (!platform || !routes(platform, cwd).length) throw new Error('Choose a supported platform');
         const account = options.account ?? await prompt?.question('Your account handle: ');
         if (!account) throw new Error('--account is required');
         const existing = options.remove ? (await connections()).find(r => r.platform === platform && r.account === account) : undefined;
-        const route = existing?.route ?? options.route ?? ((await prompt?.question(`Route (${routes(platform).join(', ')}; Enter for default): `)) || routes(platform)[0]) as Route;
+        const route = existing?.route ?? options.route ?? ((await prompt?.question(`Route (${routes(platform, cwd).join(', ')}; Enter for default): `)) || routes(platform, cwd)[0]) as Route;
         const keychain = route === 'browser' ? new MemoryKeychain() : osKeychain();
         if (options.remove) { await removeConnection(platform, account, keychain); output('connect', { removed: true }, json); return; }
         let token = options.tokenEnv ? process.env[options.tokenEnv] : undefined;
@@ -30,7 +33,7 @@ export function register(program: Command) {
           token = Buffer.concat(chunks).toString('utf8').trim();
         }
         if (route !== 'browser' && !token) throw new Error('Provide a token via --token-env NAME or stdin');
-        output('connect', await connect({ platform, route, account, profile: options.profile }, token, keychain), json);
+        output('connect', await connect({ platform, route, account, profile: options.profile }, token, keychain, undefined, cwd), json);
       } finally { prompt?.close(); }
     });
 }

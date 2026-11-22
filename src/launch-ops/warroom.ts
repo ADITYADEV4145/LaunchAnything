@@ -23,7 +23,7 @@ export async function warroom(cwd: string, options: { metrics?: string; approve?
     const observed: ObservedPost[] = [], warnings: string[] = [];
     for (const post of posts) {
       let status: unknown;
-      try { status = await (options.readStatus ?? (p => getAdapter(p.channel, p.id).status(p.channel, p.id, cwd)))(post); }
+      try { status = await (options.readStatus ?? (p => getAdapter(p.channel, p.id, cwd).status(p.channel, p.id, cwd)))(post); }
       catch { warnings.push(`Status unavailable: ${post.channel}/${post.id}`); }
       const adapter = status === undefined ? {} : normalizeObservation(status, post.channel);
       const entered = manual.get(postKey(post.channel, post.id));

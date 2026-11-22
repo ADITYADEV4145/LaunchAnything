@@ -32,23 +32,8 @@
     "channels": {
       "type": "array",
       "items": {
-        "enum": [
-          "show-hn",
-          "product-hunt",
-          "x",
-          "linkedin",
-          "reddit",
-          "devto",
-          "indie-hackers",
-          "github-release",
-          "tiktok",
-          "reels",
-          "shorts",
-          "instagram",
-          "email",
-          "blog",
-          "press-release"
-        ]
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
       },
       "minItems": 1
     },

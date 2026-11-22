@@ -14,11 +14,11 @@ export async function publish(cwd?: string, confirm = false, env = process.env) 
   for (const post of active) requireApproval(post, approvals, config.approvers);
   const queue = await Promise.all(active.map(async post => {
     const adapter = await selectAdapter(post.channel, cwd, env);
-    adapter.validate(post);
+    adapter.validate(post, cwd);
     return { post, adapter };
   }));
   const plan = queue.map(({ post, adapter }) => ({
-    channel: post.channel, adapter: adapter.name, submitUrl: destination(post.channel), scheduledAt: post.scheduledAt,
+    channel: post.channel, adapter: adapter.name, submitUrl: destination(post.channel, cwd), scheduledAt: post.scheduledAt,
     hash: post.hash, title: post.title, body: post.body,
     ...(post.linkFirstComment ? { firstComment: post.link } : { link: post.link }),
     media: post.media.map(({ path, slot }) => ({ path, slot })),

@@ -3,6 +3,7 @@ import { isAbsolute, relative, resolve, sep, join } from 'node:path';
 import { parse } from 'yaml';
 import { launchDir } from '../core/launch-dir.js';
 import { validateFile } from '../core/schema.js';
+import { site } from '../core/registry.js';
 import { git } from './files.js';
 
 interface Source { type: 'file' | 'commit' | 'url'; ref: string }
@@ -49,5 +50,12 @@ export async function validate(cwd: string, kind: string, file?: string) {
   const data: unknown = /\.ya?ml$/i.test(path) ? parse(text) : JSON.parse(text);
   const result = kind === 'product' ? await validateProduct(cwd, data) :
     { ...validateFile(kind, data), warnings: [] as string[] };
+  if (kind === 'config' && result.valid) {
+    for (const id of (data as { channels: string[] }).channels) {
+      try { site(id, cwd); }
+      catch (error) { result.errors.push((error as Error).message); }
+    }
+    result.valid = result.errors.length === 0;
+  }
   return { kind, path, ...result };
 }

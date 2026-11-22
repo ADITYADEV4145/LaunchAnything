@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "id",
+    "name",
+    "version",
+    "lastVerified",
+    "sources",
+    "submitUrl",
+    "channel",
+    "copy"
+  ],
+  "properties": {
+    "kind": {
+      "const": "site"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ]
+    },
+    "lastVerified": {
+      "type": "string",
+      "format": "date"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://"
+      }
+    },
+    "submitUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "route": {
+      "enum": [
+        "manual",
+        "integration"
+      ]
+    },
+    "adapters": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "postiz",
+          "buffer",
+          "ayrshare",
+          "github-release",
+          "devto",
+          "email"
+        ]
+      }
+    },
+    "channel": {
+      "type": "object",
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "devtool",
+              "indie-saas",
+              "b2b-saas",
+              "consumer-mobile",
+              "enterprise"
+            ]
+          },
+          "minItems": 1
+        },
+        "bestPostingTimes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "minItems": 1
+        },
+        "bestPostingDays": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat",
+              "sun"
+            ]
+          },
+          "minItems": 1
+        },
+        "leadTimeDays": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "profiles",
+        "bestPostingTimes",
+        "bestPostingDays",
+        "leadTimeDays"
+      ],
+      "additionalProperties": false
+    },
+    "copy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "body",
+        "maxLinks",
+        "requiredLink",
+        "bannedWords",
+        "guidance",
+        "verified",
+        "verifiedFields",
+        "verificationNotes"
+      ],
+      "properties": {
+        "style": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requiresAffiliationDisclosure": {
+          "type": "boolean"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "verifiedFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verificationNotes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "title": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "maxLength"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "maxLength": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "prefix": {
+              "type": "string"
+            }
+          }
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minLength",
+            "maxLength"
+          ],
+          "properties": {
+            "minLength": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxLength": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "maxLinks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requiredLink": {
+          "type": "boolean"
+        },
+        "bannedWords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "threadMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "postMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hookMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tryableNow": {
+          "type": "boolean"
+        },
+        "taglineMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "captionMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subjectMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "linkFirstComment": {
+          "type": "boolean"
+        },
+        "makerComment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heading",
+            "required"
+          ],
+          "properties": {
+            "heading": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": {
+              "type": "boolean"
+            }
+          }
+        },
+        "gallery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minImages",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "minImages": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "subreddits": {
+          "type": "object",
+          "minProperties": 1,
+          "patternProperties": {
+            "^r/[A-Za-z0-9_]+$": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "selfPromotion",
+                "flairRequired",
+                "verified",
+                "note"
+              ],
+              "properties": {
+                "selfPromotion": {
+                  "enum": [
+                    "allowed",
+                    "restricted",
+                    "forbidden"
+                  ]
+                },
+                "flairRequired": {
+                  "type": "boolean"
+                },
+                "verified": {
+                  "type": "boolean"
+                },
+                "note": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "guidance": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "route": {
+            "const": "integration"
+          }
+        },
+        "required": [
+          "route"
+        ]
+      },
+      "then": {
+        "required": [
+          "adapters"
+        ]
+      }
+    }
+  ]
+}

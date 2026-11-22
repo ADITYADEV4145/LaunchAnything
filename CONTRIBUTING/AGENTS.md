@@ -14,6 +14,7 @@ Coordinate changes to those with the lead rather than editing them concurrently.
 | 4 | video | src/video/, templates/video/, src/selftest/phase4.ts, tests/phase4.test.ts |
 | 5 | review, publish | src/review/, src/adapters/, src/selftest/phase5.ts, tests/phase5.test.ts |
 | 5b | connect | src/connect/, src/selftest/phase5b.ts, tests/phase5b.test.ts, skill/references/phase5b.md |
+| 5c | adapters | src/core/registry.ts, rules/adapters/, schemas/site.schema.json, tests/phase5c.test.ts, skill/references/phase5c.md |
 | 6 | results, learn, receipt | src/results/, src/selftest/phase6.ts, tests/phase6.test.ts |
 | Launch ops | warroom, friends, followup, retro, release | src/launch-ops/, src/results/retro.ts, src/selftest/launch-ops.ts, tests/launch-ops.test.ts, skill/references/launch-ops.md |
 

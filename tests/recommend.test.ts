@@ -11,6 +11,37 @@ import { scoreEvidence } from '../src/communities/index.js';
 import type { Evidence } from '../src/communities/adapters.js';
 
 describe('recommend', () => {
+  it('tries every observed Reddit hour before skipping a rule-constrained subreddit', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'recommend-'));
+    try {
+      const { work, paths } = await groundworkGoFixture(cwd);
+      const config = JSON.parse(await readFile(paths.config, 'utf8'));
+      await writeFile(paths.config, JSON.stringify({ ...config, channels: ['reddit'], timezone: 'UTC' }));
+      const evidence = JSON.parse(await readFile(resolve('fixtures/cli-tool/.liftoff-fixture/communities-evidence.json'), 'utf8')) as Evidence[];
+      const source = evidence[0];
+      source.rules = [{ short_name: 'Posting', description: 'Self-promotion is allowed. Post between 10:00 and 12:00 UTC.' }];
+      source.topPosts = [9, 10, 11].map((hour, index) => ({ ...source.topPosts[0], url: `https://www.reddit.com/r/builders/comments/${index}/ask`,
+        created_utc: Date.parse(`2026-11-24T${String(hour).padStart(2, '0')}:00:00Z`) / 1000, score: 30 - index * 10 }));
+      const sub = scoreEvidence(source, ['pain tracking'], [], {}, 'UTC');
+      expect(sub.bestHours).toEqual(['09:00 UTC', '10:00 UTC', '11:00 UTC']);
+      const reportPath = join(paths.root, 'communities.json');
+      const save = () => writeFile(reportPath, JSON.stringify({ subreddits: [sub], recommended: [sub.subreddit], plan: [], threads: [], other: [] }));
+      await save();
+      const options = { historyPath: join(work, 'history.json') };
+      const result = await recommend(work, options);
+      expect(result.channels.find(row => row.channel === 'reddit')).toMatchObject({ date: config.launchDate, time: '10:00' });
+      expect(result.channels[0].why).toContain('10:00 UTC');
+      sub.bestHours = ['09:00 UTC', '13:00 UTC', '11:00 UTC'];
+      await save();
+      expect((await recommend(work, options)).channels[0].time).toBe('11:00');
+      sub.bestHours = ['09:00 UTC', '13:00 UTC'];
+      await save();
+      expect((await recommend(work, options)).skip.some(row => row.channel === 'reddit')).toBe(true);
+      sub.bestHours = [];
+      await save();
+      expect((await recommend(work, options)).skip.some(row => row.channel === 'reddit')).toBe(true);
+    } finally { await rm(cwd, { recursive: true, force: true }); }
+  }, 30000);
   it('uses community observed hours and cites rules, reach and account requirements', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'recommend-'));
     try {

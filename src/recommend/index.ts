@@ -85,9 +85,11 @@ export async function recommend(cwd: string, options: { historyPath?: string; pr
   let firstBig: string | undefined;
   for (const c of [...candidates.filter(c => !owned.has(c.id)), ...candidates.filter(c => owned.has(c.id))]) {
     const lesson = lessons.find(l => l.channel === c.id);
-    const observed = c.sub?.bestHours[0]?.split(' ');
-    const zone = observed?.[1] ?? c.rule.sourceTimezone ?? config.timezone;
-    const time = observed?.[0] ?? c.rule.sourceTimes?.[0] ?? c.rule.bestPostingTimes[0];
+    const windows = c.sub ? c.sub.bestHours.map(hour => {
+      const [time, zone] = hour.split(' ');
+      return { time, zone: zone ?? config.timezone };
+    }) : [{ time: c.rule.sourceTimes?.[0] ?? c.rule.bestPostingTimes[0], zone: c.rule.sourceTimezone ?? config.timezone }];
+    const attempts = windows.flatMap(window => (lesson ? [true, false] : [false]).map(useLesson => ({ ...window, useLesson })));
     let ph = { dates: [] as string[], source: '' };
     if (c.id === 'product-hunt') { try { ph = await (options.productHunt ?? offlineProductHunt).openDates(config.launchDate); } catch { ph = await offlineProductHunt.openDates(config.launchDate); } }
     let found = false;
@@ -95,7 +97,7 @@ export async function recommend(cwd: string, options: { historyPath?: string; pr
       const date = nextDate(config.launchDate, day);
       if (!c.sub && !c.rule.bestPostingDays.includes(weekdays[new Date(date + 'T12:00:00Z').getUTCDay()])) continue;
       if (ph.dates.length && !ph.dates.includes(date)) continue;
-      for (const useLesson of lesson ? [true, false] : [false]) {
+      for (const { time, zone, useLesson } of attempts) {
         let instant: string;
         try { instant = parseSchedule(`| Channel | Local date | Local time |\n| --- | --- | --- |\n| ${c.id} | ${date} | ${useLesson ? lesson!.time : time} |`, useLesson ? config.timezone : zone)[0].scheduledAt; } catch { continue; }
         if (owned.has(c.id)) {

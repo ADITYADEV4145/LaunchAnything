@@ -1,7 +1,19 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { loadScript } from './script.js';
+
+export async function narrationFiles(cwd: string, scenes: { voiceover?: string }[], extensions = ['mp3','wav']): Promise<(string | undefined)[]> {
+  return Promise.all(scenes.map(async (scene, index) => {
+    if (!scene.voiceover?.trim()) return undefined;
+    for (const extension of extensions) {
+      const file = join(launchDir(cwd).video, 'vo', `${index}.${extension}`);
+      try { await access(file); return file; }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    }
+    return undefined;
+  }));
+}
 
 export async function voice(cwd: string, options: { dryRun?: boolean } = {}) {
   const script = await loadScript(cwd);

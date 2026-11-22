@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { renderCarousel } from '../src/media/platform-images.js';
 import { renderClip } from '../src/video/clip.js';
-import { voice } from '../src/video/voice.js';
+import { voice, narrationFiles } from '../src/video/voice.js';
 import { takeShots } from '../src/visuals/shots.js';
 import { browser, exec } from '../src/visuals/runtime.js';
 import { run, render } from '../src/video/render.js';
@@ -28,6 +28,17 @@ async function loudness(file: string) {
   const {stderr} = await run('ffmpeg',['-hide_banner','-i',file,'-af','ebur128','-f','null','-']);
   return Number([...stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)].at(-1)?.[1]);
 }
+
+it('ignores stale indexed audio after narration is removed, while retaining current narration and format priority',async()=>{
+  const cwd=await fixture();const vo=join(cwd,'.launch/video/vo');await mkdir(vo,{recursive:true});
+  for(const file of ['0.mp3','0.wav','1.mp3','2.wav']) await writeFile(join(vo,file),'stale audio');
+  const scenes=[{voiceover:'Current narration'},{},{voiceover:'   '}];
+  expect(await narrationFiles(cwd,scenes)).toEqual([join(vo,'0.mp3'),undefined,undefined]);
+  expect(await narrationFiles(cwd,scenes,['wav','mp3'])).toEqual([join(vo,'0.wav'),undefined,undefined]);
+  delete scenes[0].voiceover;
+  expect(await narrationFiles(cwd,scenes)).toEqual([undefined,undefined,undefined]);
+  expect(await narrationFiles(cwd,[])).toEqual([]);
+});
 async function legacyScript(cwd: string) {
   await mkdir(join(cwd,'.launch/video'),{recursive:true});
   const script={scenes:Array.from({length:6},(_,index)=>({shot:'real.png',text:'Catch unknown exports',duration:5,...(index===0?{voiceover:'Catch unknown exports'}:{})}))};

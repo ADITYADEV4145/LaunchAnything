@@ -11,6 +11,7 @@ import { endCardSeconds, loadScript, resolveShot, srt, totalDuration, sceneDurat
 import { renderClip } from './clip.js';
 import { branding, endAsset, frameLayout, sceneAssets } from './design.js';
 import { detectContent } from './crop.js';
+import { narrationFiles } from './voice.js';
 
 const exec = promisify(execFile);
 export async function run(binary: string, args: string[], cwd?: string) {
@@ -49,10 +50,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'captions.srt'), srt(script));
   if (script.scenes.some(scene => scene.role) || options.music) {
-    const voices = await Promise.all(script.scenes.map(async (_, index) => {
-      for (const ext of ['mp3', 'wav']) { const path = join(dir, 'vo', `${index}.${ext}`); if (await exists(path)) return path; }
-      return undefined;
-    }));
+    const voices = await narrationFiles(cwd, script.scenes);
     const results = [];
     for (const format of selected) {
       const scenes = await Promise.all(script.scenes.map(async scene => ({ role: scene.role, caption: scene.text, source: await resolveShot(cwd, scene.shot), duration: sceneDuration(scene, format, script.scenes.some(scene => scene.role)), highlight: scene.highlight })));
@@ -74,10 +72,7 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     if (await exists(source)) { logo = source; break; }
   }
   const paths = await Promise.all(script.scenes.map(s => resolveShot(cwd, s.shot)));
-  const voices = await Promise.all(script.scenes.map(async (_, i) => {
-    for (const ext of ['wav','mp3']) { const path = join(dir, 'vo', `${i}.${ext}`); if (await exists(path)) return path; }
-    return undefined;
-  }));
+  const voices = await narrationFiles(cwd, script.scenes, ['wav','mp3']);
   try {
     const dimensions = await Promise.all(paths.map(async path => JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','json',path])).stdout).streams[0] as {width:number;height:number}));
     let terminal = false;

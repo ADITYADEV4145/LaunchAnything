@@ -1,0 +1,102 @@
+import { spawnSync } from 'node:child_process';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, expect, it, vi } from 'vitest';
+import { stringify } from 'yaml';
+import { registry, site } from '../src/core/registry.js';
+import { packageRoot } from '../src/core/package-root.js';
+import { adapterSelection } from '../src/adapters/index.js';
+import { publish } from '../src/adapters/publish.js';
+import { writeBriefs } from '../src/copy/write.js';
+import { checkPosts } from '../src/copy/check.js';
+import { createPlan } from '../src/planning/plan.js';
+import { buildReview } from '../src/review/page.js';
+
+const dirs: string[] = [];
+const temp = () => { const dir = mkdtempSync(join(tmpdir(), 'liftoff-5c-')); dirs.push(dir); return dir; };
+afterEach(() => { vi.unstubAllEnvs(); dirs.splice(0).forEach(dir => rmSync(dir, { recursive: true, force: true })); });
+function definition(id = 'betalist') {
+  return { kind: 'site', id, name: 'BetaList', version: 1, lastVerified: '2026-01-01',
+    sources: ['https://betalist.com/'], submitUrl: 'https://betalist.com/submit',
+    channel: { profiles: ['devtool'], bestPostingTimes: ['09:00'], bestPostingDays: ['tue'], leadTimeDays: 7 },
+    copy: { verified: false, verifiedFields: [], verificationNotes: ['Unverified local budgets'],
+      title: { required: true, maxLength: 80 }, body: { minLength: 10, maxLength: 1000 },
+      maxLinks: 1, requiredLink: false, bannedWords: ['guaranteed'], guidance: [] } };
+}
+function add(cwd: string, value = definition(), name = 'betalist') {
+  const dir = join(cwd, '.launch/sites'); mkdirSync(dir, { recursive: true });
+  const path = join(dir, name + '.yaml'); writeFileSync(path, stringify(value)); return path;
+}
+const cli = (cwd: string, ...args: string[]) => spawnSync(process.execPath,
+  ['--import', 'tsx', join(packageRoot(), 'src/cli.ts'), ...args, '--cwd', cwd, '--json'], { encoding: 'utf8' });
+
+it('discovers and carries a single site through plan/write/check/review and approval-gated offline publish', async () => {
+  const cwd = temp(); add(cwd);
+  const config = { profile: 'devtool', launchType: 'new-product', channels: ['betalist', 'x'],
+    timezone: 'UTC', launchDate: '2026-07-14', profileConfirmed: true };
+  writeFileSync(join(cwd, '.launch/config.json'), JSON.stringify(config));
+  cpSync(join(packageRoot(), 'fixtures/cli-tool/.liftoff-fixture/phase2/product.json'), join(cwd, '.launch/product.json'));
+  expect(createPlan(config, { cwd }).channels.map(c => c.id)).toContain('betalist');
+  expect(writeBriefs(cwd, ['betalist']).briefs).toHaveLength(1);
+  const file = join(cwd, '.launch/posts/betalist.md');
+  const copy = '---\nchannel: betalist\ntitle: Launch notes\nmedia: []\nclaims: []\n---\nA small local project for thoughtful people.\n';
+  writeFileSync(file, copy);
+  expect(checkPosts(cwd, ['betalist']).issues).toEqual([]);
+  writeFileSync(file, copy + 'guaranteed');
+  expect(checkPosts(cwd, ['betalist']).issues.map(i => i.rule)).toContain('words.banned');
+  writeFileSync(file, copy);
+  const review = await buildReview(cwd);
+  expect(readFileSync(review.path, 'utf8')).toContain('BetaList');
+  await expect(publish(cwd)).rejects.toThrow();
+  writeFileSync(join(cwd, '.launch/approvals.json'), JSON.stringify({ approvals: [{
+    channel: 'betalist', hash: review.posts[0].hash, name: 'Owner', time: '2026-07-13T09:00:00Z',
+  }] }));
+  expect((await publish(cwd)).mode).toBe('dry-run');
+  writeFileSync(file, copy + 'Edited.');
+  await expect(publish(cwd, true)).rejects.toThrow();
+  writeFileSync(file, copy);
+  const result = cli(cwd, 'publish', '--confirm');
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const staged = JSON.parse(result.stdout).data;
+  expect(staged.mode).toBe('offline-staging');
+  const post = new URL(staged.posts[0].url);
+  expect(readFileSync(post, 'utf8')).toContain('A small local project');
+  expect(readFileSync(new URL('reminder.ics', post), 'utf8')).toContain('https://betalist.com/submit');
+  const listing = cli(cwd, 'adapters');
+  expect(listing.status, listing.stdout).toBe(0);
+  expect(JSON.parse(listing.stdout).data).toContainEqual(expect.objectContaining({ id: 'betalist', source: 'project', route: 'manual', adapter: 'manual', reason: 'manual' }));
+});
+
+it('names both files on collisions and the file and schema errors on invalid definitions', () => {
+  const builtin = temp(); const path = add(builtin, definition('x'));
+  expect(() => registry(builtin)).toThrow(path);
+  expect(() => registry(builtin)).toThrow('rules/channels/x.yaml');
+  const duplicate = temp(); const a = add(duplicate); const b = add(duplicate, definition(), 'second');
+  expect(() => registry(duplicate)).toThrow(a); expect(() => registry(duplicate)).toThrow(b);
+  const invalid = temp(); const bad = add(invalid, { ...definition(), submitUrl: 'http://invalid.test' });
+  expect(() => registry(invalid)).toThrow(bad); expect(() => registry(invalid)).toThrow('pattern');
+  expect(() => site('unknown', temp())).toThrow('Known ids:');
+});
+
+it('discovers user sites through LIFTOFF_HOME and caches separately per cwd', () => {
+  const home = temp(); mkdirSync(join(home, 'sites'));
+  writeFileSync(join(home, 'sites/betalist.yaml'), stringify(definition()));
+  vi.stubEnv('LIFTOFF_HOME', home);
+  const cwd = temp(); expect(site('betalist', cwd)).toMatchObject({ source: 'user', path: join(home, 'sites/betalist.yaml') });
+  expect(registry(cwd)).toBe(registry(cwd));
+  const other = temp(); add(other); expect(() => registry(other)).toThrow('collision');
+});
+
+it('preserves built-in MCP-before-env ordering and stages integration sites offline', async () => {
+  const cwd = temp();
+  expect((await adapterSelection('x', cwd, { BUFFER_API_KEY: 'fixture' })).reason).toBe('env:BUFFER_API_KEY');
+  writeFileSync(join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { 'mcp-ayrshare': {} } }));
+  expect((await adapterSelection('x', cwd, { POSTIZ_API_KEY: 'fixture' })).reason).toBe('mcp:mcp-ayrshare');
+  for (const id of ['show-hn', 'reddit', 'product-hunt']) expect((await adapterSelection(id, cwd, { POSTIZ_API_KEY: 'fixture' })).adapter.name).toBe('manual');
+  expect((await adapterSelection('email', cwd, {})).adapter.name).toBe('email');
+  const custom = temp(); add(custom, { ...definition(), route: 'integration', adapters: ['buffer'] } as ReturnType<typeof definition>);
+  expect((await adapterSelection('betalist', custom, { BUFFER_API_KEY: 'fixture' })).adapter.name).toBe('buffer');
+  expect((await adapterSelection('betalist', custom, {})).adapter.name).toBe('manual');
+  expect((await adapterSelection('blog', custom, {})).reason).toBe('manual');
+});

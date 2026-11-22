@@ -11,6 +11,17 @@ const dirs: string[] = [];
 async function setup() { const cwd = await mkdtemp(join(tmpdir(), 'communities-')); dirs.push(cwd); await mkdir(join(cwd, '.launch/research'), { recursive: true }); await writeFile(join(cwd, '.launch/research/pains.json'), JSON.stringify({ idea: 'Groundwork', pains: [{ name: 'pain tracking', quotes: [{ url: 'https://www.reddit.com/r/builders/comments/a/ask', text: 'pain tracking' }] }] })); return cwd; }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 describe('communities', () => {
+  it.each(['9:1 ratio', '9:10 contribution ratio', 'ratio of 9:10', 'except for affiliate links', 'with a 9:1 ratio; post at 9am ET', 'except for affiliate links; post at 9am ET'])('keeps non-time promotion conditions schedulable: %s', async condition => {
+    const cwd = await setup(); const rules = [{ short_name: 'Promotions', description: `Self-promotion allowed ${condition}` }];
+    expect(restrictions(rules, 'UTC').manualReview).toBeUndefined();
+    const capture = join(cwd, 'capture.json'); await writeFile(capture, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, capture);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(report.plan).toHaveLength(1); expect(report.recommended).toEqual(['builders']);
+    expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
+  it.each(['at 18:30 UTC', 'at noon UTC', 'from 18 to 21 in ET', 'after 9am ET'])('still requires review for real unparsed time constraints: %s', description => {
+    expect(restrictions([{ short_name: 'Promotions', description }], 'UTC').manualReview).toBeDefined();
+  });
   it.each(['weekly_thread', 'megathread', 'self_promo', 'promo-thread', 'discussion'])('directs URL-only promotion restrictions to the cited %s thread', async slug => {
     const cwd = await setup(); const url = `https://reddit.com/r/builders/comments/abc/${slug}`;
     const rules = [{ short_name: 'Promotions', description: `Self-promo only in ${url}` }];

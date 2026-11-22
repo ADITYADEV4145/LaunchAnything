@@ -9,7 +9,8 @@ export function restrictions(rules: { short_name: string; description: string }[
   const threadUrl = threadUrls.length === 1 && /^(?:https?:\/\/)?(?:(?:www|old)\.)?reddit\.com\/r\/[^/]+\/comments\/[^/]+(?:\/|$)/i.test(threadUrls[0]!) ? threadUrls[0] : undefined;
   const source = raw.replace(urlPattern, ' ')
     .replace(/(?<![\w/])\/?[ru]\/[\w-]+(?:\/[\w/-]+)?/gi, ' ');
-  const text = source.replace(/[A-Z]/g, letter => letter.toLowerCase());
+  const text = source.replace(/[A-Z]/g, letter => letter.toLowerCase())
+    .replace(/\b\d+\s*:\s*\d+\s+(?:contribution\s+)?ratio\b|\bratio(?:\s+of)?\s*:?\s*\d+\s*:\s*\d+\b|\b\d+\s*:\s*1\b/g, token => ' '.repeat(token.length));
   const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
   if (/\bweekends?\b/.test(text)) days.push(0, 6);
   const clock = (hour: string, minute?: string, period?: string) => {
@@ -35,7 +36,7 @@ export function restrictions(rules: { short_name: string; description: string }[
   if (new Set(mentions).size > 1) manualReview = 'Conflicting rule timezones';
   const parsed = range ?? at;
   const remainder = parsed ? text.slice(0, parsed.index) + ' ' + text.slice(parsed.index! + parsed[0].length) : text;
-  const unparsedTime = /\b(?:\d{1,2}\s*(?::\d|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|before\b|after\b|until\b|till\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|except\b|excluding\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder);
+  const unparsedTime = /\b(?:\d{1,2}\s*(?::\d{2}\b|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder) || Boolean(parsed && /\b(?:before|after|until|till|except|excluding)\s*$/.test(text.slice(0, parsed.index)));
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   if (parsed) {
     const context = source.replace(new RegExp(`(?<![\\w./:])${zonePattern}(?![\\w/])`, 'gi'), token => ' '.repeat(token.length))

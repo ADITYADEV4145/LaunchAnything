@@ -3,7 +3,8 @@ const zones: Record<string, string> = { et: 'America/New_York', est: 'Etc/GMT+5'
 const unsupportedZones = ['cet', 'cest', 'eet', 'eest', 'ist', 'bst', 'jst', 'aest', 'aedt', 'acst', 'acdt', 'awst', 'nzst', 'nzdt', 'hkt', 'sgt', 'wet', 'west', 'ast', 'adt', 'hst', 'akst', 'akdt'];
 const zonePattern = `(?:(?:utc|gmt)[ \\t]*[+-][ \\t]*\\d+(?::\\d{2})?|[a-z_]+(?:/[a-z0-9_+-]+)+|${[...Object.keys(zones), ...unsupportedZones].join('|')})`;
 export function restrictions(rules: { short_name: string; description: string }[], timezone: string) {
-  const text = rules.map(r => r.short_name + ' ' + r.description).join('\n').toLowerCase();
+  const source = rules.flatMap(r => [r.short_name, r.description]).join('\n\n');
+  const text = source.toLowerCase();
   const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
   if (/\bweekends?\b/.test(text)) days.push(0, 6);
   const clock = (hour: string, minute?: string, period?: string) => {
@@ -31,6 +32,14 @@ export function restrictions(rules: { short_name: string; description: string }[
   const remainder = parsed ? text.slice(0, parsed.index) + ' ' + text.slice(parsed.index! + parsed[0].length) : text;
   const unparsedTime = /\b(?:\d{1,2}\s*(?::\d|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|before\b|after\b|until\b|till\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|except\b|excluding\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder);
   if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
+  if (parsed) {
+    const context = source.replace(new RegExp(`(?<![\\w./:])${zonePattern}(?![\\w/])`, 'gi'), token => ' '.repeat(token.length))
+      .replace(new RegExp(`\\b(?:(?:${weekdays.join('|')})s?|weekends?|at|from|between|to|and|in|on|only|post|posting|time)\\b`, 'gi'), token => ' '.repeat(token.length));
+    const before = context.slice(0, parsed.index).split('\n\n').at(-1)!;
+    const after = context.slice(parsed.index! + parsed[0].length).split('\n\n')[0]!;
+    const unknown = /(\p{Lu}[\p{L}\p{M}-]*)[\s()[\],:]*$/u.exec(before)?.[1] ?? /^[\s()[\],:]*(\p{Lu}[\p{L}\p{M}-]*)/u.exec(after)?.[1];
+    if (unknown) manualReview = `Unrecognized rule timezone or place: ${unknown}`;
+  }
   return { days: [...new Set(days)], megathread: /mega[- ]?thread/.test(text), start, end, timezone: mentions[0] ?? timezone, manualReview };
 }
 export function allowedDate(date: string, days: number[]) { return !days.length || days.includes(new Date(date + 'T12:00:00Z').getUTCDay()); }

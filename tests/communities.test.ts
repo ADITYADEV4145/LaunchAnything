@@ -176,6 +176,14 @@ describe('communities', () => {
     report.plan.push({ subreddit: 'builders', date: '2026-01-04', time: '12:00', timezone: 'UTC', angle: 'lesson', variant: 'value-first', file: 'posts/builders.md' });
     expect((await checkCommunities(cwd, report)).errors).toContain('builders: rule timezone needs manual review');
   });
+  it.each(['9am Singapore', 'Singapore 9am', 'at 9am in Singapore', 'Singapore time at 9am', 'at 9am (Singapore)', 'at 9am ET Singapore'])('never substitutes the config zone for an unknown place: %s', async description => {
+    const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
+    expect(limit.manualReview).toBe('Unrecognized rule timezone or place: Singapore'); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    const cwd = await setup(); const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, file);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(result.markdown).toContain('Unrecognized rule timezone or place: Singapore');
+    expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+  });
   it.each([5, 6])('preserves the %s:30 UTC instant when New York repeats 01:30 at fall-back', async hour => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'America/New_York' }));
     const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday at ${hour}:30am UTC` }] };

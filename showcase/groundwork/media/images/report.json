@@ -1,0 +1,86 @@
+[
+  {
+    "size": "og",
+    "width": 1200,
+    "height": 630,
+    "bytes": 122564,
+    "contrastRatio": 17.766766973431775,
+    "checks": {
+      "dimensions": true,
+      "safeArea": true,
+      "contrast": true,
+      "fileSize": true
+    },
+    "ok": true
+  },
+  {
+    "size": "product-hunt",
+    "width": 1270,
+    "height": 760,
+    "bytes": 138552,
+    "contrastRatio": 17.766766973431775,
+    "checks": {
+      "dimensions": true,
+      "safeArea": true,
+      "contrast": true,
+      "fileSize": true
+    },
+    "ok": true
+  },
+  {
+    "size": "x",
+    "width": 1600,
+    "height": 900,
+    "bytes": 175009,
+    "contrastRatio": 17.766766973431775,
+    "checks": {
+      "dimensions": true,
+      "safeArea": true,
+      "contrast": true,
+      "fileSize": true
+    },
+    "ok": true
+  },
+  {
+    "size": "linkedin",
+    "width": 1200,
+    "height": 627,
+    "bytes": 121521,
+    "contrastRatio": 17.766766973431775,
+    "checks": {
+      "dimensions": true,
+      "safeArea": true,
+      "contrast": true,
+      "fileSize": true
+    },
+    "ok": true
+  },
+  {
+    "size": "instagram",
+    "width": 1080,
+    "height": 1350,
+    "bytes": 158103,
+    "contrastRatio": 17.766766973431775,
+    "checks": {
+      "dimensions": true,
+      "safeArea": true,
+      "contrast": true,
+      "fileSize": true
+    },
+    "ok": true
+  },
+  {
+    "size": "youtube",
+    "width": 1280,
+    "height": 720,
+    "bytes": 126565,
+    "contrastRatio": 17.766766973431775,
+    "checks": {
+      "dimensions": true,
+      "safeArea": true,
+      "contrast": true,
+      "fileSize": true
+    },
+    "ok": true
+  }
+]

@@ -1,0 +1,389 @@
+{
+  "readmeSections": [
+    {
+      "heading": "Agent Linux",
+      "body": "**Give your agent a Linux computer.**\n\nRun a persistent Debian/Xfce desktop on your Apple silicon Mac. Connect an agent over MCP, watch it work, and take over the same desktop when you need to. The guest comes with Chromium, Firefox ESR, a file manager, a terminal and a text editor.\n\n[Quick start](#quick-start) · [Control the desktop](#control-the-desktop) · [Manage workspaces](#manage-workspaces) · [Compatibility](#compatibility-and-limits) · [Documentation](#documentation)\n\n![Illustration of an Agent Linux workspace showing a browser and terminal in a Debian/Xfce desktop on an Apple silicon Mac.](docs/assets/readme-workspace.svg)\n\n*Illustration featuring the [offline project-budget demo](docs/demo.md).*\n\n[Supervised guest agent runs](docs/agent-runs.md) provide bounded Codex/Claude/custom\nrunner supervision and an experimental Grok adapter. Real ARM64 guest agent runs\nare not yet qualified; hosted agents such as Devin are not claimed to run in the VM.\n\n> **Available today: source-built local developer preview.** Tested on one M4 Pro Mac. No public binaries or VM images are published, and the native app is not notarized. Cloud and billing are development prototypes, not a hosted or paid service. See [launch readiness](docs/launch-readiness.md)."
+    },
+    {
+      "heading": "Quick start",
+      "body": "On an Apple-silicon Mac, paste this into a terminal:\n\n```sh\ncurl -fsSL https://raw.githubusercontent.com/ADITYADEV4145/AgentLinux/main/install.sh | bash\n```\n\nThis **builds from source locally**, installs the CLI without sudo, builds an\noptional unsigned (ad-hoc signed, not notarized) Mac app, and launches Linux.\nIf prompted to install Xcode Command Line Tools, finish that installation and\nre-run the same command. Python 3.9+ from the tools is sufficient. It downloads\nsource, Go 1.26.9 if needed, Go modules, and pinned Lima unless a supported Lima\nis on PATH. First launch downloads the Debian image and guest packages.\nRe-run to upgrade; it never edits shell profiles or Gatekeeper settings.\nSee [installer options and uninstall](docs/release.md#one-command-source-install).\n\nFor guided project import, fresh guest agent authentication and a task/verification\nrecord, run `agent-linux onboard --project /absolute/path/to/project`.\nSee [first-run onboarding](docs/onboarding.md) for safety boundaries and limits.\nBare `agent-linux` in a terminal still starts/resumes Linux and opens its viewer."
+    },
+    {
+      "heading": "1. Build and check your Mac",
+      "body": "- **Host:** Apple silicon Mac with hardware virtualization; see the [tested configuration](#compatibility-and-limits).\n- **Tools (manual build):** Git, macOS developer command-line tools, OpenSSH, [Go 1.26.9](https://go.dev/dl/), Python 3.9+, and [Lima 2.2.1 or stable 2.3.x](https://github.com/lima-vm/lima/releases). If you use Homebrew, run `brew install lima` and confirm the version with `limactl --version`. The build may fetch the pinned Go toolchain if it is missing.\n- **Storage and network:** Have at least 30 GiB free for the default VM (2 CPUs, 4 GiB RAM, 24 GiB logical disk). First startup needs internet access for the pinned Debian image (~322 MiB) and guest packages.\n\n```sh\ngit clone https://github.com/ADITYADEV4145/AgentLinux.git\ncd AgentLinux\nmake build\n./bin/agent-linux doctor --json\n```\n\nThe examples assume a supported `limactl` is on your PATH. Otherwise add `--lima /absolute/path/to/limactl` to each local command, before any positional arguments. For a reproducible build, verifying a downloaded archive, an optional private install without sudo, upgrades or uninstall, see [packaging and release](docs/release.md)."
+    },
+    {
+      "heading": "2. Start Linux and watch in your browser",
+      "body": "In terminal A:\n\n```sh\n./bin/agent-linux start --viewer web --view-only\n```\n\nOpen the private loopback URL the CLI prints. Leave this command running while you connect your agent. This starts or resumes a local VM, waits for its desktop, and leaves human input disabled so the agent can act. It does not create cloud resources."
+    },
+    {
+      "heading": "3. Connect an agent",
+      "body": "In terminal B:\n\n```sh\n./bin/agent-linux mcp-config --client codex\n```\n\nReview the snippet and add it to your client using the [MCP setup guide](docs/mcp.md). This command prints configuration without changing your settings. Your client launches the stdio MCP server; you give prompts to the client, not to the server.\n\n> Try asking: “Check my Linux machine, open its browser, visit https://example.com, and tell me what you see. Use screenshots before and after you act.”\n\nFor an offline walkthrough with synthetic data, try the [project-budget form demo](docs/demo.md). When you're done, run `./bin/agent-linux stop` in terminal B. Closing the viewer alone leaves Linux running; stopping it preserves guest files."
+    },
+    {
+      "heading": "Control the desktop",
+      "body": "![Two paths into one local VM: a person uses a viewer and an agent uses MCP. Both can observe the guest, but human ownership pauses agent input.](docs/assets/readme-control.svg)\n\nThe viewer and the MCP server connect to the same local Debian VM. Both can observe the desktop. When you take control in the viewer, agent input pauses until you release it.\n\nRun `./bin/agent-linux start` without `--view-only` for interactive control. The CLI chooses the installed native app, Kitty, or the loopback web viewer. If the CLI is on PATH, the bare `agent-linux` command does the same thing in an interactive terminal. You can also choose a viewer explicitly:\n\n| Viewer | Select it | What to expect |\n| --- | --- | --- |\n| **Web** | `start --viewer web` | Private loopback URL; use the on-screen controls to take or release input. See [viewer controls](docs/viewer.md). |\n| **Kitty** | `start --viewer kitty` | Live desktop in [Kitty](https://sw.kovidgoyal.net/kitty/binary/); **F2** hands off input and **Ctrl+]** exits without stopping Linux. |\n| **Native Mac preview** | `start --viewer app` | [Build with Xcode/Swift](docs/native-workspace.md) first. Open the searchable [workspace switcher](docs/workspace-switcher.md) with **Command+Shift+K**. |\n\n**Agent workflow:** capture a fresh screenshot → act on the guest → capture again to verify the result. An input acknowledgment is not proof the app changed. Optional [structured browser and UI tools](docs/structured-control.md) require a supporting guest; older guests remain visual-only until upgraded."
+    },
+    {
+      "heading": "Manage workspaces",
+      "body": "| I want to… | Use |\n| --- | --- |\n| Keep work separate | `./bin/agent-linux start --machine work` starts or resumes a [named machine](docs/local-machines.md). Use the same `--machine work` for its MCP configuration and lifecycle commands. |\n| See and manage my machines | `./bin/agent-linux machines list --json` lists them; `./bin/agent-linux dashboard --local` opens the [local dashboard](docs/web-console.md). |\n| Move a file in or out | Use [`copy-in` and `copy-out`](docs/file-transfer.md) for explicit, bounded file transfers. There is no host project mount or automatic sync. |\n| Save or recover a workspace | Stop the machine before creating or restoring a [disk checkpoint](docs/checkpoints.md). Checkpoints capture saved disk state, not RAM or unsaved buffers. |\n| Reset, delete, or uninstall | Check the exact machine ID with `status --json`, stop the VM, and review the plan before confirming. See [reset undo/redo and guarded deletion](docs/recoverable-workspaces.md) and [tools uninstall](docs/release.md). Uninstalling tools does not remove VM data. |\n\nThe default [managed budget](docs/local-machines.md#managed-resource-budgets) is half the host RAM (including 1 GiB runtime overhead per VM) and two fewer than the host's logical CPU count, with a minimum of one CPU. Agent Linux refuses new starts under macOS memory pressure without stopping running machines.\n\nLocal state defaults to `~/.local/share/agent-linux/local`. If you use a custom `--state-dir`, use it consistently for lifecycle, viewers and MCP. Local use has no Agent Linux usage fee; your Mac supplies resources and your agent client/model may charge separately."
+    },
+    {
+      "heading": "Compatibility and limits",
+      "body": "| Area | Tested or available | Not established |\n| --- | --- | --- |\n| **Mac host** | M4 Pro, macOS 26.5 (25F71), Lima 2.2.1 with Apple Virtualization | macOS 14+ is a target, not a verified minimum. Intel Mac, Linux and Windows are not local hosts. |\n| **Guest** | ARM64 Debian 13 and Xfce 4.20 on one X11 display | No Wayland or guest multi-display. Existing disks retain their provisioned recipe and helper. |\n| **Viewers** | Kitty 0.50.0 and Chrome 156 loopback viewing/input on the tested Mac; native app is a local preview | Broader terminal, browser, keyboard and accessibility coverage is pending. |\n| **Agents** | Codex CLI and the official Go MCP SDK have local acceptance evidence | Visual tasks require an image-capable client/model. Claude Code and VS Code setup is documented, but their model/tool flows are untested here. |\n| **Cloud and billing** | The [cloud prototype](docs/cloud.md) defaults to **SIMULATED**; [billing](docs/billing.md) is sandbox-only | Real-provider and hosted Stripe sandbox acceptance are pending. No live billing or automatic local-to-cloud fallback. |\n\n> **Trust boundary:** Guest commands run inside Linux and can access guest data and the network. NAT can reach host and LAN services; it is not network isolation. Host folders, shared clipboard, host pointer control, SSH-agent forwarding and device sharing are off by default. This is not an independently audited or certified hostile-code sandbox. Screenshots and tool results go to the connected client/model; use disposable guests and synthetic data when trying it out. See [security boundaries](docs/security.md)."
+    },
+    {
+      "heading": "Documentation",
+      "body": "| If you're… | Start here |\n| --- | --- |\n| **Setting up or debugging** | [Troubleshooting](docs/troubleshooting.md) · [Known issues](docs/known-issues.md) · [Verification evidence](docs/verification.md) |\n| **Reproducing the launch flow** | [Reproduction and recording](docs/reproduction.md) · [Support matrix](docs/support-matrix.md) · [Recovery limits](docs/recovery-limits.md) · [Costs](docs/costs.md) |\n| **Working on the project** | [Architecture](docs/architecture.md) · [Development](docs/development.md) · [Contributor roadmap](docs/contributor-roadmap.md) · [Contributing](CONTRIBUTING.md) |\n| **Checking release status** | [Launch readiness](docs/launch-readiness.md) · [Pricing assumptions](docs/pricing-targets.md) · [Public site](https://agent-linux.netlify.app) |\n| **Reporting a security issue** | [Security reporting policy](SECURITY.md) |\n\nFor local diagnostics, start with `doctor`, `status --json`, and `logs --backend`. Review the output before sharing; never post keys, private viewer links, or unreviewed screenshots.\n\nOriginal repository code is [Apache-2.0](LICENSE). External runtimes, SDKs, browsers and guest packages retain their own [licenses and notices](third_party/README.md)."
+    }
+  ],
+  "package": {},
+  "license": "\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n",
+  "commits": [
+    {
+      "sha": "b7c6f02f20d92acd68258e1ecb15fa3359f8078d",
+      "subject": "Skip rewriting a fresh transport probe on every status handshake"
+    },
+    {
+      "sha": "92fd310d47e38a1f8f210ea7127afb560ff8c230",
+      "subject": "Move technical fine print into Details and Help"
+    },
+    {
+      "sha": "0226e5be36f60b7d6bfa5a72fa13c7374ad7ba7c",
+      "subject": "test(acceptance): wait for the editor's Open dialog before typing into it"
+    },
+    {
+      "sha": "0d7e299012d8bda4419e8d902637eba4893bdc79",
+      "subject": "Refresh native branding and workspace navigation"
+    },
+    {
+      "sha": "4aaed99da4ec60bb997fa04b9ea45a413f814568",
+      "subject": "Native app: one-click Connect to Claude for Mac"
+    },
+    {
+      "sha": "92e96746da91a7dff27cae4568f2531ed61fada4",
+      "subject": "fix(broker): name a broker from a different build instead of INVALID_MESSAGE"
+    },
+    {
+      "sha": "a9cce27735c74ef980aec8d80a2e12e8b1adf6f9",
+      "subject": "Native app: Space/Return activate Settings tabs"
+    },
+    {
+      "sha": "51c8a418852844a5f35552c534f2e84f15e14764",
+      "subject": "Bundle native help guide and local issue report"
+    },
+    {
+      "sha": "9333b3fc435aa365f91a90b9cc507ec0498c6800",
+      "subject": "Add one-command install and launch from source"
+    },
+    {
+      "sha": "86feebb29d7ef0a24f9470b224e4f32ef919327a",
+      "subject": "Native app: keyboard escape, VoiceOver, contrast and reduced-motion fixes"
+    },
+    {
+      "sha": "3f37361a87c41c3ba9d7e82d775cf2099606e7bd",
+      "subject": "Redesign native app with guided setup, workspace library and Settings"
+    },
+    {
+      "sha": "3244a6a5b79e4218b73626d9ebdcbc73cb7aa83a",
+      "subject": "Design a complete local-first Mac app experience"
+    },
+    {
+      "sha": "4059e3db97532dd034fec66c2065b39d36751616",
+      "subject": "Make terminal disconnect recovery tests deterministic"
+    },
+    {
+      "sha": "f9b148bf7854513e2ae1bba657a4682a353ac01f",
+      "subject": "Add checkpoint provenance and operator integrity diagnostics"
+    },
+    {
+      "sha": "80e98774c1349d11467a4b430204d969c240f413",
+      "subject": "Wire onboarding agent and verify steps into the agent supervisor"
+    },
+    {
+      "sha": "57dcb387f781c2a8e00487e89d60b4dc7bab3451",
+      "subject": "fix(lima): keep pinned SSH host key across restarts"
+    },
+    {
+      "sha": "64c3cb11c8a45bb65bac0efda7a49b163f3ccfe7",
+      "subject": "Package Agent Linux as a downloadable Mac app and DMG"
+    },
+    {
+      "sha": "941f94099584ac1ca00f3061f1094ad54ab61e81",
+      "subject": "Add durable SQLite ledger with outcome-unknown recovery"
+    },
+    {
+      "sha": "29a5d24e47fd6cbb5b90080dd8b39776c47d3593",
+      "subject": "Embed native guest input in the workspace window"
+    },
+    {
+      "sha": "e4fa6fcde13b4dea1856476a3e5887c0164f67f5",
+      "subject": "Add guided first-run onboarding (agent-linux onboard)"
+    },
+    {
+      "sha": "6e1d367fc898f28c2a8a2d21bcc972eb5daa9c19",
+      "subject": "Add native keyboard, IME and pointer input"
+    },
+    {
+      "sha": "152c7a831f7aee32ef891dcd973325cd038d250b",
+      "subject": "Reuse validated guest pixels for changing RFB frames"
+    },
+    {
+      "sha": "b41da995517fbbd317ac2d6ad90c1ad2424b5e8a",
+      "subject": "Verify downloaded archives and reproduce builds from clean worktrees"
+    },
+    {
+      "sha": "0e0a1bb9fe14af192d47989ba97bd6c7a93bcdb9",
+      "subject": "Use transport probe for machines list lifecycle"
+    },
+    {
+      "sha": "3e8975c4a4055c735d8832ac527e51b1bbd76b38",
+      "subject": "Supervise agent runs in the guest"
+    },
+    {
+      "sha": "276cbbbb0cc024fbc5ab1e795377ab682fa4a1e2",
+      "subject": "native: workspace inventory, Tasks/Artifacts/Connections views and workspace control strip"
+    },
+    {
+      "sha": "a1aa0deae19e9c66066d2ea1c2e5c5051d4f1927",
+      "subject": "Reuse decoded pixels for identical RFB frames"
+    },
+    {
+      "sha": "6045a1c69d18a994081f205111b1b94788a3d7a7",
+      "subject": "Order control ownership per machine"
+    },
+    {
+      "sha": "d7880e9b100defe45c2e11e2daee32dd57bc6705",
+      "subject": "Polish native workspace visual design"
+    },
+    {
+      "sha": "3bdbe17813c6b64e3811bab01cd2f034fa51d4cf",
+      "subject": "Document Phase 5 reproduction, support matrix, recovery limits and costs"
+    },
+    {
+      "sha": "85f7a6de1ff9ee9336afe10902a515132f4692dc",
+      "subject": "Add lifecycle stage to machines list JSON"
+    },
+    {
+      "sha": "dc333f09e619e56c0cfb8fae3883b5cc038dd883",
+      "subject": "Isolate native video decoding in a sandboxed XPC service"
+    },
+    {
+      "sha": "86e863828816ed7041fb306531742c5b1025d296",
+      "subject": "Decode host screenshots once: lima transport seals, machine.Local skips re-decode"
+    },
+    {
+      "sha": "9323123fd66fa377a4895733f1eb46541c6bd7ac",
+      "subject": "Add private durable host artifact store"
+    },
+    {
+      "sha": "96fd34ceb372451e26d9580a1e7ea15114ee1cae",
+      "subject": "Cut CLI status latency: in-process sysctl, skip correct owner marker rewrite"
+    },
+    {
+      "sha": "ece08e1d0a316609b9d70d8c5de211d779127e53",
+      "subject": "Redesign the Agent Linux README"
+    },
+    {
+      "sha": "efe25ab73adf6535628bef9a460eab5a1876a0de",
+      "subject": "Accept reviewed Homebrew Lima 2.3 releases"
+    },
+    {
+      "sha": "f2ac4b72e3a4f8ce1b83de60291bf02d619f8683",
+      "subject": "Show honest workspace lifecycle progress in native app"
+    },
+    {
+      "sha": "80170583547cf0eb1e3709a67fa0ddb7c09c2f5d",
+      "subject": "Skip redundant PNG decode in MCP computer_screenshot"
+    },
+    {
+      "sha": "cd3bb8683171b3211e358a3626a70099a8ff7bad",
+      "subject": "Add Phase 1 host-isolation security tests"
+    },
+    {
+      "sha": "86f31e9842e0645fc23af43ca54e60e5b0979c97",
+      "subject": "Charge 1 GiB runtime overhead and refuse starts under macOS memory pressure"
+    },
+    {
+      "sha": "c5216ce8c450fefe45818b78d0deb117fc04f48c",
+      "subject": "rfb: skip framebuffer copy after PNG decode for packed RGBA frames"
+    },
+    {
+      "sha": "8e7a03b6c213e24ec1bdd63a03fbe9664464f0fd",
+      "subject": "Merge pull request #1 from ADITYADEV4145/devin/1795204055-screenshot-latency"
+    },
+    {
+      "sha": "e37a8e2f783b873ee29cecac2f36d9a784ab903a",
+      "subject": "Cache validation of identical screenshot PNGs"
+    },
+    {
+      "sha": "4824e2b0a2806dd9a7dcb04d27bec2aa553c4d55",
+      "subject": "Add experimental bounded native guest video with explicit RFB fallback"
+    },
+    {
+      "sha": "20c2036018ae8b12f6e2e39ec931244204149100",
+      "subject": "Fix guest media deadline handoff and verify sustained renewals"
+    },
+    {
+      "sha": "df27f699aab2f77d8b61fcc8ddebd3d4865d3e8b",
+      "subject": "feat: integrate authenticated media transport and recoverable installation"
+    },
+    {
+      "sha": "e6fd07693c0e69ade413fd96553f7fd7bf3e8828",
+      "subject": "feat: add experimental Rust Linux media worker with bounded framing"
+    },
+    {
+      "sha": "78b710aa4bc0acb04a6805db48cbb073aa693ca3",
+      "subject": "feat: qualify controlled incremental Linux desktop viewing"
+    },
+    {
+      "sha": "0f20bfe36ad83c445e32f27875fefc08a7079c6c",
+      "subject": "docs: establish preserved workspace baseline and private verification policy"
+    },
+    {
+      "sha": "c35ad6c09ad86f845164867e83df7d8f325345ee",
+      "subject": "docs: remove public competitor comparisons and benchmark summaries"
+    },
+    {
+      "sha": "0b391ea9f52ec4e95d03086e66fe7eb0ee2c1303",
+      "subject": "docs: evaluate selective Rust adoption and responsiveness bottlenecks"
+    },
+    {
+      "sha": "d6eb1f1480ee4aaafb3a7662a7c4d6087d78c356",
+      "subject": "feat: add native workspace switching and display placement"
+    },
+    {
+      "sha": "98ba7cdd97dc4f843ff9f98f5d9cd3174010696b",
+      "subject": "feat: add native workspace preview and persistent X11 input"
+    },
+    {
+      "sha": "2b0422f8283619fd55668b8a3a066611a1b7ab56",
+      "subject": "feat: persist human authority and broker local guest input"
+    },
+    {
+      "sha": "deed130a74d055807fd3261f2d351dd291b33456",
+      "subject": "docs: research desktop and agent-computer competitors"
+    },
+    {
+      "sha": "e2614c9d128ec1a7e08a64527ff21eafe52d6fb8",
+      "subject": "docs: audit human ownership, input latency and agent efficiency"
+    },
+    {
+      "sha": "7baf9f0754ab0a3a4eb888932781237103270dbe",
+      "subject": "feat(local): add reliable human input and structured guest UI control"
+    },
+    {
+      "sha": "053614209d835067c309630b2618be072fb9bbb2",
+      "subject": "feat(viewer): add on-demand guest capture with conditional frame updates"
+    },
+    {
+      "sha": "2decbcdb0bf7b4094fefca10c7b0e69632f89c87",
+      "subject": "feat(local): bound observation recovery and retain private operation history"
+    },
+    {
+      "sha": "fce31878aa50b86907fa9d433da8ccba24f7d6b9",
+      "subject": "feat(local): make workspace reset recoverable with undo and redo"
+    },
+    {
+      "sha": "abd3a1878dc562c8fcd84978be35156b330f1b01",
+      "subject": "test(local): cover sparse extents and record checkpoint CI"
+    },
+    {
+      "sha": "a8df429615c5666ab4183d53e103b6e49ef4b836",
+      "subject": "feat(local): add stopped disk checkpoints and explicit recovery"
+    },
+    {
+      "sha": "98c292e38dc038d197a68f72c845e729deaf9378",
+      "subject": "feat(site): deploy public Agent Linux landing on Netlify"
+    },
+    {
+      "sha": "23fc4752d1e00decbf042e04be265f69d93bea25",
+      "subject": "feat(local): add named machines, fleet budgets and local dashboard"
+    },
+    {
+      "sha": "247815c3f29d676ea5e9cfa864e1077dc8fd36ee",
+      "subject": "feat(site): apply supplied Agent Linux orbital logo"
+    },
+    {
+      "sha": "69507ce7c752b389048f5ff410e9d1e252bf8b13",
+      "subject": "perf(viewer): reuse pinned capture channels and decouple terminal capture"
+    },
+    {
+      "sha": "0930a0a98cd46ab12343da25c97c8dc672d5fcc6",
+      "subject": "docs(local): record disposable VM hardening baseline"
+    },
+    {
+      "sha": "190c38d9ff0363e3a4b61050a04765050f8a0d6b",
+      "subject": "feat(site): integrate exported landing with unified Manrope typography"
+    },
+    {
+      "sha": "953c1bce1ab477be39b51fdee256eb29a1d2935e",
+      "subject": "feat(pricing): display selected hourly monthly and annual plans"
+    },
+    {
+      "sha": "cd2deadd9a1b01938fe82b5428fd97fdea1b5073",
+      "subject": "feat(product): add one-command start and responsive development console"
+    },
+    {
+      "sha": "9801f206d216379ac4a77e653e0d7303890f5a83",
+      "subject": "fix(viewer): wake local capture after separate guest mutations"
+    },
+    {
+      "sha": "78aba41177b714abcec87e3a314e891e90688290",
+      "subject": "feat: prepare local preview and truthful launch readiness"
+    },
+    {
+      "sha": "b797430d5ea51448000b1b8818de9d868803697d",
+      "subject": "feat: add sandbox cloud metering and billing foundation"
+    },
+    {
+      "sha": "c964d97a3abf770f4b20faba095ab064cd8a03f3",
+      "subject": "feat: add gated cloud prototype and interactive one-command Linux startup"
+    },
+    {
+      "sha": "77733c9521bc0ecad8006e103c5860fe217b0213",
+      "subject": "Select and polish the agent workstation with real desktop comparison"
+    },
+    {
+      "sha": "58ac142c15afb50f995bea507090f41b37baabd2",
+      "subject": "Evaluate modern GNOME desktop target with real Ubuntu ARM64 evidence"
+    },
+    {
+      "sha": "e2ee55dd8dd01d9fb29782aad939fa08776da271",
+      "subject": "Harden local product and prepare unpublished developer release candidate"
+    },
+    {
+      "sha": "236b15f6c4e0ba135e13d320fe2aff875ed983b0",
+      "subject": "Complete Phase 4 hardware viewer acceptance and narrow status handling"
+    },
+    {
+      "sha": "3191b654941223500fa31c00b2b5d2c2e727ab2b",
+      "subject": "feat: add bounded terminal and local web desktop viewers"
+    },
+    {
+      "sha": "9d5bb7b628cae17d4f5f06389ca851d1f14f984d",
+      "subject": "feat: complete Linux desktop apps and guest software maintenance"
+    },
+    {
+      "sha": "f78109d553c01954a335ded3d03e7c8fcf08455c",
+      "subject": "feat: expose local Linux desktop through MCP stdio"
+    },
+    {
+      "sha": "f673bc908cc938bba0ea7e4df90ddc1647623c29",
+      "subject": "feat: add real Linux desktop and bounded guest computer control"
+    },
+    {
+      "sha": "7128b09791625a54036c296bc948ded58486c52a",
+      "subject": "feat: implement local VM lifecycle and authenticated guest health protocol"
+    },
+    {
+      "sha": "afaa74b02c780591ffdf55558ac2203c1003eabe",
+      "subject": "docs: define Phase 0 product specification and architecture"
+    }
+  ],
+  "routes": [],
+  "screenshots": [
+    "internal/console/landing/framerusercontent.com/images/eom8bDQh6gZMIkmm0Gyn3fClog_1.gif"
+  ],
+  "landingUrl": "https://raw.githubusercontent.com/ADITYADEV4145/AgentLinux/main/install.sh"
+}

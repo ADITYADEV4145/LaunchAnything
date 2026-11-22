@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:04,500
+Agent Linux: built CLI help
+
+2
+00:00:04,500 --> 00:00:09,000
+Source-built developer preview, not public binaries
+
+3
+00:00:09,000 --> 00:00:13,500
+MCP options from the built CLI
+
+4
+00:00:13,500 --> 00:00:18,000
+No Mac VM was booted here
+
+5
+00:00:18,000 --> 00:00:22,500
+No guest agent session was verified
+
+6
+00:00:22,500 --> 00:00:27,000
+Human review and launch results pending

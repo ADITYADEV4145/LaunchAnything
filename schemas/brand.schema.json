@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description", "logoUrl", "iconUrl", "ogImage", "colors", "fonts"],
+  "properties": {
+    "name": {"type": "string"}, "description": {"type": "string"},
+    "logoUrl": {"type": "string"}, "iconUrl": {"type": "string"}, "ogImage": {"type": "string"},
+    "colors": {"type": "array", "items": {"type": "string"}},
+    "fonts": {"type": "array", "items": {"type": "string"}}
+  }
+}

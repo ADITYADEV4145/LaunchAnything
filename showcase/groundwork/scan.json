@@ -1,0 +1,392 @@
+{
+  "readmeSections": [
+    {
+      "heading": "Introduction",
+      "body": "<p align=\"center\">\n  <picture>\n    <source media=\"(max-width: 600px)\" srcset=\"docs/assets/groundwork-hero-mobile.webp\">\n    <img src=\"docs/assets/groundwork-hero.webp\" alt=\"Groundwork: find code, reuse it, and verify calls. A live, local map of your codebase for coding agents. Local, offline and MIT licensed.\" width=\"100%\">\n  </picture>\n</p>\n\n<h1 align=\"center\">Less searching. More building.</h1>\n\n<p align=\"center\">\n  A live, local map of your codebase for coding agents.<br>\n  Find the right symbol. Reuse the right helper. Call code that actually exists.\n</p>\n\n<p align=\"center\">\n  <strong>Claude Code · Codex · Cursor</strong><br>\n  TypeScript · JavaScript · Python &nbsp; / &nbsp; Node.js 22+ &nbsp; / &nbsp; MIT\n</p>\n\n<p align=\"center\">\n  <a href=\"#install\"><strong>Get started</strong></a> ·\n  <a href=\"#what-it-does\">Why Groundwork</a> ·\n  <a href=\"#see-a-real-check\">See a real check</a> ·\n  <a href=\"#how-it-works\">How it works</a> ·\n  <a href=\"#learn-more\">Docs</a>\n</p>\n\n---\n\nYour agent can write code. **Groundwork helps it understand the code you already have.**\n\nInstead of filling the context window with grep results and whole files, the agent gets a ranked map, precise symbol reads, and existing code to reuse. Hooks keep that map current and check new calls against real definitions as the agent works.\n\n**No hosted service. No telemetry. No network access at runtime.**"
+    },
+    {
+      "heading": "Install",
+      "body": "Requires **Node.js 22 or later**. Choose an install method:\n\n**Homebrew** installs Node.js too:\n\n```sh\nbrew install ADITYADEV4145/groundwork/groundwork\n```\n\n**npm, pnpm or Bun:**\n\n```sh\nnpm install -g groundwork-agent"
+    },
+    {
+      "heading": "or",
+      "body": "pnpm add -g groundwork-agent"
+    },
+    {
+      "heading": "or",
+      "body": "bun add -g groundwork-agent\n```\n\n**Install script:**\n\n```sh\ncurl -fsSL https://raw.githubusercontent.com/ADITYADEV4145/GroundWork/main/scripts/install.sh | sh\n```\n\n**One-off, without installing globally:**\n\n```sh\nnpx groundwork-agent doctor"
+    },
+    {
+      "heading": "or",
+      "body": "bunx groundwork-agent doctor\n```\n\n**From source:**\n\n```sh\ngit clone https://github.com/ADITYADEV4145/GroundWork.git\ncd GroundWork\nnpm ci\nnpm run build\nnpm link\n```\n\nThen, **from the repository you want your agent to work in**:\n\n```sh\ngw init       # build the local index in .groundwork/\ngw setup      # preview project-level changes, then confirm\n```\n\nRestart your agent after setup. Codex asks you to trust the new hooks once, under `/hooks`.\n\nCodex setup also installs the skill and references in `.agents/skills/groundwork/`,\nthe [repository skill location Codex discovers](https://developers.openai.com/codex/skills/).\nRemoval preserves pre-existing or subsequently edited skill files.\nFor a skill-only install (no MCP or hooks), use `npx skills add ADITYADEV4145/GroundWork`;\nthe repository's root `SKILL.md` and `references/` follow the Agent Skills layout.\n\nWant to see exactly what setup would do first?\n\n```sh\ngw setup --dry-run\n```\n\n<details>\n<summary><strong>Setup options, changed files, and removal</strong></summary>\n\n| Flag | Effect |\n| --- | --- |\n| `--agent claude,codex,cursor` | Set up only these agents. By default, setup detects installed agents. |\n| `--profile minimal\\|standard\\|strict` | Choose guard behavior. See [Profiles](#profiles). |\n| `--dry-run` | Show the plan without writing anything. |\n| `--yes` | Apply without asking; required when there is no terminal. |\n| `--command \"<cmd>\"` | Choose how agents launch Groundwork; default: `gw`. |\n| `--remove` | Remove what setup added, preserving unrelated settings. |\n\nSetup writes project-level integration files for the agents you select: `.claude/settings.json`, `.mcp.json`, `.codex/hooks.json`, `.codex/config.toml`, `.cursor/hooks.json` and `.cursor/mcp.json`. It preserves existing settings. A selected profile is stored in `.groundwork/config.json`.\n\nTo uninstall the integrations, run `gw setup --remove`. To remove the local index and state too, delete `.groundwork/` afterward.\n\n</details>\n\n<details>\n<summary><strong>Claude Code plugin and other MCP clients</strong></summary>\n\nThese integrations use the `gw` on your PATH from any install above. One-off runs do not put `gw` on PATH:\n\n- **Claude Code plugin:** `/plugin marketplace add ADITYADEV4145/GroundWork`, then `/plugin install groundwork`.\n- **Any MCP client:** run `gw mcp` as a stdio server from the repository root.\n\n</details>"
+    },
+    {
+      "heading": "What it does",
+      "body": "<picture>\n  <source media=\"(max-width: 600px)\" srcset=\"docs/assets/groundwork-workflow-mobile.webp\">\n  <img src=\"docs/assets/groundwork-workflow.webp\" alt=\"Three parts of the Groundwork workflow: navigate to the right symbol, reuse existing code, and ground calls in real definitions.\" width=\"100%\">\n</picture>"
+    },
+    {
+      "heading": "One skill. Three better habits.",
+      "body": "| Instead of… | Groundwork helps your agent… |\n| --- | --- |\n| **Searching in circles** — grep loops, whole-file reads, re-reading unchanged code | Navigate a ranked repository map and read just the symbols it needs, within a token budget. Claude Code's read guard catches repeat reads of unchanged ranges. |\n| **Writing the same helper twice** — new names for code you already have | Find similar code first and choose `REUSE`, `EXTEND` or `NEW because …`. The change gate flags clones, duplicate constants and files, and code left dead by a change. |\n| **Calling code that sounds right** — invented imports, members or arguments | Check edited calls against the index, suggest real definitions, and run the same grounding checks explicitly with `gw verify` or `gw check`. |\n\nWaste guards also catch repeated commands, suggest more focused exploration, and trim noisy command output while retaining failures and a full local log. See [waste guards](docs/waste-guards.md) for the agent-specific behavior and limits.\n\n**Languages:** TypeScript, JavaScript (including JSX and CommonJS), and Python. Other files fall back to the agent's normal tools."
+    },
+    {
+      "heading": "See a real check",
+      "body": "An agent imports `formatCurrency`, but the module exports `formatPrice`. It also passes two arguments to a one-argument function. Groundwork reports both, with the real signature:\n\n```text\n$ gw check\nBLOCK grounding (unknown-export): label.ts:1\nWhy: 'formatCurrency' is not exported in money.ts. Did you mean formatPrice (money.ts:1, formatPrice(cents: number): string)?\nFix: Use formatPrice (money.ts:1): formatPrice(cents: number): string.\n\nBLOCK grounding (arity): label.ts:3\nWhy: formatPrice() takes 1 argument, got 2 — formatPrice(cents: number): string (money.ts:1).\n```\n\n**Not a plausible guess: a lookup against your repository.** `gw check` exits with code 1 on BLOCK findings, so you can also use it as a CI gate."
+    },
+    {
+      "heading": "How it works",
+      "body": "<picture>\n  <source media=\"(max-width: 600px)\" srcset=\"docs/assets/architecture-mobile.svg\">\n  <img src=\"docs/assets/architecture.svg\" alt=\"Claude Code, Codex and Cursor connect through Groundwork's MCP navigation and hooks to a local tree-sitter and SQLite index. Hooks refresh changed files and fail open on errors. No hosted service or telemetry.\" width=\"100%\">\n</picture>\n\n1. **Map once.** `gw init` parses the repository with tree-sitter and stores files, symbols, imports, calls, literals and fingerprints in SQLite (`node:sqlite`, with a `sql.js` fallback).\n2. **Navigate precisely.** MCP tools answer with ranked, token-budgeted context. [SKILL.md](SKILL.md) teaches the agent to look for existing code before writing.\n3. **Stay current.** Edit hooks reparse changed files, provide grounding notes and run the duplicate gate at Stop. Errors and timeouts fail open so the agent can continue."
+    },
+    {
+      "heading": "MCP tools",
+      "body": "| Tool | What your agent gets |\n| --- | --- |\n| `repo_map` | A ranked directory tree with top symbols per file; narrow by path. |\n| `find_code` | Symbols matching a name or description, with signatures. |\n| `outline` | A file's symbols and signatures without their bodies. |\n| `read_symbol` | One symbol's source, not the whole file. |\n| `callers` / `callees` / `where_used` | Who calls a symbol, what it calls, and its references. |\n| `find_similar` | Existing code to consider before writing something new. |\n| `verify_calls` | Whether snippet imports and calls exist, and their argument counts. |\n| `index_status` | Index freshness and size. |\n\nEach answer has a token budget. Oversized answers are cut short with a way to fetch the rest."
+    },
+    {
+      "heading": "Agent support",
+      "body": "The map is shared; hook capabilities differ.\n\n| Capability | Claude Code | Codex | Cursor |\n| --- | --- | --- | --- |\n| MCP navigation and reuse tools | Yes | Yes | Yes |\n| Index refresh and grounding notes after edits | Yes | Yes | Yes |\n| Unchanged-file read guard | Yes | — | — |\n| Automatic noisy-command wrapping | Yes | — | — |\n| Stop findings in `standard` | Warnings | Warnings | Not shown |\n| Stop gate in `strict` | Once per new finding set | Once per new finding set | Once per new finding set |\n\nUse `gw run -- <cmd>` for explicit output trimming, or `gw check` for explicit change checks, regardless of agent. Cursor's Stop hook cannot show a warning without blocking; use `strict` or run `gw check` yourself there."
+    },
+    {
+      "heading": "Profiles",
+      "body": "Start with `standard`. Tighten the Stop gate only when you want it.\n\n| Profile | What runs | Stop behavior |\n| --- | --- | --- |\n| `minimal` | Navigation and the read guard where supported. | No duplicate gate. |\n| `standard` **(default)** | Adds Reuse First, grounding notes and waste guards. | Findings are warnings; Cursor does not display Stop warnings. |\n| `strict` | The same checks as `standard`. | Blocks once per new set of BLOCK findings in a session. |\n\nChoose a profile during setup:\n\n```sh\ngw setup --profile strict\n```\n\nOr edit `.groundwork/config.json`. Explicit settings override profile defaults:\n\n```json\n{\n  \"profile\": \"standard\",\n  \"grounding\": { \"enabled\": true },\n  \"guards\": {\n    \"repeatCommand\": { \"enabled\": false },\n    \"explorationHint\": { \"threshold\": 20 }\n  }\n}\n```\n\nCommit `config.json` to share your team's preferences. Everything else in `.groundwork/` is git-ignored.\n\n> The profile controls the **Stop gate**, not every possible intervention. Read and repeat-command guards can deny redundant actions in the profiles where they are enabled; each has an override."
+    },
+    {
+      "heading": "Commands",
+      "body": "| Command | What it does |\n| --- | --- |\n| `gw symbols <query>` / `gw show <symbol>` | Search symbols; show a signature, callers and callees. |\n| `gw similar \"<description>\"` | Find existing code to reuse. |\n| `gw check [--base <ref>]` | Check changed code for duplicates and grounding errors; exit 1 on BLOCK. |\n| `gw verify [files...]` | Check grounding alone; exit 1 on definite errors. |\n| `gw run -- <cmd>` | Keep the full command log locally and print a trimmed summary. |\n| `gw report` | Show session guard activity and estimated savings. |\n| `gw refresh` / `gw stats` | Refresh the index or inspect its contents. |\n| `gw doctor` / `gw selftest` | Check the environment or run acceptance checks. |\n\nEvery command accepts `--json`."
+    },
+    {
+      "heading": "Benchmark results",
+      "body": "Recorded Devin-agent runs show **less copied code, not demonstrated token or\nmoney savings**. Reuse v2 copied-code rate fell from **14/20 (70%) to 0/20 (0%)**.\nTask success was identical in each suite; grounding v3 had zero wrong calls in\nboth arms. Across eight paired runs per task, compact navigation showed no\nstatistically significant estimated-output change; long-horizon output increased\nsignificantly under the paired-task bootstrap (its reduction interval is entirely\nbelow zero). GroundWork was significantly slower in both timed suites under the\nsame task-bootstrap analysis.\nThese small task sets do not establish performance on other agents or projects.\n\n| Eight-run suite | Success, baseline / GroundWork | Estimated-output reduction, median [95% CI] | Mean wall time, baseline → GroundWork | Wall-time reduction, median [95% CI] |\n| --- | --- | --- | --- | --- |\n| Compact navigation: 30 tasks × 8 runs/arm | 240/240 / 240/240 | -2.0% [-25.2, 16.4] | 5.58s → 7.44s | -31.3% [-55.4, -18.9] |\n| Long-horizon: 10 sequential tasks × 8 runs/arm | 80/80 / 80/80 | -63.2% [-86.1, -38.6] | 5.18s → 11.04s | -110.1% [-132.7, -91.5] |\n\n![Estimated tool-output reductions: navigation crosses zero; long-horizon is entirely negative](docs/assets/bench/token-reduction.svg)\n\nPositive reduction means less output; negative means more. Intervals bootstrap\npaired tasks after summing repeats, not independent sessions. Long-horizon\ntasks share conversation context. This is bytes/4, **not billed model tokens**;\nprovider usage is unavailable and no dollar savings can be established. Statistical\nsignificance here means the reported 95% task-bootstrap interval excludes zero,\nnot that results generalize across sessions, agents or projects. Wall-time means\nand median paired-task percentage reductions are different estimands: the\nreduction intervals are not confidence intervals around the mean bars.\n\nMethodology: protocol deviations were noted per session. Some sessions wrote\nfiles via the shell wrapper rather than the read wrapper; one long-horizon\nagent's first `find_similar` call failed validation. These are not perfectly\nuniform protocol executions. Work outside wrappers or task timers is not measured.\n\n![Reuse v2 copied-code rates with 95% Wilson intervals](docs/assets/bench/copied-code.svg)\n\nReviewed copied-code labels in reuse v2 are distinct from long-horizon raw\n`duplicatesAdded` scorer findings (58 baseline vs 62 GroundWork in the eight-run set).\n\n![Task success counts for all four benchmarks, with both navigation versions shown separately](docs/assets/bench/success.svg)\n\n![Mean task wall time and 95% paired-task reduction intervals: GroundWork slower in both suites](docs/assets/bench/wall-time.svg)\n\nSources: navigation [initial](bench/nav/evidence-initial.json) and\n[compact combined](bench/nav/results/combined.json), [long-horizon combined](bench/long-horizon/results/combined.json),\n[reuse v2](bench/reuse-v2/report.json), and [grounding v3](bench/grounding/results/report.json).\nRegenerate the static charts with `npm run bench:charts` (no dependencies or network).\nNavigation initial remains the original three-run set (90/90 per arm), separate\nfrom compact navigation and not pooled with it. Raw exports and combination\ninstructions are in [bench/COMBINE.md](bench/COMBINE.md). Historical tables follow."
+    },
+    {
+      "heading": "Long-horizon benchmark",
+      "body": "The table below preserves the **original three-run collection**, not the current\neight-run result above. See the [eight-run report](bench/long-horizon/results/combined.md)\nfor current numbers; the original collection is included there, not added again.\n\n**Devin-agent results (6 sessions: 3 baseline, 3 Groundwork; 10 sequential tasks each); tokens are estimated tool-output tokens (bytes/4), not model tokens**\n\n<!-- long-horizon-results:start -->\n| Measure | Baseline | Groundwork |\n| --- | ---: | ---: |\n| Success | 30/30 (100.0%) | 30/30 (100.0%) |\n| Estimated tool-output tokens (bytes / 4), mean per attempt | 161.8 | 158.5 |\n| Captured tool calls | 60 | 93 |\n| Distinct directly read files (summed across attempts) | 17 | 21 |\n| Direct source-read bytes | 5769 | 7072 |\n| Guarded reads blocked | 0 | 0 |\n| Wall time, mean per attempt (s) | 4.7 | 9.2 |\n| Provider input tokens per attempt | unavailable | unavailable |\n| Provider output tokens per attempt | unavailable | unavailable |\n\nEstimated tool-output token reduction (median of paired task reductions): **18.8% (95% bootstrap interval [-9.9, 28.8]%)**.\nProvider input token reduction: unavailable. Wall time reduction: -166.2% (95% bootstrap interval [-229.4, -47.5]%).\nSuccess delta (Groundwork minus baseline, median per task): 0.0 pp (95% bootstrap interval [0.0, 0.0] pp).\n\n| Suite metric | Baseline total | Groundwork total | Paired delta (GW – baseline, per task) | Task coverage |\n| --- | ---: | ---: | ---: | ---: |\n| duplicatesAdded | 25 | 24 | 0.0 (95% bootstrap interval [-0.2, 0.0]) | 10/10 |\n| inventedCalls | 0 | 0 | 0.0 (95% bootstrap interval [0.0, 0.0]) | 10/10 |\n<!-- long-horizon-results:end -->\n\n**These results do not demonstrate token or time savings.** The estimated-output\ninterval spans zero; Groundwork took more wall time. Negative reductions mean\nincreases. The intervals above bootstrap the median across ten\ntasks, not suite-total ratios or variation across independent sessions; the\nsequential tasks also share conversation context. Duplicate counts are raw\nscorer findings, not independently labeled clones. Provider token usage is\nunavailable.\n\nThis rerun used the final Phase 2 tools at collector revision `fa8657c`.\nThe first, pre-19 run reported estimated-output reduction -76.8%\n(95% interval [-82.8, -36.8]%) and wall-time reduction -15.2%\n(95% interval [-49.0, -10.5]%). It remains separately verifiable as historical\nevidence; the two sets are not pooled.\n\nSee the [original three-run report](bench/long-horizon/results/2026-11-21T21-44-09-424Z-long-horizon.md),\n[raw observations](bench/long-horizon/observations/) and\n[methodology and offline reproduction](bench/long-horizon/README.md), including\nself-reported collection deviations: shell README reads, externally staged\nfile authoring, skipped helper lookup and a retried tool call. Costs outside\nwrappers or task timers cannot be established from these captures."
+    },
+    {
+      "heading": "Accuracy",
+      "body": "**Useful guardrails, with explicit limits.**\n\n| Check | What is measured | What not to assume |\n| --- | --- | --- |\n| Duplicate BLOCK findings | 95% precision on the labeled duplicate corpus; 100% recall for exact copies and 96% for renamed copies. | These are planted examples, not production-repository results. Heavily rewritten clones may be warnings or missed. |\n| Grounding | Resolves 99% of internal imports in this repository. | Dynamic dispatch, computed member names and external packages are skipped, not verified. |\n\nSee [reuse methodology](references/reuse.md) and [grounding behavior](references/grounding.md). These figures are not a claim about end-to-end token savings."
+    },
+    {
+      "heading": "Privacy and security",
+      "body": "- **Local state:** the index, logs and session state stay in your repository's `.groundwork/`.\n- **Offline runtime:** there is no telemetry or hosted inference. The optional `gw init --embeddings` command downloads a local model only when explicitly requested; similarity search also works without it.\n- **Your permissions:** hooks run as your user. They inspect agent actions and may wrap supported noisy commands with `gw run`; they are not an autonomous command runner.\n- **Fail open:** hook errors and timeouts let the agent continue. Explicit CLI checks still return nonzero on findings.\n\nRead [SECURITY.md](SECURITY.md) for hook behavior and audit details."
+    },
+    {
+      "heading": "FAQ",
+      "body": "<details>\n<summary><strong>Does it slow my agent down?</strong></summary>\n\nHooks usually answer in milliseconds and have a 2-second dispatch budget. If a hook errors or times out, the action goes ahead. The index refreshes changed files rather than reparsing the whole repository.\n\n</details>\n\n<details>\n<summary><strong>What if a guard is wrong?</strong></summary>\n\nRetry the exact read once, rerun a command with `GW_FORCE=1`, or mark a deliberate duplicate with `// groundwork: allow-duplicate <reason>`. Overrides are logged so you can tune the configuration. See [troubleshooting](references/troubleshooting.md).\n\n</details>\n\n<details>\n<summary><strong>Will it block my agent?</strong></summary>\n\nThe duplicate Stop gate blocks only in `strict`, and never twice for the same finding set in a session. Read and repeat-command guards can independently deny redundant actions; use the overrides above when the repetition is intentional.\n\n</details>\n\n<details>\n<summary><strong>Can I use it without embeddings?</strong></summary>\n\nYes. `find_similar` works without a downloaded model. Embeddings are optional and run locally after the explicit model download.\n\n</details>\n\n<details>\n<summary><strong>How do I remove it?</strong></summary>\n\nRun `gw setup --remove` to remove the integrations, then delete `.groundwork/` to remove local state.\n\n</details>"
+    },
+    {
+      "heading": "Learn more",
+      "body": "| Start here | Go deeper |\n| --- | --- |\n| [The agent skill](SKILL.md) — the protocol the agent follows | [Navigation](references/navigation.md) — map and symbol tools |\n| [Reuse First](references/reuse.md) — reuse decisions and the duplicate gate | [Grounding](references/grounding.md) — how call verification works |\n| [Waste guards](docs/waste-guards.md) — repeat reads, commands and output | [Troubleshooting](references/troubleshooting.md) — common fixes |\n| [Security](SECURITY.md) — local behavior and auditing | [Contributing](AGENTS.md) — development commands and extension points |\n\nTo work on Groundwork itself: `npm test`, `npm run typecheck`, `npm run build`, and `npm run selftest -- --through 5`.\n\n---\n\n<p align=\"center\">\n  <strong>Give your agent solid ground.</strong><br>\n  Built by <a href=\"https://github.com/ADITYADEV4145\">Aditya</a> · <a href=\"LICENSE\">MIT licensed</a><br>\n  <sub>The generated illustrations are conceptual artwork, not product screenshots.</sub>\n</p>"
+    }
+  ],
+  "package": {
+    "name": "groundwork-agent",
+    "version": "0.0.1",
+    "description": "A live, local map of your codebase for coding agents: navigation, reuse-first duplicate gate, grounding checks and waste guards.",
+    "type": "module",
+    "license": "MIT",
+    "publishConfig": {
+      "provenance": true,
+      "access": "public"
+    },
+    "author": "Aditya",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/ADITYADEV4145/GroundWork.git"
+    },
+    "bin": {
+      "gw": "dist/cli/main.js"
+    },
+    "main": "dist/api.js",
+    "types": "dist/api.d.ts",
+    "exports": {
+      ".": "./dist/api.js"
+    },
+    "files": [
+      "dist",
+      "fixtures",
+      "SKILL.md",
+      "references",
+      "docs",
+      "hooks",
+      ".claude-plugin",
+      ".mcp.json",
+      "SECURITY.md",
+      "README.md",
+      "LICENSE"
+    ],
+    "engines": {
+      "node": ">=22"
+    },
+    "scripts": {
+      "build": "tsc -p tsconfig.build.json && node scripts/bundle-hook.mjs",
+      "typecheck": "tsc -p tsconfig.scripts.json",
+      "test": "vitest run",
+      "gw": "node --import tsx src/cli/main.ts",
+      "selftest": "node --import tsx src/cli/main.ts selftest --install-check",
+      "bench:grounding": "node --import tsx scripts/bench-grounding.ts",
+      "setup:grounding-repos": "node --import tsx scripts/setup-grounding-repos.ts",
+      "bench:v2": "node --import tsx scripts/bench-v2.ts",
+      "bench:charts": "node scripts/bench-charts.mjs",
+      "golden": "node --import tsx scripts/update-golden.ts",
+      "calibrate": "node --import tsx scripts/calibrate.ts",
+      "prepublishOnly": "npm run build && npm test"
+    },
+    "dependencies": {
+      "@modelcontextprotocol/sdk": "^1.32.2",
+      "commander": "^15.1.0",
+      "ignore": "^7.0.16",
+      "picomatch": "^4.0.7",
+      "sql.js": "^1.17.0",
+      "tree-sitter-javascript": "^0.25.0",
+      "tree-sitter-python": "^0.25.0",
+      "tree-sitter-typescript": "^0.23.2",
+      "web-tree-sitter": "^0.27.2",
+      "zod": "^4.6.7"
+    },
+    "devDependencies": {
+      "@types/node": "^22.20.5",
+      "@types/picomatch": "^4.0.3",
+      "@types/sql.js": "^1.16.0",
+      "esbuild": "^0.28.2",
+      "fast-check": "^4.10.3",
+      "tsx": "^4.23.15",
+      "typescript": "^5.9.3",
+      "vitest": "^5.1.1",
+      "yaml": "2.8.2"
+    },
+    "optionalDependencies": {
+      "@huggingface/transformers": "^4.3.2"
+    },
+    "keywords": [
+      "claude-code",
+      "codex",
+      "cursor",
+      "mcp",
+      "coding-agent",
+      "agent-skill",
+      "code-index",
+      "tree-sitter"
+    ],
+    "homepage": "https://github.com/ADITYADEV4145/GroundWork#readme",
+    "bugs": {
+      "url": "https://github.com/ADITYADEV4145/GroundWork/issues"
+    }
+  },
+  "license": "MIT License\n\nCopyright (c) 2026 Aditya\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+  "commits": [
+    {
+      "sha": "587457364678e8162ac956ea6bada55e74c9e14d",
+      "subject": "Publish eight-run benchmark results on README and /benchmarks (#32)"
+    },
+    {
+      "sha": "59ef792783a2b1c5244963ecb0d15e229deb3e21",
+      "subject": "Move benchmark charts to a dedicated website page (#31)"
+    },
+    {
+      "sha": "d8371eb5afca1bb03c8f4637c010a082f7359af2",
+      "subject": "Publish evidence-backed benchmark charts and honest performance summary (#30)"
+    },
+    {
+      "sha": "072c9d735ec2817d0c75ab41207cc515974eb867",
+      "subject": "Phase 3: real-repo BLOCK review evidence, waves 3-6 (#28)"
+    },
+    {
+      "sha": "3c3ae9555a969edcba5386a3fca75be086610f04",
+      "subject": "Phase 3 gate code: agent-review BLOCK gate, generator-arg grounding fix (#29)"
+    },
+    {
+      "sha": "9d0f08c0c88cbfb8989a619e4bf3eb5bf6eee0e0",
+      "subject": "Show install tabs directly on the main page (#27)"
+    },
+    {
+      "sha": "56c5cf1f7489e85adfa990ac028eaaddd990a4f4",
+      "subject": "Add copyable package manager install tabs to website (#26)"
+    },
+    {
+      "sha": "e5e3a46a40fe8c4f3766d6bb183f71e2f820df29",
+      "subject": "Phase 4 gate: real-repo zero findings, fresh-process hook latency, Benchmark v3 (#23)"
+    },
+    {
+      "sha": "d3541ef6ce8579f461c59d9c1c98661fa5c120da",
+      "subject": "Merge pull request #25 from ADITYADEV4145/devin/1795298343-fix-lh-metrics-grounding"
+    },
+    {
+      "sha": "870ad5cb3ea22929d1b66b36aeb443cbcb055eaf",
+      "subject": "Merge pull request #24 from ADITYADEV4145/devin/1795293040-bench-v2"
+    },
+    {
+      "sha": "44e26408fb8a5592dbfc768c611f66349fb6fca4",
+      "subject": "Fix grounding of long-horizon compiled module imports"
+    },
+    {
+      "sha": "995ae2aaaf2ef772cfbcc172ac5b8443b72ea3a5",
+      "subject": "Run benchmark Python acceptance commands with selected interpreter"
+    },
+    {
+      "sha": "a5df8bdf3eecc96a98e7e7e3f0606f67eb76b8bd",
+      "subject": "Normalize benchmark project path before cache containment checks"
+    },
+    {
+      "sha": "57cc93763370090adbabbbcbceb5022b390eeeb3",
+      "subject": "Exclude colocated test calls from benchmark reuse labels"
+    },
+    {
+      "sha": "70d8a6d79f22ff2f5f4677b90dadb8a156186beb",
+      "subject": "Merge main into bench-v2"
+    },
+    {
+      "sha": "8e9402d7db53e9d09b7ea5bfbbffa524addf2740",
+      "subject": "Merge pull request #21 from ADITYADEV4145/devin/1795293455-long-horizon-bench"
+    },
+    {
+      "sha": "2cab1e2ff0fcb335f61c2de9a30a348dd27ec171",
+      "subject": "Clarify all-suite replay and observation grading in benchmark help"
+    },
+    {
+      "sha": "484835111aa0d8b6728978924a31e170b32708e9",
+      "subject": "Keep ad-hoc long-horizon grading output outside published results"
+    },
+    {
+      "sha": "df6bb7e57ea802b72a6827e03037f96b72b290fc",
+      "subject": "Review BLOCK evidence and count distinct symbol pairs in real-repo gate"
+    },
+    {
+      "sha": "affb8f6dc9134fd7941a755e987fa2a6384daeed",
+      "subject": "Publish final-tools long-horizon rerun and retain verified historical evidence"
+    },
+    {
+      "sha": "08b129a75805a2c72143decad2641bcf5e69d56f",
+      "subject": "Replay available evidence when selecting all benchmark suites"
+    },
+    {
+      "sha": "e5d514cd15e12b6b4962f3eb4d56398c1f13b849",
+      "subject": "Add check-only BLOCK evidence task wave and suite scoring"
+    },
+    {
+      "sha": "4610b60b4dbd83d4ee1777a75523d465135a2772",
+      "subject": "Exclude resolved delegation pairs from duplicate checks"
+    },
+    {
+      "sha": "d44b79a2d7e52b7881bea4320f8cee188ec7ba6c",
+      "subject": "Record agent-reviewed Benchmark v2 results for all 40 runs"
+    },
+    {
+      "sha": "4fec0a31bb64f7396dea21b4ba9a1cadc2c4125f",
+      "subject": "Validate YAML metadata in source, packaged, and installed skills (#22)"
+    },
+    {
+      "sha": "fa8657cbb6bc73dfb9a8011b891f55b6af499eda",
+      "subject": "Archive historical long-horizon evidence and repin identical fixture after rebase"
+    },
+    {
+      "sha": "dd8e7e9621018405134f6c3139557593a0ae5b37",
+      "subject": "Include collector provenance added by merged benchmark reporter"
+    },
+    {
+      "sha": "7b54e910052d33886d6b81aa653ca190229ee5d5",
+      "subject": "Fingerprint long-horizon evaluator and fixture inputs in evidence"
+    },
+    {
+      "sha": "94afe4e498aa68f0115d50f9cc66500fd24b5882",
+      "subject": "Publish six-session long-horizon results and offline evidence"
+    },
+    {
+      "sha": "2e231c85adb22fc2e2b9a60815c1e7aa3d4fa2f5",
+      "subject": "Add ten-step long-horizon benchmark with scorer-backed grading"
+    },
+    {
+      "sha": "f2d5514fd96dac166b8e57c1790949fe67e65b05",
+      "subject": "Add pinned Gather fixture for sequential feature benchmark"
+    },
+    {
+      "sha": "43a663a7d2a6790bd9dd0d745968f0dc4b20e5d8",
+      "subject": "Benchmark and compact Groundwork navigation output (#19)"
+    },
+    {
+      "sha": "06476e70191d334243c26d4669ac668a04189240",
+      "subject": "Make Groundwork cinematic and ready for Netlify (#18)"
+    },
+    {
+      "sha": "4f176edea87718ee1346e23b7861eb3764267c3d",
+      "subject": "Harden the Phase 5 gate: real failure corpus, setup remove round-trip, install timing, Codex skill, provenance release (#20)"
+    },
+    {
+      "sha": "5c0d7146b60132fc691f4f3d54e40fa18cee1181",
+      "subject": "Add Benchmark v2 task suite, scorer and Phase 3 evidence gates"
+    },
+    {
+      "sha": "c3eac2cbf0d5cbd1a298ead6716b592987cc3c27",
+      "subject": "Credit the author as Aditya (#17)"
+    },
+    {
+      "sha": "e0709ce62f2e8766080ec753c90a46fc96620610",
+      "subject": "Brighten README artwork and make the workflow immediately clear (#16)"
+    },
+    {
+      "sha": "3f78d7af71d0b6a00c5e84bf5d4c84793c176a0d",
+      "subject": "Install via Homebrew, npm, pnpm, Bun and an install script (#14)"
+    },
+    {
+      "sha": "2dab274561541bf571c67fa43c04e8074040dc7c",
+      "subject": "Bundle the hook runner and take the best of 3 rounds in the Stop latency check (#15)"
+    },
+    {
+      "sha": "45a35b01f0f7d5491fc1e85bd04ac35fa1c87402",
+      "subject": "Build a visual Groundwork landing page (#13)"
+    },
+    {
+      "sha": "d022c7f6be29fa025fb86b36c74cfbb24f805022",
+      "subject": "Give Groundwork a visual README and generated brand artwork (#12)"
+    },
+    {
+      "sha": "afcf331f4de57a4dff7d9db7b9cb3e4f43a2b8e7",
+      "subject": "Plugin and .mcp.json launch gw from PATH; prepare npm package without publishing (#11)"
+    },
+    {
+      "sha": "79bf21ad23fb6aa81c8f3fd695c9389e4f892e4e",
+      "subject": "README: accurate install from source, real example output, MCP tools, config and accuracy (#10)"
+    },
+    {
+      "sha": "f11dd0fda7a66f57f4445744aa051836149964de",
+      "subject": "Real-history work: contract-aware BLOCK scoring, test-folder skip, results summary (#9)"
+    },
+    {
+      "sha": "0932959e6eda753089df0a6999eb78994ae459d5",
+      "subject": "Phase 3 follow-up: Stop hook <300 ms, local embeddings, real-repo review gate (#8)"
+    },
+    {
+      "sha": "8640b2457a66d3354016398fba10a633dac75fdc",
+      "subject": "Packaging: gw setup for Claude Code, Codex and Cursor, profiles, Claude plugin, final SKILL.md (#6)"
+    },
+    {
+      "sha": "ca55316b9e09b3a90be8623e6a3864697e6f133a",
+      "subject": "Phase 3: Reuse First — find_similar, gw check duplicate gate, calibration (#7)"
+    },
+    {
+      "sha": "426b94f65d2933578a209c5d0260b09eba1d2a5f",
+      "subject": "Phase 4: grounding — verify_calls, PostToolUse hook, did-you-mean, precision fixtures (#4)"
+    },
+    {
+      "sha": "47049038233f17a3966f8792dcb3f65d3040f525",
+      "subject": "Keep retry counts out of version matches"
+    },
+    {
+      "sha": "061c6b3946eadbbc12c42e123617f04a3b96febb",
+      "subject": "Add Phase 5 waste guards and gw report (#3)"
+    },
+    {
+      "sha": "2d874a12973d65dccd3adeb3fcba3dd1b59ba1cd",
+      "subject": "Add Groundwork navigation tools and Claude Read guard"
+    },
+    {
+      "sha": "023b5c0e37454146dbbb964c876ca01a546da35f",
+      "subject": "Phase 1 scaffold: codebase index, gw CLI, extension registries (#1)"
+    },
+    {
+      "sha": "a50ab402fc0dfa653af3b5410a772f03b86dd072",
+      "subject": "Initial commit"
+    }
+  ],
+  "routes": [],
+  "screenshots": [],
+  "landingUrl": "https://github.com/ADITYADEV4145/GroundWork#readme"
+}

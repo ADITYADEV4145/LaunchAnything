@@ -1,0 +1,8 @@
+{"scenes":[
+  {"shot":"cli-overview","text":"Agent Linux: built CLI help","duration":4.5},
+  {"shot":"cli-overview","text":"Source-built developer preview, not public binaries","duration":4.5},
+  {"shot":"mcp-options","text":"MCP options from the built CLI","duration":4.5},
+  {"shot":"mcp-options","text":"No Mac VM was booted here","duration":4.5},
+  {"shot":"cli-overview","text":"No guest agent session was verified","duration":4.5},
+  {"shot":"cli-overview","text":"Human review and launch results pending","duration":4.5}
+]}

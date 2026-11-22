@@ -1,0 +1,28 @@
+[
+  {
+    "id": "source-lookup",
+    "kind": "terminal",
+    "files": [
+      "source-lookup.png",
+      "source-lookup.gif"
+    ],
+    "width": 1100,
+    "height": 650,
+    "redactedCount": 0,
+    "secretsFound": 0,
+    "ocr": false
+  },
+  {
+    "id": "verify-options",
+    "kind": "terminal",
+    "files": [
+      "verify-options.png",
+      "verify-options.gif"
+    ],
+    "width": 1100,
+    "height": 750,
+    "redactedCount": 0,
+    "secretsFound": 0,
+    "ocr": false
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "id": "cli-overview",
+    "kind": "terminal",
+    "files": [
+      "cli-overview.png",
+      "cli-overview.gif"
+    ],
+    "width": 1100,
+    "height": 1000,
+    "redactedCount": 0,
+    "secretsFound": 0,
+    "ocr": false
+  },
+  {
+    "id": "mcp-options",
+    "kind": "terminal",
+    "files": [
+      "mcp-options.png",
+      "mcp-options.gif"
+    ],
+    "width": 1100,
+    "height": 750,
+    "redactedCount": 0,
+    "secretsFound": 0,
+    "ocr": false
+  }
+]

@@ -17,7 +17,8 @@
     "rules/",
     "skill/",
     "templates/",
-    "fixtures/"
+    "fixtures/",
+    "bench/launchbench/"
   ],
   "scripts": {
     "build": "tsc",

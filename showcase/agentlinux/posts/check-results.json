@@ -1,0 +1,24 @@
+{
+  "posts": [
+    {
+      "channel": "devto",
+      "sourceHash": "0855b3ee4227e7d8c07cfeecaf496cd59623a18138236c38ce192be74d69d44f",
+      "issues": []
+    },
+    {
+      "channel": "reddit",
+      "sourceHash": "da92e566568b446a96fc5403467669f5d4547724141ff0c0e5d691a50781230a",
+      "issues": []
+    },
+    {
+      "channel": "show-hn",
+      "sourceHash": "d565e9036e419bd283fced5cda5afd0cb3f36c091408eb1d8ffbef1f9cf0de69",
+      "issues": []
+    },
+    {
+      "channel": "x",
+      "sourceHash": "8f53e856af12e31277a07e3d77a688385bfa7204161aa0c1f0f642ccc0ce8dcd",
+      "issues": []
+    }
+  ]
+}

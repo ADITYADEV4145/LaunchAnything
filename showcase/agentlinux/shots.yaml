@@ -1,0 +1,9 @@
+shots:
+  - id: cli-overview
+    commands:
+      - HOME=. bin/agent-linux --help
+    viewport: {width: 1100, height: 1000}
+  - id: mcp-options
+    commands:
+      - HOME=. bin/agent-linux mcp --help
+    viewport: {width: 1100, height: 750}

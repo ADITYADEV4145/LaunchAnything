@@ -1,0 +1,119 @@
+[
+  {
+    "command": "validate product",
+    "durationMs": 441,
+    "result": {
+      "ok": true,
+      "command": "validate",
+      "data": {
+        "kind": "product",
+        "path": "./product.json",
+        "valid": true,
+        "errors": [],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "command": "plan",
+    "durationMs": 460,
+    "result": {
+      "ok": true,
+      "command": "plan",
+      "data": {
+        "path": "./plan.md",
+        "markdown": "# Launch plan\n\nProfile: devtool | Launch type: new-product\nLaunch date: 2026-12-01 | Timezone: UTC\nAll scheduled dates and times below are local wall-clock times in this timezone.\nPosting windows are starting heuristics, not performance promises.\n\n## Channels\n\n| Channel | Local date | Local time | Why | Preparation lead time |\n| --- | --- | --- | --- | --- |\n| show-hn | 2026-12-01 | 09:00 | Invite hands-on feedback from technical peers with a tryable demo; introduce the product with grounded proof | 1 day(s) |\n| reddit | 2026-12-01 | 09:00 | Invite relevant community feedback with a manual, subreddit-appropriate submission; introduce the product with grounded proof | 1 day(s) |\n| x | 2026-12-01 | 09:00 | Share a concise update and invite direct conversation; introduce the product with grounded proof | 1 day(s) |\n| devto | 2026-12-01 | 09:00 | Explain the implementation with a technical walkthrough; introduce the product with grounded proof | 1 day(s) |\n\nUse the next allowed posting day on or after launch day; prepare assets at least the listed lead time ahead.\nEvery post requires human approval. Show HN and Reddit are paste-ready manual submissions only.\n\n## T-7 to T+3 checklist\n\n- [ ] T-7: Confirm audience, profile, source-backed claims and channel selection.\n- [ ] T-6: Check channel rules and start any longer-lead launch preparation.\n- [ ] T-5: Verify product access, landing page and pricing.\n- [ ] T-4: Draft channel-native posts with claim citations.\n- [ ] T-3: Capture real screenshots and redact private information.\n- [ ] T-2: Prepare demo assets and verify links and media dimensions.\n- [ ] T-1: Collect human approvals for exact posts and media hashes.\n- [ ] T+0: Submit approved posts at the listed local times; never auto-post to HN or Reddit.\n- [ ] T+1: Record initial observations and draft replies for human review.\n- [ ] T+2: Check unanswered questions; do not auto-reply.\n- [ ] T+3: Record metrics and lessons without claiming causation.\n\n## History observations\n- No history observation changed a time slot; using bundled channel scheduling defaults.\n",
+        "channels": [
+          {
+            "id": "show-hn",
+            "date": "2026-12-01",
+            "time": "09:00",
+            "reason": "Invite hands-on feedback from technical peers with a tryable demo; introduce the product with grounded proof",
+            "leadTimeDays": 1
+          },
+          {
+            "id": "reddit",
+            "date": "2026-12-01",
+            "time": "09:00",
+            "reason": "Invite relevant community feedback with a manual, subreddit-appropriate submission; introduce the product with grounded proof",
+            "leadTimeDays": 1
+          },
+          {
+            "id": "x",
+            "date": "2026-12-01",
+            "time": "09:00",
+            "reason": "Share a concise update and invite direct conversation; introduce the product with grounded proof",
+            "leadTimeDays": 1
+          },
+          {
+            "id": "devto",
+            "date": "2026-12-01",
+            "time": "09:00",
+            "reason": "Explain the implementation with a technical walkthrough; introduce the product with grounded proof",
+            "leadTimeDays": 1
+          }
+        ],
+        "launchDate": "2026-12-01",
+        "timezone": "UTC"
+      }
+    }
+  },
+  {
+    "command": "brief",
+    "durationMs": 431,
+    "result": {
+      "ok": true,
+      "command": "brief",
+      "data": {
+        "path": "./brief.md",
+        "html": "./brief.html",
+        "warnings": [
+          "stale-brief: inputs changed or fingerprint missing; review and regenerate with brief --force",
+          "Pain research unavailable: pains.json missing or empty"
+        ],
+        "scaffold": true
+      }
+    }
+  },
+  {
+    "command": "write",
+    "durationMs": 461,
+    "result": {
+      "ok": true,
+      "command": "write",
+      "data": {
+        "briefs": [
+          "./posts/briefs/show-hn.md",
+          "./posts/briefs/reddit.md",
+          "./posts/briefs/x.md",
+          "./posts/briefs/devto.md"
+        ],
+        "copywriting": [],
+        "estimate": {
+          "stage": "write",
+          "estimated": true,
+          "inputTokens": 8473,
+          "outputTokens": 2400,
+          "totalTokens": 10873,
+          "channels": [
+            "show-hn",
+            "reddit",
+            "x",
+            "devto"
+          ],
+          "xPosts": 3,
+          "xApiUsd": 0.6000000000000001,
+          "xPricing": [
+            "$0.20 per Post: Create request (with URL). Estimate only; threads and media may add charges.",
+            "$0.20 per Post: Create request (with URL). Estimate only; threads and media may add charges.",
+            "$0.20 per Post: Create request (with URL). Estimate only; threads and media may add charges."
+          ],
+          "renderSeconds": 36,
+          "scenes": 6,
+          "formats": 3,
+          "assumptions": "Estimates only: chars/4 input tokens; 600 output tokens/channel; 2s/scene/format conservative render heuristic (bundled 6-scene square demo measured ~3–6s on Linux; hardware dependent), 3 formats. X direct API rates; no API or LLM calls."
+        }
+      }
+    }
+  }
+]

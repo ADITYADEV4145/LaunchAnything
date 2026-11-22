@@ -1,0 +1,22 @@
+{
+  "name": "GroundWork",
+  "oneLiner": "A local code map and source-grounding checks for coding agents",
+  "audience": "Developers using coding agents on existing repositories",
+  "problem": "Agents need precise code locations and source definitions before changing an unfamiliar repository.",
+  "proofPoints": [
+    "The symbol command prints ranked matches with file locations and signatures (src/cli/commands/query.ts).",
+    "The duplicate gate reports duplicated implementations when the agent stops; strict mode can hold the stop (src/hooks/handlers/duplicate_gate.ts).",
+    "The grounding hook checks new calls against source definitions (src/hooks/handlers/grounding.ts)."
+  ],
+  "features": [
+    {"name":"Symbol lookup","description":"Search symbols and inspect their definitions through the local index.","sources":[{"type":"file","ref":"src/cli/commands/query.ts"},{"type":"file","ref":"src/index/navigation.ts"}]},
+    {"name":"Reuse gate","description":"Report duplicated implementations at agent stop; standard mode provides context and strict mode can hold the stop.","sources":[{"type":"file","ref":"src/hooks/handlers/duplicate_gate.ts"}]},
+    {"name":"Call grounding","description":"Check new calls against source definitions through the agent hook.","sources":[{"type":"file","ref":"src/hooks/handlers/grounding.ts"}]}
+  ],
+  "claims": [
+    {"id":"navigation","text":"GroundWork searches symbols through a local index and prints file locations and signatures.","sources":[{"type":"file","ref":"src/cli/commands/query.ts"},{"type":"file","ref":"src/index/navigation.ts"}]},
+    {"id":"reuse","text":"The duplicate gate reports duplicated implementations at agent stop; standard mode provides context and strict mode can hold the stop.","sources":[{"type":"file","ref":"src/hooks/handlers/duplicate_gate.ts"}]},
+    {"id":"grounding","text":"The grounding hook checks new calls against source definitions.","sources":[{"type":"file","ref":"src/hooks/handlers/grounding.ts"}]},
+    {"id":"runtime","text":"GroundWork uses a local index; its runtime does not require a hosted service. Optional embedding setup downloads a model only with explicit consent.","sources":[{"type":"file","ref":"README.md"},{"type":"file","ref":"src/cli/commands/index-cmds.ts"}]}
+  ]
+}

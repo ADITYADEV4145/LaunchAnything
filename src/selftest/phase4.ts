@@ -21,8 +21,13 @@ export async function prepareFixtureVideo(cwd:string,fixture:string) {
     captures=await media(cwd);
   }
   if (!captures.length) throw new Error(`No captured footage for ${fixture}`);
-  const product=JSON.parse(await readFile(join(cwd,'.liftoff-fixture/product.json'),'utf8'));
-  await writeFile(paths.product,JSON.stringify(product));
+  let product;
+  try { product=JSON.parse(await readFile(paths.product,'utf8')); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    product=JSON.parse(await readFile(join(cwd,'.liftoff-fixture/product.json'),'utf8'));
+    await writeFile(paths.product,JSON.stringify(product));
+  }
   const description=String(product.oneLiner).replace(/[.]$/,'');
   const parts=description.split(/\s(?:with|that|to)\s/);
   const headline=parts[0].split(/\s+/).slice(0,8).join(' ');

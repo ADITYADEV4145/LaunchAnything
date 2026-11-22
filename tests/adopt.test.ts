@@ -11,6 +11,7 @@ import { telemetry, recordEvent, sanitizeEvent } from '../src/adopt/telemetry.js
 import { phases } from '../src/selftest/index.js';
 import { connect, connections } from '../src/connect/registry.js';
 import { MemoryKeychain } from '../src/connect/keychain.js';
+import { checkPosts } from '../src/copy/check.js';
 
 const dirs: string[] = [];
 async function temp() { const dir = await mkdtemp(join(tmpdir(), 'liftoff-adopt-test-')); dirs.push(dir); return dir; }
@@ -115,6 +116,9 @@ describe('adoption', () => {
     expect(result.stages.map(s => s.stage)).toEqual(['init', 'scan', 'product', 'validate', 'plan', 'brief', 'write', 'check', 'shots', 'images', 'video', 'review']);
     expect(result.stages.every(s => s.status === 'completed' || s.status.startsWith('skipped:'))).toBe(true);
     expect(result.estimate.formats).toBe(1);
+    expect(checkPosts(dir)).toMatchObject({ passed: true, issues: [] });
+    const product = JSON.parse(await readFile(join(dir, '.launch/product.json'), 'utf8'));
+    expect(product.claims.some((claim: { id: string }) => claim.id === 'interface')).toBe(true);
     await expect(demo({ dir })).rejects.toThrow();
   }, 300000);
 

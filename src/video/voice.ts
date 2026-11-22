@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { loadScript } from './script.js';
@@ -19,7 +19,13 @@ export async function voice(cwd: string, options: { dryRun?: boolean } = {}) {
   const script = await loadScript(cwd);
   const id = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}`;
-  const requests = script.scenes.flatMap((scene, index) => scene.voiceover ? [{ index, url, method: 'POST', body: { text: scene.voiceover, model_id: 'eleven_multilingual_v2' } }] : []);
+  const requests = script.scenes.flatMap((scene, index) => scene.voiceover?.trim() ? [{ index, url, method: 'POST', body: { text: scene.voiceover, model_id: 'eleven_multilingual_v2' } }] : []);
+  const dir = join(launchDir(cwd).video, 'vo');
+  if (!options.dryRun) {
+    const active = new Set(requests.map(request => request.index));
+    const existing = await readdir(dir).catch(error => { if (error.code === 'ENOENT') return [] as string[]; throw error; });
+    await Promise.all(existing.filter(file => /^\d+\.(?:mp3|wav)$/i.test(file) && !active.has(Number(file.split('.')[0]))).map(file => rm(join(dir, file), { force: true })));
+  }
   const key = process.env.ELEVENLABS_API_KEY;
   if (options.dryRun || !key) return { mode: options.dryRun ? 'dry-run' : 'captions-only', requests, files: [] as string[] };
   const files: string[] = [];
@@ -28,7 +34,7 @@ export async function voice(cwd: string, options: { dryRun?: boolean } = {}) {
     if (!response.ok) throw new Error(`ElevenLabs request failed (${response.status}) for scene ${request.index}`);
     const audio = Buffer.from(await response.arrayBuffer());
     if (!audio.length) throw new Error(`ElevenLabs returned empty audio for scene ${request.index}`);
-    const dir = join(launchDir(cwd).video, 'vo'); await mkdir(dir, { recursive: true });
+    await mkdir(dir, { recursive: true });
     const path = join(dir, `${request.index}.mp3`); await writeFile(path, audio); files.push(path);
   }
   return { mode: 'voiceover', requests, files };

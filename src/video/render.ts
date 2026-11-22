@@ -72,7 +72,10 @@ export async function render(cwd: string, renderer = 'auto', selected: Format[] 
     if (await exists(source)) { logo = source; break; }
   }
   const paths = await Promise.all(script.scenes.map(s => resolveShot(cwd, s.shot)));
-  const voices = await narrationFiles(cwd, script.scenes, ['wav','mp3']);
+  const voices = await Promise.all(script.scenes.map(async (_, index) => {
+    for (const extension of ['wav','mp3']) { const file = join(dir, 'vo', `${index}.${extension}`); if (await exists(file)) return file; }
+    return undefined;
+  }));
   try {
     const dimensions = await Promise.all(paths.map(async path => JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','json',path])).stdout).streams[0] as {width:number;height:number}));
     let terminal = false;

@@ -45,6 +45,21 @@ async function legacyScript(cwd: string) {
   await writeFile(join(cwd,'.launch/video/script.json'),JSON.stringify(script)); return script;
 }
 
+it('removes stale indexed audio on regeneration, including captions-only mode, without changing files on dry-run',async()=>{
+  const cwd=await fixture();const script=await legacyScript(cwd);
+  script.scenes[2].voiceover='   ';await writeFile(join(cwd,'.launch/video/script.json'),JSON.stringify(script));
+  const vo=join(cwd,'.launch/video/vo');await mkdir(vo);
+  for(const file of ['0.mp3','1.wav','2.mp3','9.mp3','notes.txt'])await writeFile(join(vo,file),'existing audio');
+  vi.stubEnv('ELEVENLABS_API_KEY','');
+  expect((await voice(cwd,{dryRun:true})).requests).toHaveLength(1);
+  expect(await readdir(vo)).toHaveLength(5);
+  expect((await voice(cwd)).mode).toBe('captions-only');
+  expect((await readdir(vo)).sort()).toEqual(['0.mp3','notes.txt']);
+  delete script.scenes[0].voiceover;await writeFile(join(cwd,'.launch/video/script.json'),JSON.stringify(script));
+  expect((await voice(cwd)).requests).toHaveLength(0);
+  expect(await readdir(vo)).toEqual(['notes.txt']);
+});
+
 it('exports standalone carousel and clip renderers without shots.yaml, with quiet deterministic music and readable plates', async () => {
   const cwd=await fixture();
   const carousel=await renderCarousel(cwd,[{role:'after',caption:'Catch unknown exports',source:'.launch/media/real.png'}],{size:'x',outDir:'out',prefix:'launch'});

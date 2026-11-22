@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { join, resolve, isAbsolute, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -82,11 +82,18 @@ export async function runProof(cwd: string, options: { skipRun?: boolean; timeou
     if (resultPath === directory || resultPath.startsWith(directory + sep))
       throw new Error('Invalid benchmark config: results must not be under .launch/proof/');
     const mode = command && !options.skipRun ? 'ran' : 'recorded';
+    const before = mode === 'ran' && existsSync(resultPath) ? {
+      mtime: statSync(resultPath, { bigint: true }).mtimeNs,
+      sha256: createHash('sha256').update(readFileSync(resultPath)).digest('hex'),
+    } : undefined;
     if (mode === 'ran') await runCommand(command!, cwd, timeout);
     assertSafePath(cwd, resultPath);
     let raw: Buffer, results: unknown;
     try { raw = readFileSync(resultPath); results = JSON.parse(raw.toString('utf8')); }
     catch (error) { throw new Error(`Benchmark ${name}: missing or invalid JSON results file ${resultsFile}: ${String(error)}`); }
+    const sha256 = createHash('sha256').update(raw).digest('hex');
+    if (before && before.mtime === statSync(resultPath, { bigint: true }).mtimeNs && before.sha256 === sha256)
+      throw new Error('benchmark command did not write ' + resultsFile);
     const source_file = '.launch/proof/' + name + '.json';
     const metrics = benchmark.metrics.map(({ metric, pointer, unit, context }) => {
       const value = jsonPointer(results, pointer);
@@ -94,7 +101,7 @@ export async function runProof(cwd: string, options: { skipRun?: boolean; timeou
       return { metric, value, unit, context, source_file, source_pointer: '/results' + pointer };
     });
     const record = { benchmark: benchmark.name, mode, command, repo, ranAt: new Date().toISOString(), exitCode: 0,
-      results_file: resultsFile, sha256: createHash('sha256').update(raw).digest('hex'), results, metrics };
+      results_file: resultsFile, sha256, results, metrics };
     const validation = validateFile('proof', record);
     if (!validation.valid) throw new Error(validation.errors.join('; '));
     atomicWrite(cwd, resolve(cwd, source_file), JSON.stringify(record, null, 2) + '\n');

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -90,6 +90,29 @@ describe('proof run', () => {
     for (const text of ['not JSON', '{}', '{"count":{}}']) {
       writeFileSync(join(cwd, 'results.json'), text);
       await expect(runProof(cwd)).rejects.toThrow();
+    }
+  });
+  it('rejects a successful command that leaves old results unchanged without refreshing provenance', async () => {
+    await runProof(cwd);
+    const recordPath = join(cwd, '.launch/proof/checks.json');
+    const original = readFileSync(recordPath, 'utf8');
+    config([{ ...benchmark, command: 'node -e ""' }]);
+    await expect(runProof(cwd)).rejects.toThrow('benchmark command did not write results.json');
+    expect(readFileSync(recordPath, 'utf8')).toBe(original);
+    unlinkSync(join(cwd, 'results.json'));
+    await expect(runProof(cwd)).rejects.toThrow('missing or invalid JSON results file results.json');
+  });
+  it('accepts updated results when only the hash or only the mtime changes', async () => {
+    for (const script of [
+      "fs.writeFileSync('results.json', JSON.stringify({count: 9})); fs.utimesSync('results.json', 1000, 1000);",
+      "fs.utimesSync('results.json', 2000, 2000);",
+    ]) {
+      writeFileSync(join(cwd, 'results.json'), '{"count":7}');
+      utimesSync(join(cwd, 'results.json'), 1000, 1000);
+      writeFileSync(join(cwd, 'benchmark.cjs'), "const fs = require('node:fs'); " + script);
+      const result = await runProof(cwd);
+      expect(result.records[0].mode).toBe('ran');
+      expect(result.records[0].metrics[0].value).toBe(script.includes('writeFileSync') ? 9 : 7);
     }
   });
   it('writes a founder plan derived from features and profile then exits non-zero', () => {

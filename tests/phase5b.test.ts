@@ -117,6 +117,41 @@ it.each(['json', 'sse'])('uses initialized official HTTP MCP with keychain beare
   expect(request.mock.calls[2][1]?.headers).toMatchObject({ 'Mcp-Session-Id': 'session' });
 });
 
+it.each(['\n', '\r\n', '\r'])('resolves matching MCP SSE replies without waiting for stream closure: %j', async newline => {
+  const cancel = vi.fn();
+  const request = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+    const { id, method } = JSON.parse(String(init?.body));
+    if (method === 'notifications/initialized') return new Response(null, { status: 202 });
+    const result = method === 'tools/list' ? { tools: [{ name: 'get_launch' }] } : { text: 'Draft 🧪' };
+    const message = JSON.stringify({ jsonrpc: '2.0', id, result }).replace(',"id":', ',\n"id":');
+    const source = [': keepalive', '', 'data:', '', 'data: {"method":"notifications/progress"}', '',
+      'data: {"id":-1,"result":{}}', '', 'event: message', ...message.split('\n').map(line => 'data: ' + line),
+      '', 'data: invalid trailing event', '', ''].join(newline);
+    return new Response(new ReadableStream<Uint8Array>({
+      start(controller) { for (const byte of new TextEncoder().encode(source)) controller.enqueue(Uint8Array.of(byte)); },
+      cancel,
+    }), { headers: { 'Content-Type': 'text/event-stream' } });
+  });
+  const client = new HttpMcpClient('product-hunt', 'secret', request);
+  expect(await client.listTools()).toEqual([{ name: 'get_launch' }]);
+  expect(await client.callTool('get_launch', { launch_id: 'draft' })).toEqual({ text: 'Draft 🧪' });
+  expect(request).toHaveBeenCalledTimes(4);
+  expect(cancel).toHaveBeenCalledTimes(3);
+});
+it.each(['empty', 'malformed', 'rpc-error', 'missing-id', 'read-error'])('rejects %s MCP SSE responses and releases the reader', async state => {
+  let response: Response;
+  const request = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+    const { id } = JSON.parse(String(init?.body));
+    const source = state === 'empty' ? '' : state === 'malformed' ? 'data: invalid\n\n' :
+      'data: ' + JSON.stringify(state === 'rpc-error' ? { id, error: { code: -1, message: 'Failed' } } : { id: -1, result: {} }) + '\n\n';
+    response = new Response(state === 'read-error' ? new ReadableStream({ start(controller) { controller.error(new Error('Read failed')); } }) : source,
+      { headers: { 'Content-Type': 'text/event-stream' } });
+    return response;
+  });
+  await expect(new HttpMcpClient('product-hunt', 'secret', request).listTools()).rejects.toThrow();
+  expect(response!.body!.locked).toBe(false);
+});
+
 async function approvedPost(channel: string, media: string[] = [], extra = {}) {
   const cwd = await workspace();
   const paths = launchDir(cwd);

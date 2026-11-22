@@ -19,6 +19,38 @@ export function allowTool(platform: McpPlatform, name: string) {
     throw new Error('MCP tool refused: only verified draft, readiness and preview tools are allowed; never submit or publish');
 }
 
+async function sseResponse(response: Response, id: number) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Invalid official MCP response');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let data: string[] = [];
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      let newline: RegExpExecArray | null;
+      while ((newline = /\r\n|\r|\n/.exec(buffer))) {
+        if (!done && newline[0] === '\r' && newline.index === buffer.length - 1) break;
+        const line = buffer.slice(0, newline.index);
+        buffer = buffer.slice(newline.index + newline[0].length);
+        if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
+        else if (!line) {
+          const source = data.join('\n');
+          data = [];
+          if (!source.trim()) continue;
+          const message = JSON.parse(source);
+          if (message?.id === id) return message;
+        }
+      }
+      if (done) throw new Error('Invalid official MCP response');
+    }
+  } finally {
+    try { await reader.cancel(); } catch {}
+    reader.releaseLock();
+  }
+}
+
 export class HttpMcpClient implements McpClient {
   private session?: string;
   private initialized?: Promise<void>;
@@ -36,13 +68,10 @@ export class HttpMcpClient implements McpClient {
     if (!response.ok) throw new Error('Official MCP request failed; reconnect your own account');
     this.session = response.headers.get('mcp-session-id') ?? this.session;
     if (notification) return;
-    const source = await response.text();
-    const messages = response.headers.get('content-type')?.includes('text/event-stream')
-      ? source.split(/\r?\n\r?\n/).filter(block => /^data:/m.test(block)).map(block =>
-        JSON.parse(block.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n')))
-      : [JSON.parse(source)];
-    const message = messages.find(item => item.id === id);
-    if (!message || message.error || !('result' in message)) throw new Error('Invalid official MCP response');
+    const message = response.headers.get('content-type')?.includes('text/event-stream')
+      ? await sseResponse(response, id) : await response.json();
+    if (!message || typeof message !== 'object' || message.id !== id || message.error || !('result' in message))
+      throw new Error('Invalid official MCP response');
     return message.result;
   }
   private ready() {

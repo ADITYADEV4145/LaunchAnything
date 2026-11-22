@@ -13,6 +13,7 @@ import { writeBriefs } from '../src/copy/write.js';
 import { checkPosts } from '../src/copy/check.js';
 import { createPlan } from '../src/planning/plan.js';
 import { buildReview } from '../src/review/page.js';
+import { validate } from '../src/product/validate.js';
 
 const dirs: string[] = [];
 const temp = () => { const dir = mkdtempSync(join(tmpdir(), 'liftoff-5c-')); dirs.push(dir); return dir; };
@@ -144,4 +145,27 @@ it('preserves built-in MCP-before-env ordering and stages integration sites offl
   expect((await adapterSelection('betalist', custom, { BUFFER_API_KEY: 'fixture' })).adapter.name).toBe('buffer');
   expect((await adapterSelection('betalist', custom, {})).adapter.name).toBe('manual');
   expect((await adapterSelection('blog', custom, {})).reason).toBe('manual');
+});
+
+it('validates config channels against the registry for the config cwd', async () => {
+  const cwd = temp(); add(cwd);
+  const path = join(cwd, '.launch/config.json');
+  const config = { profile: 'devtool', launchType: 'new-product', channels: ['betalist', 'x'],
+    timezone: 'UTC', launchDate: '2026-07-14', profileConfirmed: true };
+  writeFileSync(path, JSON.stringify(config));
+  expect(await validate(cwd, 'config')).toMatchObject({ valid: true, errors: [] });
+  writeFileSync(path, JSON.stringify({ ...config, channels: ['typo', 'another-typo'] }));
+  const invalid = await validate(cwd, 'config');
+  expect(invalid.valid).toBe(false);
+  expect(invalid.errors).toHaveLength(2);
+  expect(invalid.errors[0]).toContain('Unknown channel: typo. Known ids:');
+  expect(invalid.errors[0]).toContain('betalist');
+  expect(invalid.errors[0]).toContain('x');
+  expect(invalid.errors[1]).toContain('Unknown channel: another-typo. Known ids:');
+  const result = cli(cwd, 'validate', 'config');
+  expect(result.status, result.stdout + result.stderr).toBe(1);
+  expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, command: 'validate',
+    error: expect.stringContaining('Unknown channel: typo. Known ids:') });
+  writeFileSync(path, JSON.stringify({ ...config, channels: [] }));
+  expect(await validate(cwd, 'config')).toMatchObject({ valid: false });
 });

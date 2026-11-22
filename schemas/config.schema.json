@@ -3,6 +3,14 @@
   "$id": "https://launch-liftoff.dev/schemas/config.schema.json",
   "type": "object",
   "properties": {
+    "xApiCost": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": { "type": ["number", "null"], "minimum": 0 },
+        "withUrl": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
     "accounts": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
     "profile": {
       "enum": [

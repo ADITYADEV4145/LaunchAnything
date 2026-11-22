@@ -5,9 +5,11 @@ import { parse } from 'yaml';
 import { launchDir } from '../core/launch-dir.js';
 import { loadRule } from '../core/rules.js';
 import { validateFile } from '../core/schema.js';
+import type { XApiCost } from '../connect/costs.js';
 
 export interface Approver { name: string; role?: string }
 interface Config {
+  xApiCost?: XApiCost;
   profile: string;
   launchDate: string;
   timezone: string;

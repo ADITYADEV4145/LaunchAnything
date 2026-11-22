@@ -7,6 +7,7 @@ import { fixListPath, readCopyVerdicts } from './checks.js';
 import type { CopyVerdict } from './checks.js';
 import { loadReview, mediaType } from './posts.js';
 import type { ReviewPost } from './posts.js';
+import { xCost, xPricingSource } from '../connect/costs.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
@@ -28,7 +29,7 @@ function checkMarkup(verdict?: CopyVerdict) {
     Fix list: <code>${fixListPath}</code>`;
 }
 
-function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyVerdict) {
+function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyVerdict, cost?: string) {
   const media = post.media.map(({ path, slot, bytes }) => {
     const mime = mediaType(path);
     const src = mime && 'data:' + mime + ';base64,' + bytes.toString('base64');
@@ -48,6 +49,7 @@ function card(post: ReviewPost, state: string, timezone: string, verdict?: CopyV
     : escape(post.link)}</p>` : ''}
   ${media}
   <dl>
+    ${cost === undefined ? '' : `<div><dt>X API cost before approval</dt><dd>${escape(cost)} <a href="${xPricingSource}" target="_blank" rel="noopener noreferrer">Official default pricing</a>; override with <code>xApiCost</code> in config.json.</dd></div>`}
     <div><dt>Scheduled</dt><dd><time datetime="${post.scheduledAt}">${escape(time)} (${escape(timezone)})</time></dd></div>
     <div><dt>Characters</dt><dd>${titleCount} title · ${bodyCount} body</dd></div>
     <div><dt>Checks</dt><dd>Post schema passed · ${post.media.length} local attachments verified</dd></div>
@@ -215,7 +217,8 @@ export async function buildReview(cwd?: string) {
       ? `Approval stale: copy or attachments changed (previously approved by ${previous.join(', ')})`
       : 'Awaiting approval';
     const verdict = verdicts.find(entry => entry.channel === post.channel && entry.sourceHash === post.sourceHash);
-    return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone, verdict);
+    return card(post, skips[post.channel] === post.hash ? 'Skipped' : approved ? 'Approved' : pending, config.timezone, verdict,
+      post.channel === 'x' ? xCost(post, config.xApiCost) : undefined);
   });
   for (const verdict of unavailable.filter(entry => !posts.some(post => post.channel === entry.channel))) {
     cards.push(`<article><h2>${escape(verdict.channel)} · Post unavailable</h2>

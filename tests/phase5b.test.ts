@@ -18,6 +18,8 @@ import { lockTimeout, recoveryTimeout, tryLock } from '../src/connect/lock.js';
 import { launchDir } from '../src/core/launch-dir.js';
 import type { Route } from '../src/connect/registry.js';
 import { HttpMcpClient, MockMcpClient, mcpDraft, officialServers, productHuntTools } from '../src/connect/mcp.js';
+import { xCost } from '../src/connect/costs.js';
+import { buildReview } from '../src/review/page.js';
 
 const temp: string[] = [];
 async function workspace() { const path = await mkdtemp(join(tmpdir(), 'liftoff-5b-')); temp.push(path); return path; }
@@ -67,6 +69,31 @@ it('discovers official X capabilities without trusting an advertised unverified 
   const client = new MockMcpClient('x', [{ name: 'create_tweet' }]);
   await expect(mcpDraft('x', client, post, paths.root)).rejects.toThrow('No verified official X post-create tool');
   expect(client.discoveries).toBe(1); expect(client.calls).toEqual([]);
+});
+it.each([
+  { extra: {}, config: undefined, expected: '$0.015' },
+  { extra: { link: 'https://example.test' }, config: undefined, expected: '$0.20' },
+  { extra: {}, config: { create: 0.123 }, expected: '$0.123' },
+  { extra: { link: 'https://example.test' }, config: { withUrl: 0 }, expected: '$0.00' },
+  { extra: {}, config: { create: null }, expected: 'cost unknown — set it in config' },
+])('shows sourced or configured X costs before approval: %j', async ({ extra, config, expected }) => {
+  const { cwd, paths } = await approvedPost('x', [], extra);
+  await writeFile(paths.approvals, '{"approvals":[]}');
+  if (config) await writeFile(paths.config, JSON.stringify({ ...JSON.parse(await readFile(paths.config, 'utf8')), xApiCost: config }));
+  const review = await buildReview(cwd);
+  const html = await readFile(review.path, 'utf8');
+  expect(html).toContain(expected); expect(html).toContain('https://docs.x.com/x-api/getting-started/pricing');
+  expect(html.indexOf('X API cost before approval')).toBeLessThan(html.indexOf('data-action="approve"'));
+  expect(html).toContain('Awaiting approval');
+});
+it('prices inline and bare URLs, empty posts, and invalid overrides safely', async () => {
+  expect(xCost({ title: '', body: '' })).toContain('$0.015');
+  for (const body of ['https://example.test/path', 'www.example.test', 'Visit example.com now'])
+    expect(xCost({ title: '', body })).toContain('$0.20');
+  expect(() => xCost({ title: '', body: '' }, { create: -1 })).toThrow('Invalid X API cost');
+  const { cwd, paths } = await approvedPost('x');
+  await writeFile(paths.config, JSON.stringify({ ...JSON.parse(await readFile(paths.config, 'utf8')), xApiCost: { create: 'cheap' } }));
+  await expect(buildReview(cwd)).rejects.toThrow('config:');
 });
 it.each(['json', 'sse'])('uses initialized official HTTP MCP with keychain bearer and %s responses', async format => {
   const methods: string[] = [];

@@ -15,7 +15,7 @@ import { judgePosts } from '../copy/judge.js';
 import { warroom } from '../launch-ops/warroom.js';
 import { parseSchedule } from './schedule.js';
 import { readConsent, revokeConsent, sameScope, saveConsent, type Scope } from './consent.js';
-import { liveAdapter, mockAdapter, routeFor, mcpUnavailableReason, McpPublishingUnavailable, type GoAdapter } from './adapters.js';
+import { liveAdapter, mockAdapter, routeFor, mcpUnavailableReason, McpPublishingUnavailable, PublishRequestFailure, type GoAdapter } from './adapters.js';
 
 export interface GoOptions {
   confirm?: boolean; yes?: boolean; by?: string; mock?: boolean; noWait?: boolean; revoke?: boolean; phSubmit?: boolean;
@@ -137,7 +137,9 @@ export async function go(cwd = process.cwd(), options: GoOptions = {}) {
             break;
           } catch (error) {
             if (error instanceof McpPublishingUnavailable) unavailableReason = error.message;
+            if (error instanceof PublishRequestFailure) unavailableReason = error.message;
             receipt = undefined;
+            if (error instanceof PublishRequestFailure ? !error.retryable : !options.mock && scope.route !== 'browser') break;
           }
         }
       } catch { receipt = undefined; }

@@ -27,6 +27,10 @@ export function mcpUnavailableReason(channel: string) {
 export class McpPublishingUnavailable extends Error {
   constructor(channel: string) { super(mcpUnavailableReason(channel)); }
 }
+export class PublishRequestFailure extends Error {
+  constructor(message: string, public retryable = false) { super(message); }
+}
+const unknownOutcome = 'Publication outcome is unknown; check the destination for an existing post before using the paste file. No automatic retry.';
 export function mockAdapter(browser?: (channel: string) => BrowserDriver): GoAdapter {
   return { async publish({ post, root, notify }) {
     let url = `https://example.test/${post.channel}/${post.hash}`;
@@ -62,10 +66,18 @@ export function liveAdapter(options: { keychain?: Keychain; request?: typeof fet
     if (!token) throw new Error('Connected account token unavailable');
     if (post.media.length) throw new Error('Live media upload is not supported by this adapter; use the paste file with the approved attachments');
     const send = async (url: string, headers: Record<string, string>, body: unknown) => {
-      const response = await request(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
-        headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!response.ok) throw new Error('Publish request failed (' + response.status + '); inspect destination before manual retry');
-      return response.json();
+      let response: Response;
+      try {
+        response = await request(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
+          headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } catch (error) {
+        const failure = error as { code?: string; cause?: { code?: string } };
+        const safe = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'].includes(failure.cause?.code ?? failure.code ?? '');
+        throw new PublishRequestFailure(safe ? 'Connection failed before the publish request reached the platform.' : unknownOutcome, safe);
+      }
+      if (!response.ok) throw new PublishRequestFailure(`Publish request failed (${response.status}). ${unknownOutcome}`);
+      try { return await response.json(); }
+      catch { throw new PublishRequestFailure(unknownOutcome); }
     };
     let result: any, url: unknown, id: unknown;
     if (route === 'devto-api') {
@@ -87,10 +99,10 @@ export function liveAdapter(options: { keychain?: Keychain; request?: typeof fet
           settings: { __type: post.channel } }] });
       const item = Array.isArray(result) ? result[0] : result;
       url = item?.url; id = item?.postId ?? item?.id;
-      if (!url) throw new Error('Postiz accepted request but has not returned a live URL; inspect Postiz before retrying');
+      if (!url) throw new PublishRequestFailure(unknownOutcome);
     }
     if (typeof url !== 'string' || !/^https:\/\//.test(url) || !['string', 'number'].includes(typeof id))
-      throw new Error('Publisher did not return a live URL and ID');
+      throw new PublishRequestFailure('Publisher did not return a live URL and ID. ' + unknownOutcome);
     return { channel: post.channel, id: `go:${route}:${id}`, url, status: 'published', scheduledAt: post.scheduledAt };
   } };
 }

@@ -133,6 +133,30 @@ it('HTTP adapters use connected keychain credentials and require live IDs/URLs',
   await expect(adapter.publish(context)).rejects.toThrow('503');
   await expect(adapter.publish({ ...context, post: { ...post, channel: 'x' } })).rejects.toThrow('no verified official publish tool');
 });
+it.each(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', '503', '429', 'invalid-json', 'missing-url'])
+('live POST retry safety for %s preserves uncertain creates without retrying', async code => {
+  const { work, paths } = await fixture(), keychain = new MemoryKeychain();
+  await keychain.set('devto:mock-founder', 'fixture-token');
+  let calls = 0;
+  const request = vi.fn(async () => {
+    calls++;
+    if (calls > 1) return new Response(JSON.stringify({ id: 123, url: 'https://dev.to/founder/demo' }));
+    if (code === '503' || code === '429') return new Response('{}', { status: Number(code) });
+    if (code === 'invalid-json') return new Response('not json');
+    if (code === 'missing-url') return new Response('{"id":123}');
+    throw Object.assign(new TypeError('fetch failed'), { cause: { code } });
+  });
+  const live = liveAdapter({ keychain, request }), mock = mockAdapter();
+  const result = await go(work, { mock: true, confirm: true, yes: true, noWait: true, adapter: { publish: context =>
+    context.post.channel === 'devto' ? live.publish(context) : mock.publish(context) } });
+  const safe = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'].includes(code);
+  expect(calls).toBe(safe ? 2 : 1);
+  if (!('board' in result) || !result.board) throw new Error('Missing board');
+  const row = result.board.find(row => row.channel === 'devto')!;
+  expect(row.status).toBe(safe ? 'live' : 'failed');
+  if (!safe) expect(await readFile(row.paste!, 'utf8')).toContain('check the destination for an existing post');
+  expect(JSON.parse(await readFile(paths.published, 'utf8')).posts.some((post: any) => post.channel === 'devto')).toBe(safe);
+}, 30000);
 it('consents once across new content, but new accounts ask; revoke removes consent', async () => {
   const { work, paths } = await fixture();
   const ask = vi.fn(async () => true);

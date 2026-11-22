@@ -6,12 +6,16 @@ export function restrictions(rules: { short_name: string; description: string }[
   const text = rules.map(r => r.short_name + ' ' + r.description).join('\n').toLowerCase();
   const days = weekdays.flatMap((day, i) => new RegExp(`\\b${day}s?\\b`).test(text) ? [i] : []);
   if (/\bweekends?\b/.test(text)) days.push(0, 6);
-  const clock = (hour: string, minute?: string, period?: string) => Number(hour) % (period ? 12 : 24) * 60 + Number(minute ?? 0) + (period === 'pm' ? 720 : 0);
+  const clock = (hour: string, minute?: string, period?: string) => {
+    const h = Number(hour); const m = Number(minute ?? 0);
+    if (h < (period ? 1 : 0) || h > (period ? 12 : 23) || m > 59) return undefined;
+    return (period ? h % 12 : h) * 60 + m + (period === 'pm' ? 720 : 0);
+  };
   const range = [...text.matchAll(/\b(?:(?:between|from)\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:and|to|[-–])\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/g)].find(m =>
     m[2] !== undefined || m[3] !== undefined || m[5] !== undefined || m[6] !== undefined || /^between\b/.test(m[0]) ||
     new RegExp(`\\b${zonePattern}[ \\t]*$`).test(text.slice(0, m.index)) || new RegExp(`^[ \\t]*[(\\[]?[ \\t]*${zonePattern}\\b`).test(text.slice(m.index! + m[0].length)));
   const at = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(text);
-  const start = range ? clock(range[1]!, range[2], range[3] ?? range[6]) : at ? clock(at[1]!, at[2], at[3]) : undefined;
+  const start = range ? clock(range[1]!, range[2], range[3]) : at ? clock(at[1]!, at[2], at[3]) : undefined;
   const end = range ? clock(range[4]!, range[5], range[6]) : start;
   const mentions: string[] = [];
   let manualReview: string | undefined;
@@ -23,6 +27,10 @@ export function restrictions(rules: { short_name: string; description: string }[
     } else manualReview = `Unrecognized rule timezone: ${zone}`;
   }
   if (new Set(mentions).size > 1) manualReview = 'Conflicting rule timezones';
+  const parsed = range ?? at;
+  const remainder = parsed ? text.slice(0, parsed.index) + ' ' + text.slice(parsed.index! + parsed[0].length) : text;
+  const unparsedTime = /\b(?:\d{1,2}\s*(?::\d|[ap]\.?m\b)|(?:from|between|at)\s+\d|\d{1,2}\s+(?:to|and)\s+\d{1,2}\b|\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|before\b|after\b|until\b|till\b|noon\b|midnight\b|morning\b|afternoon\b|evening\b|night\b|except\b|excluding\b|(?:posting|business|office)\s+(?:hours?|window)\b|post\s+(?:at|from|between|during)\b)/.test(remainder);
+  if (unparsedTime || parsed && (start === undefined || end === undefined || range && Boolean(range[3]) !== Boolean(range[6]))) manualReview = 'Unparsed or ambiguous posting time/window';
   return { days: [...new Set(days)], megathread: /mega[- ]?thread/.test(text), start, end, timezone: mentions[0] ?? timezone, manualReview };
 }
 export function allowedDate(date: string, days: number[]) { return !days.length || days.includes(new Date(date + 'T12:00:00Z').getUTCDay()); }

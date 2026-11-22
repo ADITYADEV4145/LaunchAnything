@@ -162,6 +162,20 @@ describe('communities', () => {
     const limit = restrictions([{ short_name: 'Promo', description: `at 9am ${zone} Sundays` }], 'UTC');
     expect(limit.manualReview).toBeUndefined(); expect(postingSlot('2026-01-04', limit, 'UTC')).toMatchObject({ date: '2026-01-04', time, timezone: 'UTC' });
   });
+  it.each([
+    'from 18 to 21 in ET', 'from 18 to 21', 'after 9am ET', 'at noon ET', '18:00 ET',
+    '9am-5pm ET and from 18 to 21', 'at 9am and at 5pm ET', 'at 25am ET',
+    '9:75am-5pm ET', '9-5pm ET', 'post during business hours ET', 'at 9am for 2 hours ET',
+  ])('fails closed instead of scheduling a partially parsed time: %s', async description => {
+    const rules = [{ short_name: 'Self-Promo Sunday', description }]; const limit = restrictions(rules, 'UTC');
+    expect(limit.manualReview).toBe('Unparsed or ambiguous posting time/window'); expect(() => postingSlot('2026-01-04', limit, 'UTC')).toThrow();
+    const cwd = await setup(); const file = join(cwd, 'capture.json'); await writeFile(file, JSON.stringify({ ...fixture[0]!, rules })); await importEvidence(cwd, file);
+    const result = await reportCommunities(cwd); const report = JSON.parse(await readFile(join(cwd, '.launch/communities.json'), 'utf8'));
+    expect(result.valid).toBe(true); expect(result.markdown).toContain('Unparsed or ambiguous posting time/window');
+    expect(report.recommended).toEqual([]); expect(report.plan).toEqual([]); expect(await checkCommunities(cwd)).toEqual({ valid: true, errors: [] });
+    report.plan.push({ subreddit: 'builders', date: '2026-01-04', time: '12:00', timezone: 'UTC', angle: 'lesson', variant: 'value-first', file: 'posts/builders.md' });
+    expect((await checkCommunities(cwd, report)).errors).toContain('builders: rule timezone needs manual review');
+  });
   it.each([5, 6])('preserves the %s:30 UTC instant when New York repeats 01:30 at fall-back', async hour => {
     const cwd = await setup(); await writeFile(join(cwd, '.launch/config.json'), JSON.stringify({ launchDate: '2026-11-01', timezone: 'America/New_York' }));
     const evidence = { ...fixture[0]!, rules: [{ short_name: 'Self-Promo Sunday', description: `Only on Sunday at ${hour}:30am UTC` }] };

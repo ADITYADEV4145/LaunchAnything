@@ -254,7 +254,7 @@ export async function judge(cwd: string, options: { heuristicOnly?: boolean; wri
       const item: JudgeItem = {file:maskSecrets(asset.file),sha256:hash(asset.video ? png : await readFile(resolve(cwd, asset.file))),scored:asset.scored,timestamp:asset.timestamp,video:asset.video ? maskSecrets(asset.video) : undefined,banned,fixes:[]};
       if (banned.length) report.errors.push(`${maskSecrets(asset.file)}: banned ${banned.join(', ')}`);
       if (asset.scored) {
-        const measured = measure(PNG.sync.read(png),ocr.words,String(product.name ?? 'Product'),brand.colors,keywords,/\/(?:x|product-hunt-1|og)\.png$/.test(asset.file),logo);
+        const measured = measure(PNG.sync.read(png),ocr.words,String(product.name ?? 'Product'),brand.colors,keywords,Boolean(planned) && /\/(?:x|product-hunt-1|og)\.png$/.test(asset.file),logo);
         item.heuristic = measured.scores; item.scores = {...measured.scores}; item.metrics = measured.metrics;
         let terminalBox: TerminalRegion | undefined;
         if (asset.video) {

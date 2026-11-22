@@ -120,8 +120,7 @@ export function judgePosts(cwd: string, selected?: string[]) {
       .map(c => c + ' ' + scores[c] + '/10'), ...(model ? [] : local.reasons)];
     const passed = criteria.every(c => scores[c] >= threshold);
     const last = previous.get(channel);
-    const attempts = passed ? 0 : last && last.sourceHash === sourceHash && last.source === (model ? 'model' : 'local')
-      ? last.attempts : (last?.attempts ?? 0) + 1;
+    const attempts = passed ? 0 : last && last.sourceHash === sourceHash ? Math.max(1, last.attempts) : (last?.attempts ?? 0) + 1;
     verdicts.push({ channel, sourceHash, source: model ? 'model' : 'local', judge: model?.judge, scores, local: local.scores,
       reasons: passed ? [] : [...new Set(reasons)], attempts, status: passed ? 'pass' : attempts >= maxLoops ? 'flagged' : 'rewrite' });
   }

@@ -248,3 +248,11 @@ it('does not accept an unsourced pain or proof as evidence for a number', projec
     '{ text: "Small daily task lists should not need a setup guide.", pain: 1 }\n  - { text: "It saves 40 minutes a day.", pain: 1 }').replace('Review the source', 'It saves 40 minutes a day. Review the source'));
   expect(rulesFor(cwd, 'github-release')).toContain('claims.uncited');
 }));
+
+it('counts one judge loop per draft version, whoever scored it', project((cwd, posts) => {
+  const hash = createHash('sha256').update(readFileSync(join(posts, 'x.md'))).digest('hex');
+  expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ source: 'local', attempts: 1, status: 'rewrite' });
+  writeFileSync(join(posts, 'judge/x.scores.json'), JSON.stringify({ sourceHash: hash,
+    scores: Object.fromEntries(criteria.map(c => [c, 5])), reasons: [] }));
+  expect(judgePosts(cwd, ['x']).verdicts[0]).toMatchObject({ source: 'model', attempts: 1, status: 'rewrite' });
+}));

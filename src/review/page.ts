@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchDir } from '../core/launch-dir.js';
 import { decisions } from './approvals.js';
@@ -12,6 +12,8 @@ import { readFile } from 'node:fs/promises';
 import { citationId, grounded, spanPattern } from '../copy/citations.js';
 import type { Product } from '../copy/context.js';
 import { readJudgments, criteria, threshold, maxLoops, type Verdict } from '../copy/judge.js';
+import { storyboard } from '../media/assets.js';
+import { judge } from '../media/judge.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
@@ -243,6 +245,12 @@ a{color:#1b4faf}
 `;
 
 export async function buildReview(cwd?: string) {
+  const mediaPaths = launchDir(cwd);
+  const finished = await Promise.all([join(mediaPaths.media,'images'),join(mediaPaths.media,'polished'),mediaPaths.video].map(async directory => {
+    try { return (await readdir(directory)).some(file=>/\.(png|jpe?g|webp|svg|gif|bmp|tiff?|avif|mp4|webm|mov)$/i.test(file)); }
+    catch(error) { if((error as NodeJS.ErrnoException).code==='ENOENT') return false;throw error; }
+  }));
+  if (finished.some(Boolean) || await storyboard(cwd ?? process.cwd())) await judge(cwd ?? process.cwd());
   const verdicts = await readCopyVerdicts(launchDir(cwd).posts);
   const unavailable = verdicts.filter(entry => entry.sourceHash === null);
   const { paths, config, posts } = await loadReview(cwd, new Set(unavailable.map(entry => entry.channel)));

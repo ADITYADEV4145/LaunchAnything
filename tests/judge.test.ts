@@ -49,6 +49,19 @@ it('judges a clean storyboard set and rendered frames, scans unbranded raw captu
   await overrides(cwd,result.items); expect((await judge(cwd)).items).toHaveLength(result.items.length);
 },120000);
 
+it('scores a letterboxed terminal with a readable main caption independently of small UI copy and corner branding',async()=>{
+  const cwd=await fixture(); const path=join(cwd,'.launch/media/images/portrait.png');
+  const app=await browser();
+  try {
+    const page=await app.newPage({viewport:{width:720,height:1280}});
+    await page.setContent(`<body style="margin:0;background:#101827;color:white;font-family:Arial"><header style="position:absolute;left:36px;top:40px;font-size:32px">Scope</header><pre style="position:absolute;left:50px;top:400px;font-size:13px">${Array(6).fill('BLOCK grounding: inspect the missing export in local source').join('\n')}</pre><div style="position:absolute;left:36px;top:900px;width:640px;border-left:5px solid #77e5b3;font-size:60px;font-weight:bold;padding:15px">Catch unknown exports before they ship</div></body>`);
+    await page.screenshot({path});
+  } finally { await app.close(); }
+  const item=(await judge(cwd)).items.find(item=>item.file.endsWith('/portrait.png'))!;
+  expect(item.scores!.focus).toBeGreaterThanOrEqual(8);
+  expect(item.scores!.readability).toBeGreaterThanOrEqual(8);
+});
+
 it('fails banned video frames with timestamps and rule names, without reproducing OCR content',async()=>{
   const cwd=await fixture(); const bad=join(cwd,'bad.png'); await picture(bad,'sed log | grep fixtures/');
   await exec('ffmpeg',['-y','-v','error','-loop','1','-t','1','-i',join(cwd,'.launch/media/polished/after.png'),'-loop','1','-t','1','-i',bad,'-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0','-r','12','-c:v','libx264','-pix_fmt','yuv420p','-threads','1',join(cwd,'.launch/video/unsafe.mp4')]);

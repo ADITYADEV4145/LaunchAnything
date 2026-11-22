@@ -51,11 +51,14 @@ it('exports standalone carousel and clip renderers without shots.yaml, with quie
   await expect(renderClip(cwd,[{caption:'Catch unknown exports',source:'absent.png',duration:2}])).rejects.toThrow();
 },120000);
 
-it('keeps portrait margins and trims a focus-anchored inset for wide highlighted stills',async()=>{
+it('fits the entire highlighted window in portrait without cropping either edge',async()=>{
   const cwd=await fixture();
   const result=await renderClip(cwd,[{role:'after',caption:'Catch unknown exports',source:'.launch/media/real.png',duration:1,highlight:{x:38,y:48,width:170,height:55}}],{format:'9x16',renderer:'ffmpeg'});
-  expect(result.receipt.scenes[0].crop).toEqual({x:0,y:0,width:900,height:360});
+  expect(result.receipt.scenes[0].crop).toBeUndefined();
   expect(result.receipt.scenes[0].frame.width).toBe(676);
+  expect(result.receipt.scenes[0].frame.height).toBe(242);
+  expect(result.receipt.scenes[0].frame.x).toBeGreaterThanOrEqual(0);
+  expect(result.receipt.scenes[0].frame.x+result.receipt.scenes[0].frame.width).toBeLessThanOrEqual(720);
   expect(result.receipt.scenes[0].highlight!.x).toBeGreaterThanOrEqual(0);
 });
 

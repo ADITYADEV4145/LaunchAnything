@@ -48,6 +48,27 @@ for (const renderer of ['vhs', 'html']) it(`captures a CLI storyboard with ${ren
   } finally { process.env.PATH = path; await rm(root, { recursive: true, force: true }); }
 }, 240000);
 
+for (const renderer of ['vhs','html']) it(`fits long money-moment output without hard wraps using ${renderer}, executing commands once`, async () => {
+  const spec=storyboard('cat message.txt'); spec.shots[2].setup!.push('printf x >> executions');
+  const {root,cwd,dir}=await repo(spec); const path=process.env.PATH;
+  try {
+    const message="READY\nWhy: 'formatCurrency' is not exported in money.ts. Did you mean formatPrice (money.ts:1, formatPrice(cents: number): string)?\n";
+    await writeFile(join(cwd,'message.txt'),message);
+    if(renderer==='html') {
+      const bin=join(root,'bin'); await mkdir(bin);
+      for(const name of ['bash','cat','ffmpeg','ffprobe','tesseract']) await symlink(`/usr/bin/${name}`,join(bin,name));
+      process.env.PATH=bin;
+    }
+    const shot=(await takeShots(cwd)).find(shot=>shot.id==='result')!;
+    expect(shot.columns).toBe(110); expect(shot.renderer).toBe(renderer);
+    const transcript=await readFile(join(cwd,'.launch/media/tapes/result.txt'),'utf8');
+    expect(transcript.trimEnd().split('\n').every(line=>line.length<=110)).toBe(true);
+    expect(transcript).toContain('money.ts'); expect(transcript).toContain('formatPrice');
+    expect(await readFile(join(cwd,'executions'),'utf8')).toBe('x');
+    expect((await ocrWords(await readFile(join(dir,'result.png')))).text).not.toContain('SECRETSETUPMARKER');
+  } finally {process.env.PATH=path;await rm(root,{recursive:true,force:true});}
+},120000);
+
 it('highlights code identifiers adjacent to punctuation without matching identifier prefixes', async () => {
   const shot = { id: 'signature', commands: ['cat money.ts'], fontSize: 40, highlight: { text: 'formatPrice' }, viewport: { width: 1600, height: 900 } };
   const { root, cwd, dir } = await repo({ shots: [shot] });

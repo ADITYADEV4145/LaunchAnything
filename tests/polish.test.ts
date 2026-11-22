@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { takeShots } from '../src/visuals/shots.js';
 import { polish } from '../src/media/polish.js';
-import { homepageHost } from '../src/media/assets.js';
+import { homepageHost, mediaHost } from '../src/media/assets.js';
 import { makeImages } from '../src/visuals/images.js';
 import { platforms, pngSize } from '../src/visuals/check.js';
 import { ocrWords } from '../src/media/banned.js';
-import { exec } from '../src/visuals/runtime.js';
+import { exec, browser } from '../src/visuals/runtime.js';
 
 it('captures a real tiny CLI product, polishes it and automatically builds the branded storyboard image set', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'polish-'));
@@ -34,7 +34,8 @@ it('captures a real tiny CLI product, polishes it and automatically builds the b
     expect(polished).toHaveLength(6); expect(polished.every((item: { scale: number }) => item.scale === 2)).toBe(true);
     for(const id of ['hook','after']) {
       const ocr=await ocrWords(await readFile(join(paths,'polished',`${id}.png`)));
-      expect(ocr.words.some(word=>word.text==='Scope' && word.x<250 && word.y<120)).toBe(true);
+      expect(ocr.words.some(word=>word.text==='Scope' && word.x<1120 && word.y<250)).toBe(true);
+      if(id==='after') expect(ocr.words.filter(word=>word.text==='Scope')).toHaveLength(1);
     }
     await rm(join(paths, 'polished'), { recursive: true });
     const report = await makeImages(cwd);
@@ -75,5 +76,22 @@ it('rejects empty/missing storyboard input and strips local hosts and ports', as
     await expect(polish(cwd)).rejects.toThrow('requires a storyboard');
     for (const url of ['http://localhost:3000', 'http://127.0.0.1:8080', 'http://[::1]:3000', 'not a URL']) expect(homepageHost(url)).toBe('');
     expect(homepageHost('https://scope.example:8443/docs')).toBe('scope.example');
+    expect(await mediaHost(cwd,{})).toBe('');
+    await writeFile(join(cwd,'package.json'),JSON.stringify({repository:{url:'git+https://github.com/example/scope.git'}}));
+    expect(await mediaHost(cwd,{})).toBe('github.com');
+    expect(await mediaHost(cwd,{homepage:'https://scope.example/docs'})).toBe('scope.example');
   } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+it('shows the footer accent only alongside a known hostname', async () => {
+  const template=await readFile(join(process.cwd(),'templates/images/storyboard.html'),'utf8');
+  const app=await browser();
+  try {
+    const page=await app.newPage();
+    for(const host of ['', 'scope.example']) {
+      await page.setContent(template.replace(/\{\{(\w+)\}\}/g,(_,key)=>key==='host'?host:''));
+      expect(await page.locator('footer .line').evaluate(el=>getComputedStyle(el).visibility)).toBe(host?'visible':'hidden');
+      expect(await page.locator('footer .hostname').innerText()).toBe(host);
+    }
+  } finally {await app.close();}
 });

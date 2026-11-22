@@ -50,7 +50,7 @@ export async function polish(cwd: string): Promise<PolishedShot[]> {
           ...brand.colors, title: product.name, logo: brand.logo, logoClass: brand.logo ? 'has-logo' : '', frameWidth: String(frameWidth), contentHeight: String(contentHeight),
           kind: mobile ? 'phone' : capture.kind === 'terminal' ? 'terminal' : 'browser', addressClass: capture.kind === 'web' ? 'address' : '',
           windowTitle: capture.kind === 'web' ? host || product.name : product.name,
-          screenshot: `data:image/png;base64,${PNG.sync.write(cropped).toString('base64')}`, caption: shot.caption ?? '', cardClass: shot.card ? 'title-card' : '',
+          screenshot: `data:image/png;base64,${PNG.sync.write(cropped).toString('base64')}`, caption: shot.caption ?? '', cardClass: shot.card ? 'title-card' : capture.kind === 'terminal' ? 'terminal-shot' : '',
           hx: String(box ? box.x / crop.width * 100 : 0), hy: String(box ? box.y / visibleHeight * 100 : 0),
           hw: String(box ? box.width / crop.width * 100 : 0), hh: String(box ? box.height / visibleHeight * 100 : 0), ringDisplay: box ? 'block' : 'none',
         };

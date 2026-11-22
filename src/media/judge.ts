@@ -129,7 +129,8 @@ function highlights(image: PNG, accent: number[], words: OcrWord[]) {
 function measure(image: PNG, words: OcrWord[], name: string, colors: {background:string;accent:string}, keywords: string[], critical: boolean, logo?: PNG) {
   const {width, height, data} = image;
   const valid = words.filter(word => word.conf >= 0 && word.text.length > 1);
-  const large = valid.filter(word => word.height >= quantile(valid.map(word => word.height), .6));
+  const mainHeight = quantile(valid.map(word => word.height), .95);
+  const large = valid.filter(word => word.height >= mainHeight * .7);
   const confidence = valid.length ? valid.reduce((sum, word) => sum + word.conf, 0) / valid.length : 0;
   const capHeight = quantile(large.map(word => word.height), .5) / height;
   const ratios = large.map(word => {

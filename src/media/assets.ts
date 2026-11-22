@@ -44,3 +44,8 @@ export function homepageHost(value: unknown): string {
     return url.hostname;
   } catch { return ''; }
 }
+export async function mediaHost(cwd: string, product: Record<string, any>): Promise<string> {
+  const pkg = await optionalJson(join(cwd, 'package.json'));
+  const values = [product.homepage, product.homepageUrl, product.url, product.repo, product.repository?.url, product.repository, pkg.homepage, pkg.repository?.url, pkg.repository];
+  return values.map(value => homepageHost(typeof value === 'string' ? value.replace(/^git\+/, '').replace(/^git@([^:]+):/, 'https://$1/') : value)).find(Boolean) ?? '';
+}

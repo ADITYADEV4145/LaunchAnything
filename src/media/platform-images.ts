@@ -5,7 +5,7 @@ import { packageRoot } from '../core/package-root.js';
 import { browser, escapeHtml } from '../visuals/runtime.js';
 import { platforms, checkImage, contrast, type Size } from '../visuals/check.js';
 import { assertClean, ocrWords } from './banned.js';
-import { mediaBrand, dataImage, homepageHost, storyboard } from './assets.js';
+import { mediaBrand, dataImage, mediaHost, storyboard } from './assets.js';
 import { polish } from './polish.js';
 export interface CarouselSlide { role: string; caption: string; source?: string; id?: string }
 export interface CarouselOptions { size?: Size; outDir?: string; prefix?: string }
@@ -18,6 +18,7 @@ export async function renderCarousel(cwd: string, slides: CarouselSlide[], optio
   const prefix = options.prefix ?? size;
   if (!/^[\w-]+$/.test(prefix)) throw new Error('Carousel prefix must be a safe filename');
   const paths = launchDir(cwd); const product = JSON.parse(await readFile(paths.product, 'utf8')); const brand = await mediaBrand(cwd);
+  const host = await mediaHost(cwd, product);
   const rgb = (hex: string) => [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16));
   const background = rgb(brand.colors.background);
   let foreground = brand.colors.foreground;
@@ -36,7 +37,7 @@ export async function renderCarousel(cwd: string, slides: CarouselSlide[], optio
       assertClean(`${product.name}\n${headline}`, `image ${filename}`);
       const values: Record<string, string> = {
         ...brand.colors, foreground, title: product.name, headline, logo: brand.logo,
-        screenshot: source ? await dataImage(source) : '', host: homepageHost(product.homepage ?? product.homepageUrl ?? product.url),
+        screenshot: source ? await dataImage(source) : '', host,
         classes: [size === 'instagram' ? 'portrait' : '', titleCard ? 'title-card' : '', brand.logo ? 'has-logo' : ''].join(' '),
         eyebrow: labels[slide.role] ?? '', pagination: slides.length > 1 ? `${index + 1} / ${slides.length}` : '',
       };

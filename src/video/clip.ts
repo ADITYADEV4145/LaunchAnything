@@ -41,19 +41,10 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
     const all = [...scenes, { role: 'cta' as const, caption: name, source: scenes[0].source, duration: 3 }];
     for (const [index, scene] of all.entries()) {
       const end = index === scenes.length; const card = end || scene.role === 'hook' || scene.role === 'cta';
-      let source = resolve(cwd, scene.source); await access(source);
+      const source = resolve(cwd, scene.source); await access(source);
       if (!/\.(png|jpe?g|webp|mp4|webm)$/i.test(source)) throw new Error('Clip sources must be local images or video');
       const probe = JSON.parse((await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', source])).stdout).streams[0];
-      let box = scene.highlight;
-      let crop: {x:number;y:number;width:number;height:number} | undefined;
-      if(format==='9x16' && !card && box && /\.(png|jpe?g|webp)$/i.test(source) && probe.width>probe.height) {
-        const croppedWidth=Math.min(probe.width,Math.max(Math.floor(probe.width*.9/2)*2,Math.ceil(box.width+32)));
-        const left=Math.max(0,Math.min(probe.width-croppedWidth,Math.round(box.x+box.width/2-croppedWidth/2)));
-        crop={x:left,y:0,width:croppedWidth,height:probe.height};
-        const focused=join(work,`${index}-source.png`);
-        await run('ffmpeg',['-y','-v','error','-i',source,'-vf',`crop=${crop.width}:${crop.height}:${crop.x}:0`,'-frames:v','1','-threads','1',focused]);
-        source=focused;probe.width=crop.width;box={...box,x:box.x-left};
-      }
+      const box = scene.highlight;
       const scale = Math.min(width * .94 / probe.width, height * .57 / probe.height);
       const fw = Math.max(2, Math.floor(probe.width * scale / 2) * 2), fh = Math.max(2, Math.floor(probe.height * scale / 2) * 2);
       const frame = { x: Math.round((width - fw) / 2), y: Math.round(height * .15 + (height * .57 - fh) / 2), width: fw, height: fh, kind: 'terminal' };
@@ -71,7 +62,7 @@ export async function renderClip(cwd: string, scenes: ClipScene[], options: Clip
         const captionPng = await page.screenshot({ omitBackground: true }); assertClean((await ocrWords(captionPng)).text, 'clip caption plate'); await writeFile(caption, captionPng);
         await page.addStyleTag({ content: '.caption{visibility:hidden}.ring{visibility:visible}' }); await page.screenshot({ path: ring, omitBackground: true });
       } finally { await page.close(); }
-      assets.push({ plate, caption, ring, source, frame, crop, bare: true, highlight });
+      assets.push({ plate, caption, ring, source, frame, bare: true, highlight });
       if (cli) continue;
       const piece = join(work, `${index}.mp4`); const video = /\.(mp4|webm)$/i.test(source);
       const footage = card ? '[0:v]null[base]' : `[1:v]fps=12,scale=${fw}:${fh}[shot];[0:v][shot]overlay=${frame.x}:${frame.y}[base]`;

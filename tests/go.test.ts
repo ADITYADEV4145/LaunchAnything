@@ -70,9 +70,11 @@ it('retries exactly once then writes paste files and failed board entries', asyn
   const { work, paths, channels } = await fixture();
   const publish = vi.fn().mockRejectedValue(new Error('offline'));
   const result = await go(work, { mock: true, confirm: true, yes: true, noWait: true, adapter: { publish } });
-  expect(publish).toHaveBeenCalledTimes(channels.length * 2);
-  expect('board' in result && result.board.every(row => row.status === 'failed' && row.paste)).toBe(true);
-  expect(await readdir(join(paths.root, 'go-paste'))).toHaveLength(channels.length);
+  const independent = channels.filter(channel => !['x', 'github-release'].includes(channel));
+  expect(publish).toHaveBeenCalledTimes(independent.length * 2);
+  expect('board' in result && result.board.filter(row => independent.includes(row.channel)).every(row => row.status === 'failed' && row.paste)).toBe(true);
+  expect('board' in result && result.board.filter(row => !independent.includes(row.channel)).every(row => row.status === 'held')).toBe(true);
+  expect(await readdir(join(paths.root, 'go-paste'))).toHaveLength(independent.length);
   await expect(readFile(paths.published)).rejects.toMatchObject({ code: 'ENOENT' });
 }, 30000);
 it.each(['consent', 'approval'])('rechecks %s before a retry and never publishes after revocation', async kind => {
@@ -146,7 +148,7 @@ it.each(['consent', 'approval', 'allowed', 'safe-retry'])('reserves a cap only a
     ]);
   }
 }, 30000);
-it('a founder taking time to submit a form does not block API routes', async () => {
+it('a founder taking time to submit does not block independent big channels', async () => {
   const { work } = await fixture();
   let finish!: () => void;
   const founder = new Promise<void>(resolve => { finish = resolve; });
@@ -156,7 +158,7 @@ it('a founder taking time to submit a form does not block API routes', async () 
     if (context.post.channel === 'show-hn') await founder;
     else {
       published.push(context.post.channel);
-      if (['x', 'devto', 'github-release'].every(channel => published.includes(channel))) finish();
+      if (context.post.channel === 'devto') finish();
     }
     return adapter.publish(context);
   } } });
@@ -252,12 +254,14 @@ it('GroundWork mock gate publishes all route types, confirms PH once, never subm
   expect(questions).toHaveLength(1);
   expect([...browsers.keys()].sort()).toEqual(['reddit', 'show-hn']);
   for (const channel of channels) {
-    expect(lines.some(line => line.includes(`| ${channel} |`) && line.includes('America/Chicago') && line.endsWith('queued'))).toBe(true);
+    expect(lines.some(line => line.includes(`| ${channel} |`) && line.includes('America/Chicago') && line.endsWith(result.timeline.find(row => row.channel === channel)!.status))).toBe(true);
     expect(lines.some(line => line.startsWith(`${channel} | live | https://`))).toBe(true);
   }
 }, 30000);
 it('unverified PH/X/Kit publishing fails closed with the reason in the board and paste file', async () => {
   const { work, paths } = await groundworkFixture(), lines: string[] = [];
+  const schedulePath = join(paths.root, 'recommendations.md');
+  await writeFile(schedulePath, (await readFile(schedulePath, 'utf8')).replace('| 09:06 | show-hn |', '| 08:00 | show-hn |'));
   const live = liveAdapter({ request: vi.fn(async () => { throw new Error('No network allowed'); }) });
   const mock = mockAdapter();
   const result = await go(work, { mock: true, confirm: true, yes: true, noWait: true, phSubmit: true,
@@ -310,7 +314,7 @@ it.each([false, true])('serializes shared browser profiles, keeps APIs concurren
     platform: channel, route: ['show-hn', 'reddit'].includes(channel) ? 'browser' : channel === 'x' ? 'mcp' : 'api',
     profile: channel === 'reddit' ? '/fixture/chrome/../chrome' : '/fixture/chrome', account: 'fixture-founder', connectedAt: ''
   }))));
-  let active = 0, maximum = 0, apiCount = 0, apiDuringBrowser = 0;
+  let active = 0, maximum = 0, apiDuringBrowser = 0;
   let started!: () => void, ready!: () => void;
   const browserStarted = new Promise<void>(resolve => { started = resolve; });
   const apisReady = new Promise<void>(resolve => { ready = resolve; });
@@ -326,15 +330,15 @@ it.each([false, true])('serializes shared browser profiles, keeps APIs concurren
           return await mock.publish(context);
         } finally { active--; }
       }
-      if (['devto', 'github-release'].includes(context.post.channel)) {
-        apiCount++; if (apiCount === 2) ready();
+      if (context.post.channel === 'devto') {
+        ready();
         await Promise.all([browserStarted, apisReady]);
         if (active) apiDuringBrowser++;
       }
       return mock.publish(context);
     } } });
   expect(maximum).toBe(1);
-  expect(apiDuringBrowser).toBe(2);
+  expect(apiDuringBrowser).toBe(1);
   if (!('board' in result) || !result.board) throw new Error('Missing board');
   expect(result.board.find(row => row.channel === 'reddit')?.status).toBe('live');
   expect(result.board.find(row => row.channel === 'show-hn')?.status).toBe(fail ? 'failed' : 'live');
